@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UMBRA &#x2014; maqueta</title>
+<style>
+  /* Tokens de Final Check (COMeT standalone.html), salvo la cabecera: anil propio de UMBRA. */
+  :root {
+    --bg-app: #F4F6F8; --bg-surface: #FFFFFF; --bg-surface-hover: #EBF0F5;
+    --bg-header: #3949AB; --header-text: #FFFFFF;
+    --text-main: #1f2937; --text-muted: #64748B; --border: #d1d5db;
+    --primary: #0277BD; --primary-hover: #01579B; --accent: #3b82f6;
+    --sheet-bg: #dfe3e8;
+    --sev-cri: #dc2626; --sev-may: #d97706; --sev-men: #2563eb; --sev-sug: #6b7280;
+    --c-org: #1d4ed8; --c-organo: #7c3aed; --c-per: #15803d; --c-pais: #0f766e;
+    --c-cargo: #b45309; --c-num: #475569; --c-fecha: #be185d; --c-simb: #334155;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif; font-size: 13px;
+         background: var(--bg-app); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  button { font: inherit; cursor: pointer; }
+
+  /* Cabecera */
+  .hd { background: var(--bg-header); color: var(--header-text); padding: 8px 14px; display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+  .hd .logo { font-weight: 800; letter-spacing: 2px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .hd .logo svg { width: 20px; height: 20px; }
+  .steps { display: flex; gap: 4px; margin-left: 10px; }
+  .step { background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.25); border-radius: 14px; padding: 3px 12px; font-weight: 600; font-size: 12px; }
+  .step.on { background: #fff; color: var(--bg-header); }
+  .step .n { display: inline-block; width: 16px; height: 16px; line-height: 16px; text-align: center; border-radius: 50%; background: rgba(0,0,0,.18); margin-right: 6px; font-size: 10px; }
+  .step.on .n { background: var(--bg-header); color: #fff; }
+  .hd .spacer { flex: 1; }
+  .meter { font-size: 11px; background: rgba(0,0,0,.18); padding: 3px 10px; border-radius: 10px; }
+  .hd .icon-btn { background: none; border: none; color: #fff; font-size: 16px; }
+
+  /* Barra superior (como .fc-topbar) */
+  .top { background: var(--bg-surface); border-bottom: 1px solid var(--border); padding: 8px 12px; display: flex; gap: 10px; align-items: stretch; flex-shrink: 0; flex-wrap: wrap; }
+  .drop { border: 1.5px dashed var(--border); border-radius: 8px; padding: 6px 10px; min-width: 210px; background: #fafbfc; }
+  .drop .lbl { font-size: 10px; font-weight: 700; color: var(--text-muted); letter-spacing: .5px; }
+  .drop .fn { font-weight: 600; margin-top: 2px; }
+  .drop .mt { font-size: 11px; color: var(--text-muted); }
+  .tools { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; flex: 1; }
+  .cat { border: 1px solid var(--border); background: #fff; border-radius: 12px; padding: 2px 9px; font-size: 11px; display: inline-flex; align-items: center; gap: 5px; }
+  .cat i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+  .cat.off { opacity: .45; text-decoration: line-through; }
+  .btn { border: 1px solid var(--border); background: #fff; border-radius: 6px; padding: 5px 12px; font-weight: 600; }
+  .btn.amber { background: #fbbf24; border-color: #f59e0b; color: #422006; }
+  .btn.violet { background: #7c3aed; border-color: #6d28d9; color: #fff; }
+  .btn.blue { background: var(--primary); border-color: var(--primary-hover); color: #fff; }
+  .btn.sm { padding: 2px 8px; font-size: 11px; }
+  .summary { display: flex; gap: 6px; align-items: center; }
+  .pill { border-radius: 10px; padding: 2px 9px; font-size: 11px; font-weight: 700; }
+  .pill.err { background: #fee2e2; color: #991b1b; } .pill.warn { background: #fef3c7; color: #92400e; } .pill.ok { background: #dcfce7; color: #166534; }
+
+  /* Zona principal (como .fc-main) */
+  .main { flex: 1; display: flex; min-height: 0; }
+  .rail { width: 52px; background: var(--bg-surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding-top: 8px; gap: 6px; flex-shrink: 0; }
+  .rail button { width: 40px; height: 40px; border-radius: 8px; border: none; background: none; font-size: 17px; position: relative; color: var(--text-muted); }
+  .rail button.on { background: var(--bg-surface-hover); color: var(--primary); }
+  .rail .badge { position: absolute; top: 2px; right: 2px; background: var(--sev-cri); color: #fff; border-radius: 8px; font-size: 9px; padding: 0 4px; font-weight: 700; }
+  .rail small { font-size: 8px; display: block; }
+  .list { width: 300px; background: var(--bg-surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; flex-shrink: 0; }
+  .list h4 { padding: 10px 12px 6px; font-size: 11px; letter-spacing: .5px; color: var(--text-muted); text-transform: uppercase; }
+  .bubbles { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 12px 8px; border-bottom: 1px solid var(--border); }
+  .bub { font-size: 10px; border: 1px solid var(--border); border-radius: 10px; padding: 1px 7px; background: #fff; }
+  .bub.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .scroll { overflow: auto; flex: 1; min-height: 0; padding: 8px; }
+
+  /* Tarjetas de entidad */
+  .ent { border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; margin-bottom: 6px; background: #fff; }
+  .ent .row { display: flex; align-items: center; gap: 6px; }
+  .ent .tag { font-family: Consolas, monospace; font-size: 11px; font-weight: 700; }
+  .ent .st { margin-left: auto; font-size: 10px; font-weight: 700; border-radius: 8px; padding: 0 6px; }
+  .st.ok { background: #dcfce7; color: #166534; } .st.bad { background: #fee2e2; color: #991b1b; } .st.mid { background: #fef3c7; color: #92400e; }
+  .ent .forms { font-size: 11px; color: var(--text-muted); margin-top: 3px; line-height: 1.4; }
+
+  /* Tarjetas de hallazgo (como .fc-issue-card) */
+  .iss { border: 1px solid var(--border); border-left: 4px solid var(--sev-sug); border-radius: 8px; padding: 8px 9px; margin-bottom: 7px; background: #fff; }
+  .iss.cri { border-left-color: var(--sev-cri); } .iss.may { border-left-color: var(--sev-may); } .iss.men { border-left-color: var(--sev-men); }
+  .iss.sel { box-shadow: 0 0 0 2px var(--accent); }
+  .iss .h { display: flex; gap: 5px; align-items: center; font-size: 10px; font-weight: 700; }
+  .iss .mod { background: var(--bg-surface-hover); border-radius: 6px; padding: 0 6px; color: var(--text-main); }
+  .iss .sev { border-radius: 6px; padding: 0 6px; color: #fff; }
+  .sev.cri { background: var(--sev-cri); } .sev.may { background: var(--sev-may); } .sev.men { background: var(--sev-men); } .sev.sug { background: var(--sev-sug); }
+  .iss .seg { margin-left: auto; color: var(--text-muted); font-weight: 600; }
+  .iss .t { margin: 5px 0 3px; font-size: 12px; line-height: 1.4; }
+  .iss del { background: #fee2e2; color: #991b1b; } .iss ins { background: #dcfce7; color: #166534; text-decoration: underline; }
+  .iss .why { font-size: 11px; color: var(--text-muted); }
+  .iss .acts { display: flex; gap: 4px; margin-top: 6px; }
+  .iss .src { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+
+  /* Paneles y hojas (como .fc-panes / .fc-sheet) */
+  .work { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .modstrip { display: flex; gap: 8px; padding: 8px 10px; overflow-x: auto; border-bottom: 1px solid var(--border); background: var(--bg-surface); flex-shrink: 0; }
+  .mcard { min-width: 168px; border: 1px solid var(--border); border-radius: 10px; padding: 7px 9px; background: #fff; font-size: 11px; }
+  .mcard.done { border-color: #86efac; } .mcard.run { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .mcard .nm { font-weight: 700; font-size: 12px; display: flex; gap: 5px; align-items: center; }
+  .mcard .in { font-size: 13px; color: var(--text-muted); }
+  .mcard .model { display: inline-block; margin-top: 4px; background: var(--bg-surface-hover); border-radius: 6px; padding: 1px 6px; font-size: 10px; }
+  .mcard .est { color: var(--text-muted); margin-top: 3px; }
+  .mcard .ft { display: flex; align-items: center; justify-content: space-between; margin-top: 5px; }
+  .bar { height: 4px; background: #e5e7eb; border-radius: 2px; margin-top: 5px; overflow: hidden; } .bar i { display: block; height: 100%; background: var(--accent); }
+  .panes { flex: 1; display: flex; min-height: 0; }
+  .pane { flex: 1; display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--border); }
+  .pane-head { background: var(--bg-surface); padding: 6px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; color: var(--text-muted); }
+  .pane-head input { margin-left: auto; border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; font-size: 11px; width: 140px; }
+  .pane-body { flex: 1; overflow: auto; background: var(--sheet-bg); padding: 16px; }
+  .sheet { background: #fff; max-width: 830px; margin: 0 auto; padding: 36px 44px; box-shadow: 0 1px 3px rgba(0,0,0,.15);
+           font-family: 'Times New Roman', Georgia, serif; font-size: 13.3px; line-height: 1.55; }
+  .sheet p { margin-bottom: 9px; } .sheet .ttl { font-weight: 700; text-align: center; margin-bottom: 14px; }
+  .sheet .li { padding-left: 28px; }
+  .sheet .hit { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+  mark.f { background: #fef3c7; border-bottom: 2px solid var(--sev-may); padding: 0 1px; }
+  mark.c { background: #fee2e2; border-bottom: 2px solid var(--sev-cri); padding: 0 1px; }
+  mark.m { background: #dbeafe; border-bottom: 2px solid var(--sev-men); padding: 0 1px; }
+  .gap { display: inline-block; border: 1.5px dashed var(--sev-may); color: var(--sev-may); border-radius: 4px; padding: 0 4px; font-family: -apple-system, 'Segoe UI', sans-serif; font-size: 10px; font-weight: 700; }
+
+  /* Pastillas de entidad enmascarada */
+  .tk { font-family: -apple-system, 'Segoe UI', sans-serif; font-size: 10.5px; font-weight: 700; color: #fff; border-radius: 4px; padding: 0 5px; white-space: nowrap; }
+  .tk.org { background: var(--c-org); } .tk.organo { background: var(--c-organo); } .tk.cargo { background: var(--c-cargo); }
+  .tk.num { background: var(--c-num); } .tk.fecha { background: var(--c-fecha); } .tk.simb { background: var(--c-simb); }
+  .tk.bad { box-shadow: 0 0 0 2px var(--sev-cri); }
+  .tk sup { font-size: 9.5px; vertical-align: baseline; font-weight: 600; margin-left: 2px; padding: 0 3px; border-radius: 3px; background: rgba(255,255,255,.28); }
+  .orig { border-bottom: 2px dotted; }
+  body.show-orig .tk { display: none; } body:not(.show-orig) .orig { display: none; }
+
+  /* Ajustes de modulos */
+  .settings { flex: 1; overflow: auto; padding: 18px 22px; }
+  .card { background: #fff; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 16px; }
+  .card h3 { font-size: 13px; padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .card .body { padding: 12px 14px; }
+  .card p.info { color: var(--text-muted); font-size: 12px; margin-bottom: 10px; line-height: 1.45; }
+  table.grid { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.grid th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .4px; color: var(--text-muted); padding: 6px; border-bottom: 1px solid var(--border); }
+  table.grid td { padding: 6px; border-bottom: 1px solid #eef0f3; vertical-align: middle; }
+  select, .inp { border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px; font-size: 12px; background: #fff; }
+  .prov { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pcard { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-width: 200px; font-size: 12px; }
+  .pcard .trust { font-size: 10px; font-weight: 700; border-radius: 6px; padding: 0 6px; }
+  .trust.ext { background: #fef3c7; color: #92400e; } .trust.loc { background: #dcfce7; color: #166534; }
+  .rule { display: grid; grid-template-columns: 80px 1fr 1fr 1fr 70px; gap: 6px; align-items: center; font-size: 12px; padding: 5px 0; border-bottom: 1px solid #eef0f3; }
+  .kind { font-family: Consolas, monospace; font-size: 10px; font-weight: 700; background: var(--bg-surface-hover); border-radius: 4px; padding: 1px 5px; text-align: center; }
+  .note { background: #eef2ff; border: 1px solid #c7d2fe; color: #3730a3; border-radius: 8px; padding: 8px 10px; font-size: 12px; margin-bottom: 14px; }
+  .view { display: none; flex: 1; min-height: 0; min-width: 0; } .view.on { display: flex; }
+  .plan { position: fixed; right: 18px; bottom: 18px; width: 330px; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 12px 14px; font-size: 12px; display: none; }
+  .plan.on { display: block; } .plan h5 { font-size: 13px; margin-bottom: 6px; } .plan li { margin-left: 16px; margin-bottom: 3px; }
+</style>
+</head>
+<body>
+
+<!-- CABECERA -->
+<div class="hd">
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="#fff" fill-opacity=".85"/></svg>
+    UMBRA
+  </div>
+  <div class="steps">
+    <button class="step on" data-view="mask"><span class="n">1</span>Enmascarar</button>
+    <button class="step" data-view="review"><span class="n">2</span>Revisar</button>
+    <button class="step" data-view="settings"><span class="n">3</span>Exportar y ajustes</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="meter" title="Lo gastado en esta sesi&#xF3;n">Sesi&#xF3;n: 14.380 tokens &#xB7; 0,012 US$</div>
+  <button class="icon-btn" title="Gu&#xED;a">?</button>
+  <button class="icon-btn" title="Ajustes">&#x2699;</button>
+</div>
+
+<!-- BARRA SUPERIOR -->
+<div class="top">
+  <div class="drop"><div class="lbl">1 &#xB7; ORIGINAL (EN)</div><div class="fn">A_RES_79_xx_E.docx</div><div class="mt">6 p&#xE1;rrafos &#xB7; 142 palabras</div></div>
+  <div class="drop"><div class="lbl">2 &#xB7; TRADUCCI&#xD3;N (ES)</div><div class="fn">A_RES_79_xx_S.docx</div><div class="mt">6 p&#xE1;rrafos &#xB7; 161 palabras</div></div>
+  <div class="tools" id="tools-mask">
+    <span class="cat"><i style="background:var(--c-num)"></i>Cifras</span>
+    <span class="cat"><i style="background:var(--c-fecha)"></i>Fechas</span>
+    <span class="cat"><i style="background:var(--c-org)"></i>Organismos</span>
+    <span class="cat"><i style="background:var(--c-organo)"></i>&#xD3;rganos</span>
+    <span class="cat"><i style="background:var(--c-pais)"></i>Pa&#xED;ses</span>
+    <span class="cat"><i style="background:var(--c-per)"></i>Personas</span>
+    <span class="cat"><i style="background:var(--c-cargo)"></i>Cargos</span>
+    <span class="cat"><i style="background:var(--c-simb)"></i>S&#xED;mbolos</span>
+    <span class="cat off"><i style="background:#999"></i>URL</span>
+    <div class="spacer" style="flex:1"></div>
+    <div class="summary"><span class="pill ok">9 entidades</span><span class="pill err">1 cifra distinta</span></div>
+    <button class="btn" id="toggle-orig">&#x1F441; Ver original</button>
+    <button class="btn violet">Exportar enmascarado &#x25BE;</button>
+  </div>
+  <div class="tools" id="tools-review" style="display:none">
+    <div class="summary"><span class="pill err">1 cr&#xED;tico</span><span class="pill warn">2 mayores</span><span class="pill ok">1 menor</span></div>
+    <div class="spacer" style="flex:1"></div>
+    <span style="font-size:11px;color:var(--text-muted)">Perfil de reglas:</span>
+    <select><option>Resoluciones AG</option><option>Informes del SG</option></select>
+    <button class="btn amber" id="run-sel">&#x25B6; Ejecutar seleccionados</button>
+    <button class="btn violet">Exportar &#x25BE;</button>
+  </div>
+</div>
+
+<div class="main">
+  <!-- CARRIL -->
+  <div class="rail">
+    <button class="on" title="Entidades">&#x29C9;<small>Entid.</small></button>
+    <button title="Hallazgos">&#x2691;<span class="badge">4</span><small>Hallaz.</small></button>
+    <button title="M&#xF3;dulos">&#x25A6;<small>M&#xF3;dul.</small></button>
+    <button title="Reglas">&#x2261;<small>Reglas</small></button>
+    <button title="Coste">$<small>Coste</small></button>
+  </div>
+
+  <!-- VISTA 1: ENMASCARAR -->
+  <div class="view on" id="v-mask">
+    <div class="list">
+      <h4>Entidades del documento</h4>
+      <div class="bubbles"><span class="bub on">Todas 9</span><span class="bub">Con problema 2</span><span class="bub">Cifras 3</span><span class="bub">&#xD3;rganos 1</span><span class="bub">Cargos 1</span></div>
+      <div class="scroll">
+        <div class="ent"><div class="row"><span class="tk num">NUM_7</span><span class="st bad">Sin pareja</span></div><div class="forms">O: 1,250 (&#xD7;1) &#xB7; T: &#x2014; (&#xD7;0)</div></div>
+        <div class="ent"><div class="row"><span class="tk num">NUM_8</span><span class="st bad">Sin pareja</span></div><div class="forms">O: &#x2014; (&#xD7;0) &#xB7; T: 1.520 (&#xD7;1)</div></div>
+        <div class="ent"><div class="row"><span class="tk cargo">CARGO_4</span><span class="st ok">OK</span></div><div class="forms">O: Secretary-General (&#xD7;2) &#xB7; T: Secretario General (&#xD7;2) &#xB7; <b>m</b></div></div>
+        <div class="ent"><div class="row"><span class="tk organo">ORGANO_6</span><span class="st ok">OK</span></div><div class="forms">O: General Assembly (&#xD7;1) &#xB7; T: Asamblea General (&#xD7;1) &#xB7; <b>f</b></div></div>
+        <div class="ent"><div class="row"><span class="tk org">ORG_1</span><span class="st ok">OK</span></div><div class="forms">O: United Nations (&#xD7;1) &#xB7; T: Naciones Unidas (&#xD7;1) &#xB7; <b>fp</b></div></div>
+        <div class="ent"><div class="row"><span class="tk org">ORG_9</span><span class="st ok">OK</span></div><div class="forms">O: United Nations Development Programme &#xB7; T: Programa de las Naciones Unidas para el Desarrollo &#xB7; <b>m</b></div></div>
+        <div class="ent"><div class="row"><span class="tk simb">SIMB_2</span><span class="st ok">OK</span></div><div class="forms">O/T: 46/182</div></div>
+        <div class="ent"><div class="row"><span class="tk simb">SIMB_5</span><span class="st ok">OK</span></div><div class="forms">O/T: A/79/78</div></div>
+        <div class="ent"><div class="row"><span class="tk fecha">FECHA_3</span><span class="st ok">OK</span></div><div class="forms">O: 19 December 1991 &#xB7; T: 19 de diciembre de 1991</div></div>
+        <p style="font-size:11px;color:var(--text-muted);margin-top:8px">Seleccione texto y pulse <b>Alt+E</b> para enmascararlo. Arrastre una entidad sobre otra para fusionarlas.</p>
+      </div>
+    </div>
+    <div class="work">
+      <div class="panes">
+        <div class="pane"><div class="pane-head">ORIGINAL &#xB7; EN<input placeholder="Buscar&#x2026;"></div><div class="pane-body"><div class="sheet">
+          <p class="ttl">Strengthening of the coordination of emergency humanitarian assistance of the <span class="tk org">ORG_1</span><span class="orig">United Nations</span></p>
+          <p><i>Recalling</i> its resolution <span class="tk simb">SIMB_2</span><span class="orig">46/182</span> of <span class="tk fecha">FECHA_3</span><span class="orig">19 December 1991</span>,</p>
+          <p><i>Taking note</i> of the report of the <span class="tk cargo">CARGO_4</span><span class="orig">Secretary-General</span> (<span class="tk simb">SIMB_5</span><span class="orig">A/79/78</span>),</p>
+          <p>1. <i>Requests</i> the <span class="tk cargo">CARGO_4</span><span class="orig">Secretary-General</span> to submit to the <span class="tk organo">ORGANO_6</span><span class="orig">General Assembly</span> at its eightieth session a report on the implementation of the present resolution and its annex;</p>
+          <p>2. <i>Notes</i> that <span class="tk num bad">NUM_7</span><span class="orig">1,250</span> staff members of the <span class="tk org">ORG_9</span><span class="orig">United Nations Development Programme</span> were deployed in <span class="tk num">NUM_10</span><span class="orig">2024</span>;</p>
+          <p>3. <i>Encourages</i> Member States:</p>
+          <p class="li">(a) To strengthen national preparedness capacities;</p>
+          <p class="li">(b) To promote regional cooperation;</p>
+          <p class="li">(c) To develop early warning systems;</p>
+        </div></div></div>
+        <div class="pane"><div class="pane-head">TRADUCCI&#xD3;N &#xB7; ES<input placeholder="Buscar&#x2026;"></div><div class="pane-body"><div class="sheet">
+          <p class="ttl">Fortalecimiento de la coordinaci&#xF3;n de la asistencia humanitaria de emergencia de las <span class="tk org">ORG_1<sup>:fp</sup></span><span class="orig">Naciones Unidas</span></p>
+          <p><i>Recordando</i> su resoluci&#xF3;n <span class="tk simb">SIMB_2</span><span class="orig">46/182</span>, de <span class="tk fecha">FECHA_3</span><span class="orig">19 de diciembre de 1991</span>,</p>
+          <p><i>Tomando nota</i> del informe del <span class="tk cargo">CARGO_4<sup>:m</sup></span><span class="orig">Secretario General</span> (<span class="tk simb">SIMB_5</span><span class="orig">A/79/78</span>),</p>
+          <p>1. <i>Solicita</i> al <span class="tk cargo">CARGO_4<sup>:m</sup></span><span class="orig">Secretario General</span> que presente a la <span class="tk organo">ORGANO_6<sup>:f</sup></span><span class="orig">Asamblea General</span> en su octog&#xE9;simo per&#xED;odo de sesiones un informe sobre la aplicaci&#xF3;n de la presente resoluci&#xF3;n;</p>
+          <p>2. <i>Observa</i> que en <span class="tk num">NUM_10</span><span class="orig">2024</span> se despleg&#xF3; <span class="tk num bad">NUM_8</span><span class="orig">1.520</span> funcionarios del <span class="tk org">ORG_9<sup>:m</sup></span><span class="orig">Programa de las Naciones Unidas para el Desarrollo</span>;</p>
+          <p>3. <i>Alienta</i> a los Estados Miembros a:</p>
+          <p class="li">a) Fortalecer la capacidad nacional de preparaci&#xF3;n;</p>
+          <p class="li">b) Promover la cooperaci&#xF3;n regional;</p>
+          <p class="li">c) Desarrollo de sistemas de alerta temprana;</p>
+        </div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISTA 2: REVISAR -->
+  <div class="view" id="v-review">
+    <div class="list">
+      <h4>Hallazgos</h4>
+      <div class="bubbles"><span class="bub on">Todos 4</span><span class="bub">Coherencia 2</span><span class="bub">Integridad 1</span><span class="bub">Gram&#xE1;tica 1</span><span class="bub">Fidelidad 0</span></div>
+      <div class="scroll">
+        <div class="iss cri sel"><div class="h"><span class="sev cri">CRI</span><span class="mod">Coherencia &#xB7; local</span><span class="seg">&#xA7;5</span></div>
+          <div class="t">Cifra distinta: original <b>1,250</b> &#x2192; traducci&#xF3;n <del>1.520</del> <ins>1.250</ins></div>
+          <div class="why">NUM_7 no tiene pareja en la traducci&#xF3;n; NUM_8 no existe en el original.</div>
+          <div class="acts"><button class="btn sm blue">Aceptar</button><button class="btn sm">Editar</button><button class="btn sm">Rechazar</button></div>
+          <div class="src">Sin IA &#xB7; 0 tokens</div></div>
+        <div class="iss may"><div class="h"><span class="sev may">MAY</span><span class="mod">Integridad</span><span class="seg">&#xA7;4</span></div>
+          <div class="t">&#x2026;de la presente resoluci&#xF3;n<ins> y su anexo</ins>;</div>
+          <div class="why">Omisi&#xF3;n: falta &#xAB;and its annex&#xBB; del original.</div>
+          <div class="acts"><button class="btn sm blue">Aceptar</button><button class="btn sm">Editar</button><button class="btn sm">Rechazar</button></div>
+          <div class="src">Cribado: DeepSeek V3 &#xB7; Verificado: Gemini Pro &#x2713;</div></div>
+        <div class="iss may"><div class="h"><span class="sev may">MAY</span><span class="mod">Coherencia &#xB7; paralelismo</span><span class="seg">&#xA7;6 c)</span></div>
+          <div class="t">INF &#xB7; INF &#xB7; <b>SUST</b>: <del>Desarrollo de</del> <ins>Desarrollar</ins> sistemas de alerta temprana</div>
+          <div class="why">Los elementos hermanos empiezan por infinitivo (tambi&#xE9;n en el original: &#xAB;To &#x2026;&#xBB;).</div>
+          <div class="acts"><button class="btn sm blue">Aceptar</button><button class="btn sm">Ver grupo</button><button class="btn sm">Rechazar</button></div>
+          <div class="src">Sin IA &#xB7; 0 tokens</div></div>
+        <div class="iss men"><div class="h"><span class="sev men">MEN</span><span class="mod">Ortograf&#xED;a y gram&#xE1;tica</span><span class="seg">&#xA7;5</span></div>
+          <div class="t">se <del>despleg&#xF3;</del> <ins>desplegaron</ins> NUM_8 funcionarios</div>
+          <div class="why">Concordancia: el verbo concuerda con &#xAB;funcionarios&#xBB; (plural).</div>
+          <div class="acts"><button class="btn sm blue">Aceptar</button><button class="btn sm">Editar</button><button class="btn sm">Rechazar</button></div>
+          <div class="src">Gemini Flash &#xB7; cribado</div></div>
+      </div>
+    </div>
+    <div class="work">
+      <div class="modstrip">
+        <div class="mcard done"><div class="nm"><input type="checkbox" checked> Capa 0 &#xB7; local</div><span class="in">&#x2699; sin IA</span><div class="est">0 tokens &#xB7; gratis</div><div class="ft"><span>&#x2713; 2 hallazgos</span></div></div>
+        <div class="mcard done"><div class="nm"><input type="checkbox" checked> Ortograf&#xED;a y gram&#xE1;tica</div><span class="in">&#xB6; solo espa&#xF1;ol</span><br><span class="model">Gemini Flash &#x25BE;</span><div class="est">~2.100 tokens &#xB7; 0,001 US$</div><div class="ft"><span>&#x2713; 1</span><button class="btn sm">Ejecutar</button></div></div>
+        <div class="mcard run"><div class="nm"><input type="checkbox" checked> Fidelidad</div><span class="in">&#x21C4; biling&#xFC;e &#xB7; fusionado con Integridad</span><br><span class="model">DeepSeek V3 &#x2192; Gemini Pro &#x25BE;</span><div class="est">~6.400 tokens &#xB7; 0,006 US$</div><div class="bar"><i style="width:60%"></i></div><div class="ft"><span>Lote 3/5</span><button class="btn sm">Detener</button></div></div>
+        <div class="mcard done"><div class="nm"><input type="checkbox" checked> Integridad</div><span class="in">&#x21C4; biling&#xFC;e</span><br><span class="model">DeepSeek V3 &#x2192; Gemini Pro &#x25BE;</span><div class="est">incluido arriba</div><div class="ft"><span>&#x2713; 1</span><button class="btn sm">Ejecutar</button></div></div>
+        <div class="mcard"><div class="nm"><input type="checkbox"> Estilo</div><span class="in">&#xB6; solo espa&#xF1;ol</span><br><span class="model">General &#x25BE;</span><div class="est">~2.300 tokens &#xB7; 0,002 US$</div><div class="ft"><span>7 reglas</span><button class="btn sm">Ejecutar</button></div></div>
+        <div class="mcard done"><div class="nm"><input type="checkbox" checked> Coherencia</div><span class="in">&#x2317; esqueleto</span><br><span class="model">Gemini Flash &#x25BE;</span><div class="est">~300 tokens</div><div class="ft"><span>&#x2713; 1</span><button class="btn sm">Ejecutar</button></div></div>
+        <div class="mcard"><div class="nm"><input type="checkbox" checked> Verificador</div><span class="in">&#x2713; solo hallazgos</span><br><span class="model">Gemini Pro &#x25BE;</span><div class="est">~900 tokens</div><div class="ft"><span>auto</span></div></div>
+      </div>
+      <div class="panes">
+        <div class="pane"><div class="pane-head">ORIGINAL &#xB7; EN</div><div class="pane-body"><div class="sheet">
+          <p>1. <i>Requests</i> the <span class="tk cargo">CARGO_4</span><span class="orig">Secretary-General</span> to submit to the <span class="tk organo">ORGANO_6</span><span class="orig">General Assembly</span> at its eightieth session a report on the implementation of the present resolution <mark class="f">and its annex</mark>;</p>
+          <p class="hit">2. <i>Notes</i> that <mark class="c">1,250</mark> staff members of the <span class="tk org">ORG_9</span><span class="orig">United Nations Development Programme</span> were deployed in <span class="tk num">NUM_10</span><span class="orig">2024</span>;</p>
+          <p>3. <i>Encourages</i> Member States:</p>
+          <p class="li">(a) To strengthen national preparedness capacities;</p>
+          <p class="li">(b) To promote regional cooperation;</p>
+          <p class="li">(c) <mark class="f">To develop</mark> early warning systems;</p>
+        </div></div></div>
+        <div class="pane"><div class="pane-head">TRADUCCI&#xD3;N &#xB7; ES</div><div class="pane-body"><div class="sheet">
+          <p>1. <i>Solicita</i> al <span class="tk cargo">CARGO_4<sup>:m</sup></span><span class="orig">Secretario General</span> que presente a la <span class="tk organo">ORGANO_6<sup>:f</sup></span><span class="orig">Asamblea General</span> en su octog&#xE9;simo per&#xED;odo de sesiones un informe sobre la aplicaci&#xF3;n de la presente resoluci&#xF3;n<span class="gap">+ y su anexo</span>;</p>
+          <p class="hit">2. <i>Observa</i> que en <span class="tk num">NUM_10</span><span class="orig">2024</span> se <mark class="m">despleg&#xF3;</mark> <mark class="c">1.520</mark> funcionarios del <span class="tk org">ORG_9<sup>:m</sup></span><span class="orig">Programa de las Naciones Unidas para el Desarrollo</span>;</p>
+          <p>3. <i>Alienta</i> a los Estados Miembros a:</p>
+          <p class="li">a) Fortalecer la capacidad nacional de preparaci&#xF3;n;</p>
+          <p class="li">b) Promover la cooperaci&#xF3;n regional;</p>
+          <p class="li">c) <mark class="f">Desarrollo de</mark> sistemas de alerta temprana;</p>
+        </div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISTA 3: EXPORTAR Y AJUSTES -->
+  <div class="view" id="v-settings">
+    <div class="settings">
+      <div class="note">Maqueta: los valores son de ejemplo. Ninguno de estos ajustes se comparte con COMeT; UMBRA guarda los suyos aparte.</div>
+
+      <div class="card"><h3>Exportar</h3><div class="body">
+        <div class="prov">
+          <button class="btn">DOCX enmascarado (original y traducci&#xF3;n)</button>
+          <button class="btn">Tabla biling&#xFC;e enmascarada (XLSX)</button>
+          <button class="btn">Copiar para IA externa</button>
+          <button class="btn">Importar respuesta de IA externa</button>
+          <button class="btn violet">DOCX con control de cambios y comentarios</button>
+          <button class="btn">Informe HTML</button>
+          <button class="btn">Proyecto .umbra</button>
+        </div>
+      </div></div>
+
+      <div class="card"><h3>Proveedores</h3><div class="body">
+        <p class="info">A&#xF1;ada todos los que quiera. Solo un proveedor marcado como <b>Local</b> puede recibir texto sin enmascarar, y solo si lo activa en el proyecto.</p>
+        <div class="prov">
+          <div class="pcard"><b>Google Gemini</b> <span class="trust ext">Externo</span><br>Gemini Flash, Gemini Pro<br><span style="color:var(--text-muted)">Cach&#xE9;: autom&#xE1;tica</span></div>
+          <div class="pcard"><b>OpenRouter (personal)</b> <span class="trust ext">Externo</span><br>DeepSeek V3, Mistral Large<br><span style="color:var(--text-muted)">Compatible con OpenAI</span></div>
+          <div class="pcard"><b>Ollama (este equipo)</b> <span class="trust loc">Local</span><br>qwen-14b<br><span style="color:var(--text-muted)">http://localhost:11434/v1</span></div>
+          <div class="pcard" style="border-style:dashed;display:flex;align-items:center;justify-content:center;color:var(--primary);font-weight:600">+ A&#xF1;adir proveedor</div>
+        </div>
+      </div></div>
+
+      <div class="card"><h3>Modelo por m&#xF3;dulo</h3><div class="body">
+        <p class="info">Cada m&#xF3;dulo puede usar un modelo econ&#xF3;mico para <b>cribar</b> todos los segmentos y uno potente para revisar <b>a fondo</b> solo los se&#xF1;alados. Con <b>General</b> usa el proveedor general.</p>
+        <table class="grid">
+          <tr><th>M&#xF3;dulo</th><th>Entrada</th><th>Cribado</th><th>A fondo</th><th>Razonamiento</th><th>Lote</th><th>Fusi&#xF3;n</th><th>Tope</th><th>Reglas</th></tr>
+          <tr><td><b>Ortograf&#xED;a y gram&#xE1;tica</b></td><td>&#xB6;</td><td><select><option>Gemini Flash</option></select></td><td><select><option>&#x2014;</option></select></td><td><select><option>M&#xED;nimo</option></select></td><td><select><option>Auto</option></select></td><td><input type="checkbox" checked></td><td><input class="inp" value="0,20" size="4"> US$</td><td>3</td></tr>
+          <tr><td><b>Fidelidad</b></td><td>&#x21C4;</td><td><select><option>DeepSeek V3</option></select></td><td><select><option>Gemini Pro</option></select></td><td><select><option>Bajo</option></select></td><td><select><option>Auto</option></select></td><td><input type="checkbox" checked></td><td><input class="inp" value="0,50" size="4"> US$</td><td>12</td></tr>
+          <tr><td><b>Integridad</b></td><td>&#x21C4;</td><td><select><option>DeepSeek V3</option></select></td><td><select><option>Gemini Pro</option></select></td><td><select><option>Bajo</option></select></td><td><select><option>Auto</option></select></td><td><input type="checkbox" checked></td><td><input class="inp" value="0,50" size="4"> US$</td><td>1</td></tr>
+          <tr><td><b>Estilo</b></td><td>&#xB6;</td><td><select><option>General</option></select></td><td><select><option>&#x2014;</option></select></td><td><select><option>M&#xED;nimo</option></select></td><td><select><option>Auto</option></select></td><td><input type="checkbox" checked></td><td><input class="inp" value="0,20" size="4"> US$</td><td>7</td></tr>
+          <tr><td><b>Coherencia</b></td><td>&#x2317;</td><td><select><option>Gemini Flash</option></select></td><td><select><option>&#x2014;</option></select></td><td><select><option>Bajo</option></select></td><td><select><option>Secci&#xF3;n</option></select></td><td>&#x2014;</td><td><input class="inp" value="0,10" size="4"> US$</td><td>4</td></tr>
+          <tr><td><b>Verificador</b></td><td>&#x2713;</td><td><select><option>&#x2014;</option></select></td><td><select><option>Gemini Pro</option></select></td><td><select><option>Alto</option></select></td><td><select><option>30 hallazgos</option></select></td><td>&#x2014;</td><td><input class="inp" value="0,20" size="4"> US$</td><td>&#x2014;</td></tr>
+        </table>
+      </div></div>
+
+      <div class="card"><h3>Reglas &#xB7; perfil &#xAB;Resoluciones AG&#xBB; <span style="margin-left:auto;font-size:11px;color:var(--text-muted);font-weight:400">Las reglas de estilo a&#xF1;aden ~420 tokens a cada lote</span></h3><div class="body">
+        <div class="rule" style="font-weight:700;color:var(--text-muted);font-size:10px;text-transform:uppercase"><span>Tipo</span><span>Si el original dice / patr&#xF3;n</span><span>Escribir</span><span>No escribir</span><span>M&#xF3;dulos</span></div>
+        <div class="rule"><span class="kind">expr</span><span>stakeholder*</span><span>partes interesadas</span><span>actores</span><span>Fid &#xB7; Est</span></div>
+        <div class="rule"><span class="kind">forbid</span><span>&#x2014;</span><span>en relaci&#xF3;n con</span><span>en relaci&#xF3;n a</span><span>Gram</span></div>
+        <div class="rule"><span class="kind">structure</span><span>Elementos de lista con letra</span><span>Mismo arranque que sus hermanos</span><span>&#x2014;</span><span>Coh</span></div>
+        <div class="rule"><span class="kind">style</span><span>&#x2014;</span><span>Preferir la voz activa</span><span>Pasiva perifr&#xE1;stica innecesaria</span><span>Est</span></div>
+        <div class="rule"><span class="kind">ignore</span><span>&#xAB;per&#xED;odo de sesiones&#xBB;</span><span>No se&#xF1;alar la tilde</span><span>&#x2014;</span><span>Gram</span></div>
+        <div style="margin-top:10px;display:flex;gap:6px"><button class="btn blue">+ Nueva regla</button><button class="btn">Probar en el documento</button><button class="btn">Importar (JSON / Xbench)</button><button class="btn">Exportar</button></div>
+      </div></div>
+    </div>
+  </div>
+</div>
+
+<!-- PLAN ANTES DE GASTAR -->
+<div class="plan" id="plan">
+  <h5>Plan de ejecuci&#xF3;n</h5>
+  <ul>
+    <li>Capa 0 (local): gratis</li>
+    <li>Fidelidad + Integridad fusionados: 5 lotes con DeepSeek V3 y a fondo 2 segmentos con Gemini Pro</li>
+    <li>Ortograf&#xED;a y gram&#xE1;tica: 2 lotes con Gemini Flash</li>
+    <li>Coherencia: 1 llamada (esqueleto)</li>
+    <li>Verificador: 1 llamada</li>
+  </ul>
+  <p style="margin:8px 0"><b>11 llamadas &#xB7; ~9.700 tokens &#xB7; ~0,008 US$</b><br><span style="color:var(--text-muted)">Prefijo en cach&#xE9; en 8 llamadas. 3 segmentos repetidos se revisan una sola vez.</span></p>
+  <div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn" id="plan-no">Cancelar</button><button class="btn amber">Ejecutar</button></div>
+</div>
+
+<script>
+  // Solo para la maqueta: cambiar de paso y mostrar u ocultar el original.
+  var views = { mask: 'v-mask', review: 'v-review', settings: 'v-settings' };
+  document.querySelectorAll('.step').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('.step').forEach(function (x) { x.classList.toggle('on', x === b); });
+      Object.keys(views).forEach(function (k) { document.getElementById(views[k]).classList.toggle('on', k === b.dataset.view); });
+      document.getElementById('tools-mask').style.display = b.dataset.view === 'mask' ? '' : 'none';
+      document.getElementById('tools-review').style.display = b.dataset.view === 'review' ? '' : 'none';
+      document.getElementById('plan').classList.remove('on');
+      var rail = document.querySelectorAll('.rail button');
+      rail.forEach(function (r, i) { r.classList.toggle('on', (b.dataset.view === 'mask' && i === 0) || (b.dataset.view === 'review' && i === 1) || (b.dataset.view === 'settings' && i === 2)); });
+    });
+  });
+  document.getElementById('toggle-orig').addEventListener('click', function () {
+    var on = document.body.classList.toggle('show-orig');
+    this.textContent = on ? '\uD83D\uDC41 Ver etiquetas' : '\uD83D\uDC41 Ver original';
+  });
+  document.getElementById('run-sel').addEventListener('click', function () { document.getElementById('plan').classList.add('on'); });
+  document.getElementById('plan-no').addEventListener('click', function () { document.getElementById('plan').classList.remove('on'); });
+</script>
+</body>
+</html>
