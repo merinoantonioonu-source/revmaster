@@ -320,6 +320,10 @@ export async function openProviderModal(profile) {
   });
 
   const fBase = el('div.field', el('label.lbl', 'URL base'), baseInp);
+  const batchChk = el('input', { type: 'checkbox', checked: p.batch === true ? true : null });
+  const fBatch = el('div.field', el('label', batchChk, ' Admite la API de lotes de OpenAI (Batch API: /files y /batches)'),
+    el('p.info', 'Permite el modo diferido (lotes as\u00edncronos, unos 50 % m\u00e1s baratos) con este proveedor. OpenAI la admite; ' +
+      'otros compatibles, solo si su documentaci\u00f3n lo dice. Gemini, Anthropic y Mistral ya la tienen sin marcar nada.'));
   const fPreset = el('div.field', el('label.lbl', 'Plantilla'), presetSel);
   const fAzure = el('div', el('div.field', el('label.lbl', 'Endpoint de Azure'), endpointInp),
     el('div.form-grid', el('div.field', el('label.lbl', 'Deployment'), deployInp), el('div.field', el('label.lbl', 'Versi\u00f3n de la API'), apiVerInp)));
@@ -330,6 +334,7 @@ export async function openProviderModal(profile) {
   function applyAdapter() {
     const a = adapterSel.value;
     fBase.classList.toggle('hidden', a !== 'openai-compatible');
+    fBatch.classList.toggle('hidden', a !== 'openai-compatible');
     fPreset.classList.toggle('hidden', !(isNew && a === 'openai-compatible'));
     fAzure.classList.toggle('hidden', a !== 'azure-openai');
     renderModels();
@@ -355,6 +360,7 @@ export async function openProviderModal(profile) {
       deployment: a === 'azure-openai' ? deployInp.value.trim() : '',
       apiVersion: a === 'azure-openai' ? (apiVerInp.value.trim() || '2024-06-01') : '',
       relayUrl: relayInp.value.trim(),
+      batch: a === 'openai-compatible' ? !!batchChk.checked : undefined,
       trust: trustLoc.checked ? 'local' : 'external',
       models: models.map(m => Object.assign({}, m))
     });
@@ -375,7 +381,7 @@ export async function openProviderModal(profile) {
     el('div.form-grid',
       el('div.field', el('label.lbl', 'Nombre'), nameInp),
       el('div.field', el('label.lbl', 'Tipo'), adapterSel)),
-    fPreset, fBase, fAzure,
+    fPreset, fBase, fBatch, fAzure,
     el('div.field', el('label.lbl', 'Clave de API'), el('div.row', el('div.grow', keyInp), keyState, removeKeyBtn),
       el('p.info', 'La clave se guarda solo en este navegador. No viaja en el archivo de sincronizaci\u00f3n, salvo cifrada si lo activas en Ajustes > Sincronizaci\u00f3n.')),
     el('div.field', el('label.lbl', 'Confianza'),

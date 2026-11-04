@@ -10,8 +10,10 @@
  * tokens were spent too.
  */
 
-import { resolveClient } from './registry.js';
-import { recordUsage, costOf, priceFor } from './usage.js';
+import { resolveClient, getProvider, getApiKey } from './registry.js';
+import { recordUsage, costOf, priceFor, BATCH_SUFFIX } from './usage.js';
+import { batchKind, submitBatch, pollBatch, batchResults, cancelBatch } from './batch.js';
+import { embedApi, embeddingsSupported } from './embeddings.js';
 
 export const DEFAULT_TEMPERATURE = 0.2;
 
@@ -86,4 +88,89 @@ export async function callAI(opts) {
     source: r.source,
     wanted: r.wanted || null
   };
+}
+
+// ------------------------------------------------------------------ deferred batches (-50 %)
+
+/** Can this module role run as a deferred batch? -> { ok, kind, providerId, modelId, profileName } */
+export async function deferredSupport(module, role) {
+  const r = await resolveClient(module || '', role || 'triage');
+  const kind = batchKind(r.profile);
+  return { ok: !!kind, kind, providerId: r.providerId, modelId: r.modelId, profileName: (r.profile && r.profile.name) || r.providerId };
+}
+
+/**
+ * submitDeferred({ module, role, requests:[{ key, prompt, system, maxTokens, thinking }], masked })
+ *   -> job { kind, id, model, providerId, submittedAt, total }
+ * Same masking rule as callAI: only masked text leaves, unless the provider is local and allowed.
+ */
+export async function submitDeferred(o) {
+  if (o.masked !== true && o.allowUnmasked !== true) throw _err('UNMASKED', UNMASKED_MSG);
+  const r = await resolveClient(o.module || '', o.role || 'triage');
+  if (o.masked !== true && !(o.allowUnmasked === true && r.trust === 'local')) throw _err('UNMASKED', UNMASKED_MSG);
+  const key = await getApiKey(r.providerId);
+  const reqs = (o.requests || []).map(q => Object.assign({ temperature: DEFAULT_TEMPERATURE }, q));
+  const job = await submitBatch(r.profile, key, r.modelId, reqs);
+  return Object.assign(job, { providerId: r.providerId });
+}
+
+async function _jobCtx(job) {
+  const profile = await getProvider(job.providerId);
+  if (!profile) throw _err('NO_PROVIDER', 'El proveedor de este lote ya no existe en Ajustes.');
+  return { profile, key: await getApiKey(job.providerId) };
+}
+
+export async function pollDeferred(job) {
+  const { profile, key } = await _jobCtx(job);
+  return pollBatch(job, profile, key);
+}
+
+/**
+ * The answers of a finished job: Map(key -> { text, usage, error, truncated }). Records the usage
+ * of every answer at the batch price (model '<id>#batch'), attributed to the module of its request.
+ * usageOf(key) -> { module, project, file, words } tells where each answer belongs.
+ */
+export async function fetchDeferred(job, last, usageOf) {
+  const { profile, key } = await _jobCtx(job);
+  const res = await batchResults(job, profile, key, last);
+  let cost = 0;
+  for (const [k, v] of res) {
+    if (!v || !v.usage) continue;
+    const where = (usageOf && usageOf(k)) || {};
+    try {
+      await recordUsage({ module: where.module || 'other', provider: job.providerId, model: job.model + BATCH_SUFFIX,
+        usage: v.usage, project: where.project || '', file: where.file || '', words: where.words || 0 });
+      const c = costOf(v.usage, await priceFor(job.providerId, job.model + BATCH_SUFFIX));
+      if (typeof c === 'number') cost += c;
+    } catch (_) {}
+  }
+  res.cost = cost;
+  return res;
+}
+
+export async function cancelDeferred(job) {
+  const { profile, key } = await _jobCtx(job);
+  return cancelBatch(job, profile, key);
+}
+
+// ------------------------------------------------------------------ embeddings (semantic similarity)
+
+/**
+ * embedTexts({ provider, model, texts, masked, module, project, file, signal, onProgress })
+ *   -> { vectors, usage, cost }   (API engine; the local engine never comes through here)
+ */
+export async function embedTexts(o) {
+  const profile = await getProvider(o.provider);
+  if (!profile) throw _err('NO_PROVIDER', 'Elija en Ajustes > M\u00f3dulos el proveedor de la similitud sem\u00e1ntica.');
+  if (!embeddingsSupported(profile)) throw _err('NO_EMBEDDINGS', (profile.name || profile.adapter) + ' no ofrece embeddings en UMBRA.');
+  if (o.masked !== true && !(o.allowUnmasked === true && profile.trust === 'local')) throw _err('UNMASKED', UNMASKED_MSG);
+  const key = await getApiKey(profile.id);
+  const r = await embedApi(profile, key, o.model, o.texts || [], { signal: o.signal, onProgress: o.onProgress });
+  let cost = null;
+  try {
+    await recordUsage({ module: o.module || 'semantic', provider: profile.id, model: r.model, usage: r.usage,
+      project: o.project || '', file: o.file || '', words: 0 });
+    cost = costOf(r.usage, await priceFor(profile.id, r.model));
+  } catch (_) {}
+  return { vectors: r.vectors, usage: r.usage, cost };
 }

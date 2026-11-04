@@ -203,7 +203,17 @@ function _isPrice(p) { return !!p && typeof p.in === 'number' && typeof p.out ==
  * The price of a model: { in, cached, out, src } in US$ per million tokens, or null. The profile's
  * own price first (Settings > Providers), then ai_prices, then the built-in list prices.
  */
+export const BATCH_SUFFIX = '#batch';
+export const BATCH_DISCOUNT = 0.5;
+
 export async function priceFor(providerId, modelId) {
+  // Deferred batch jobs are recorded as '<model>#batch' and cost half the normal price.
+  if (String(modelId || '').endsWith(BATCH_SUFFIX)) {
+    const base = await priceFor(providerId, String(modelId).slice(0, -BATCH_SUFFIX.length));
+    if (!base) return null;
+    const half = (v) => (typeof v === 'number' ? v * BATCH_DISCOUNT : v);
+    return Object.assign({}, base, { in: half(base.in), cached: half(base.cached), out: half(base.out), src: (base.src || '') + ' \u00b7 lotes \u221250 %' });
+  }
   let profile = null;
   try { profile = await getProvider(providerId); } catch (_) { profile = null; }
   if (profile) {

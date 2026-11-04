@@ -575,3 +575,12 @@ export async function testConnection(profile, modelId, apiKey, opts) {
 
 // For tests: the pure rules.
 export const _internals = { _geminiTakesTemperature, _geminiThinking, _claudeVersion, _claudeTakesTemperature, _claudeEffort };
+
+// Shared low-level helpers for the batch (ai/batch.js) and embeddings (ai/embeddings.js) modules,
+// so they speak to each provider exactly like the clients above.
+export const _http = {
+  send: _send, readError: _readError, httpError: _httpError, err: _err, base: baseUrlOf,
+  DEFAULT_BASE, DEFAULT_MAX_TOKENS, RETIRED_MODELS,
+  geminiThinking: _geminiThinking, geminiTakesTemperature: _geminiTakesTemperature,
+  claudeEffort: _claudeEffort, claudeTakesTemperature: _claudeTakesTemperature, openaiUsage: _openaiUsage
+};

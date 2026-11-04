@@ -276,6 +276,18 @@ function renderPanes() {
     panes[side].scrollTop = keep;
     panes[side].oncontextmenu = (ev) => {
       const t = ev.target.closest('[data-occ]');
+      // Right click on selected text: offer to mask it (keep the selection: clicking the menu clears it).
+      const sel = window.getSelection();
+      const txt = sel ? sel.toString().replace(/\s+/g, ' ').trim() : '';
+      if (!t && txt.length >= 2 && sel.anchorNode && panes[side].contains(sel.anchorNode)) {
+        ev.preventDefault();
+        openMenu({ x: ev.clientX, y: ev.clientY }, [
+          { header: '\u00ab' + (txt.length > 40 ? txt.slice(0, 37) + '\u2026' : txt) + '\u00bb' },
+          { label: 'Enmascarar la selecci\u00f3n\u2026 (Alt+E)', onClick: () => maskSelection({ text: txt, side }) },
+          { label: 'Copiar', onClick: () => copyText(txt) }
+        ]);
+        return;
+      }
       if (!t) return;
       ev.preventDefault();
       occMenu(ev, t.dataset.key, t.dataset.occ);
@@ -321,14 +333,18 @@ function onSearch(e) {
 
 // ------------------------------------------------------------------ manual masking
 
-async function maskSelection() {
+async function maskSelection(preset) {
   if (!state.session) return;
-  const sel = window.getSelection();
-  const text = sel ? sel.toString().replace(/\s+/g, ' ').trim() : '';
-  if (!text || text.length < 2) { toast('Seleccione primero el texto que quiere enmascarar.', 'warn'); return; }
-  const node = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
-  const pane = node && node.closest('.pane-body');
-  const side = pane === panes.src ? 'src' : (pane === panes.tgt ? 'tgt' : null);
+  let text, side;
+  if (preset && preset.text) { text = preset.text; side = preset.side; }
+  else {
+    const sel = window.getSelection();
+    text = sel ? sel.toString().replace(/\s+/g, ' ').trim() : '';
+    if (!text || text.length < 2) { toast('Seleccione primero el texto que quiere enmascarar.', 'warn'); return; }
+    const node = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+    const pane = node && node.closest('.pane-body');
+    side = pane === panes.src ? 'src' : (pane === panes.tgt ? 'tgt' : null);
+  }
   if (!side) { toast('Seleccione el texto dentro de una de las dos hojas.', 'warn'); return; }
   if (/\{|\}/.test(text)) { toast('La selecci\u00f3n incluye una etiqueta: use \u00abVer original\u00bb para seleccionar el texto real.', 'warn', 6000); return; }
   const catSel = el('select.inp', CATS.map(c => el('option', { value: c }, CAT_SINGULAR[c])));
@@ -337,6 +353,16 @@ async function maskSelection() {
   const other = el('input.inp', { placeholder: side === 'src' ? 'Forma en la traducci\u00f3n (opcional)' : 'Forma en el original (opcional)' });
   const pairSel = el('select.inp', el('option', { value: '' }, 'No: es una entidad nueva'),
     state.session.ent.entities.map(x => el('option', { value: x.key }, x.cat + x.n + ' \u2014 ' + (mainForm(x.srcForms) || mainForm(x.tgtForms)))));
+  // Typing the other-language form of an entity that is already masked pairs the two automatically
+  // (until the user picks something in the list by hand).
+  let pairTouched = false;
+  pairSel.addEventListener('change', () => { pairTouched = true; });
+  other.addEventListener('input', () => {
+    if (pairTouched) return;
+    const v = other.value.trim();
+    const hit = v && state.session.ent.entities.find(x => Object.keys(side === 'src' ? x.tgtForms : x.srcForms).includes(v));
+    pairSel.value = hit ? hit.key : '';
+  });
   const dict = el('input', { type: 'checkbox' });
   const body = el('div',
     el('p', 'Enmascarar \u00ab', el('b', text), '\u00bb en ', side === 'src' ? 'el original' : 'la traducci\u00f3n', ' (todas sus apariciones).'),

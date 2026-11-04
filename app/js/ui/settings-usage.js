@@ -109,7 +109,9 @@ export async function mount(container) {
   const providerName = (id) => { const p = profiles.find(x => x.id === id); return p ? p.name : (id || '?'); };
   const modelName = (r) => {
     const p = profiles.find(x => x.id === r.provider);
-    return providerName(r.provider) + ' \u00b7 ' + (p ? reg.modelLabel(p, r.model) : r.model);
+    const batch = String(r.model || '').endsWith('#batch');
+    const id = batch ? String(r.model).slice(0, -6) : r.model;
+    return providerName(r.provider) + ' \u00b7 ' + (p ? reg.modelLabel(p, id) : id) + (batch ? ' (lotes \u221250 %)' : '');
   };
   const projectName = (r) => r.project || 'Sin proyecto';
   const noteOf = (k) => { const n = notes[k]; return (n && n.text) ? String(n.text) : ''; };

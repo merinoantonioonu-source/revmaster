@@ -18,6 +18,8 @@ export function showGuide() {
     el('ul',
       el('li', 'La ', el('b', 'Capa 0'), ' revisa sin IA y gratis: cifras, etiquetas, p\u00e1rrafos que faltan, longitud, paralelismo de listas, convenciones de resoluciones y sus reglas fijas.'),
       el('li', 'Los m\u00f3dulos con IA (gram\u00e1tica, fidelidad, integridad, estilo, coherencia, convenciones, lectura en fr\u00edo y verificador) se ejecutan juntos o por separado. Antes de gastar, UMBRA muestra el plan con su coste estimado.'),
+      el('li', 'La similitud sem\u00e1ntica (Capa 0) compara el sentido de cada oraci\u00f3n con la traducci\u00f3n para encontrar omisiones y adiciones; funciona en este navegador o con un proveedor (Ajustes \u203a M\u00f3dulos).'),
+      el('li', 'Modo diferido: en el plan de gasto, marque \u00abModo diferido (lotes)\u00bb y la primera pasada costar\u00e1 la mitad; las respuestas llegan en minutos u horas y UMBRA termina la revisi\u00f3n sola cuando vuelva a abrir el proyecto.'),
       el('li', 'Acepte (A), rechace (R) o edite (E) cada hallazgo; J y K pasan al siguiente y al anterior.')),
     el('h4', '3 \u00b7 Exportar y ajustes'),
     el('ul',

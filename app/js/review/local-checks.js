@@ -348,5 +348,5 @@ function _fold(s) { return String(s || '').toLowerCase().normalize('NFD').replac
 export const LOCAL_SUBS = {
   numbers: 'Cifras', tags: 'Etiquetas', paragraphs: 'P\u00e1rrafos', untranslated: 'Sin traducir', length: 'Longitud',
   sentences: 'Oraciones', hygiene: 'Limpieza', consistency: 'Coherencia', parallel: 'Paralelismo',
-  conventions: 'Convenciones', numformat: 'Formato de cifras', rules: 'Reglas'
+  conventions: 'Convenciones', numformat: 'Formato de cifras', rules: 'Reglas', semantic: 'Similitud', spelling: 'Ortograf\u00eda'
 };

@@ -225,9 +225,8 @@ FIN <n>
   A esto se suma `review/spell.js`: un corrector ortográfico local con Hunspell (`app/data/hunspell/es.*`,
   diccionario `dictionary-es` 4.0.0 con su licencia) y `app/libs/nspell.esm.js` (nspell 2.1.5, MIT,
   empaquetado una vez con esbuild).
-- **Pendiente (fase 6 de la propuesta).** Falta la similitud semántica local con *embeddings* y el modo
-  diferido de lotes (−50 %). El «puente» para proveedores sin CORS sí está: es el campo `relayUrl` del
-  perfil.
+- **Fase 6, completa.** Incluye el «puente» para proveedores sin CORS (campo `relayUrl` del perfil), la
+  similitud semántica y el modo diferido; los dos últimos se describen en el §10.
 - **Pruebas.** `node tests/run-all.mjs` ejecuta estas cuatro:
   - la regla ASCII;
   - `formats.test.mjs` (escritura de los tres formatos, verificada con python-docx, python-pptx y
@@ -248,3 +247,48 @@ FIN <n>
 
   Los documentos de prueba se generan con `tests/fixtures/make_fixtures.py` y
   `tests/fixtures/make_e2e_fixtures.py`.
+
+## 10. Fase 6: similitud semántica y modo diferido
+
+### Similitud semántica (`review/semantic.js`, `ai/embeddings.js`)
+- **Motor local:** `transformers.js` 3.7.6 incluido en `app/libs/transformers/` (Apache 2.0) con el modelo
+  `Xenova/paraphrase-multilingual-MiniLM-L12-v2` (q8). El primer uso descarga el motor
+  `onnxruntime-web` (unos 22 MB, cdn.jsdelivr.net) y el modelo (unos 120 MB, huggingface.co); después
+  quedan en la caché del navegador. Lee el texto real, que no sale del ordenador. Usa WebGPU si existe y,
+  si no, WASM.
+- **Motor por API:** `gateway.embedTexts()` envía solo texto enmascarado y anota el gasto. Llama a Gemini
+  `models/{m}:batchEmbedContents` (`taskType: SEMANTIC_SIMILARITY`) o a `/embeddings` de Mistral y de los
+  compatibles con OpenAI.
+- **Funcionamiento:**
+  - las oraciones de cada pareja se comparan también con las de los párrafos vecinos;
+  - el umbral se adapta al documento (mediana − k·MAD, con k = 3,5 en sensibilidad normal y 2,5 en alta);
+  - una oración del original sin equivalente da `OMI`, una de la traducción da `ADD`, y un párrafo de una
+    sola oración da `MIST`;
+  - estos hallazgos sustituyen a los de «oraciones» y «longitud» del mismo párrafo.
+- **Cascada:** los párrafos sospechosos de la Capa 0 (`semantic`, `sentences`, `length`, `numbers`,
+  `tags`) pasan también al modelo «a fondo» de Integridad y Fidelidad (`runPlan`, `hooks.localFlags`).
+- **Configuración:** en `module_cfg.local`, con los campos `semantic` (`ask`, `off`, `local` o `api`),
+  `semModel`, `semProvider`, `semApiModel` y `semSensitivity`.
+
+### Modo diferido (`ai/batch.js`, `review/deferred.js`)
+- **Formatos.** Están tomados de los SDK oficiales (`@google/genai` 2.32, `openai` 7.50,
+  `@mistralai/mistralai` 3.5 y la API Message Batches de Anthropic):
+  - Gemini: `models/{m}:batchGenerateContent` con `batch.inputConfig.requests.requests[]`; el estado está
+    en `metadata.state` y los resultados en `metadata.output.inlinedResponses.inlinedResponses[]`.
+  - Anthropic: `/v1/messages/batches`, con `results_url` en JSONL.
+  - OpenAI: `/v1/files` (`purpose: batch`, JSONL) y después `/v1/batches`; los resultados se descargan
+    de `/v1/files/{id}/content`.
+  - Mistral: `/v1/batch/jobs` con `requests` en línea; los resultados se leen con `?inline=true`.
+  - Un perfil compatible con OpenAI solo usa lotes si lleva `batch: true` (casilla del perfil).
+- **Qué va en el lote.** Van solo la primera pasada (los lotes de cribado) y las llamadas de esqueleto,
+  agrupadas por módulo. El plan se serializa (`serializePlan`) en `project.deferred[]` con las claves
+  `g{grupo}b{lote}` y `s{n}`.
+- **Al terminar.** Cuando llegan todas las respuestas, `runPlan(restorePlan(...), { prefetched })` analiza
+  las respuestas guardadas y completa al momento, a precio normal, los lotes cortados, la cascada «a fondo»
+  y el verificador.
+- **Seguimiento.** UMBRA consulta el estado cada 60 s mientras la página está abierta, y también al
+  reabrir el proyecto.
+- **Gasto.** Se anota con el modelo `<id>#batch`; `priceFor` lo cobra al 50 % del precio del modelo.
+- **Pruebas:** `tests/phase6.e2e.mjs`. El simulador `tests/mock-ai.mjs` imita las cuatro APIs de lotes y
+  las de *embeddings*. El modelo local real no se puede descargar en las pruebas, así que se sustituye con
+  `setLocalEmbedderFactory`.

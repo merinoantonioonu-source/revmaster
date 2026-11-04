@@ -17,17 +17,13 @@ COMeT, consultado en modo de solo lectura: `main` en `04540f5` (2026-11-04).
 
 ## Estado de la implementación (versión 1, 2026-11-04)
 
-Están hechas las fases 0 a 5 completas y parte de la 6.
-
-**Fase 6, lo que está hecho:**
+Están hechas todas las fases, de la 0 a la 6. La fase 6 incluye:
 - el corrector ortográfico local (Hunspell);
-- el «puente» para proveedores sin CORS (campo `relayUrl`).
+- el «puente» para proveedores sin CORS (campo `relayUrl`);
+- la **similitud semántica**, en el navegador o con un proveedor;
+- el **modo diferido** de lotes (−50 %) con Gemini, Anthropic, Mistral y OpenAI.
 
-**Fase 6, lo que queda pendiente:**
-- la similitud semántica local con *embeddings*;
-- el modo diferido de lotes (−50 %).
-
-Los detalles técnicos están en `docs/ARQUITECTURA.md` §9.
+Los detalles técnicos están en `docs/ARQUITECTURA.md`, §9 y §10.
 
 ## 0. Decisiones tomadas (2026-11-04)
 

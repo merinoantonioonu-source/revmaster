@@ -133,7 +133,8 @@ async function mountModules(host) {
   host.appendChild(el('div.card', el('h3', 'Capa 0 (sin IA)'), el('div.body',
     el('label', el('input', { type: 'checkbox', checked: cfg.local.spell !== false, onchange: (e) => saveModuleConfig('local', { spell: e.target.checked }).then(() => toast('Guardado.', 'ok', 1500)) }),
       ' Corrector ortogr\u00e1fico local (diccionario espa\u00f1ol de Hunspell; se descarga una vez, unos 900 KB)'),
-    el('p.info', { style: { marginTop: '6px' } }, 'Si se\u00f1ala una palabra correcta, rech\u00e1cela y elija \u00abNo volver a se\u00f1alarlo\u00bb: se crea una regla para ignorarla.'))));
+    el('p.info', { style: { marginTop: '6px' } }, 'Si se\u00f1ala una palabra correcta, rech\u00e1cela y elija \u00abNo volver a se\u00f1alarlo\u00bb: se crea una regla para ignorarla.'),
+    await _semanticSettings(cfg.local))));
   host.appendChild(el('div.card', el('h3', 'Ajustes de los m\u00f3dulos'), el('div.body',
     el('p.info', 'Fusionar: Fidelidad con Integridad, y Gram\u00e1tica con Estilo, comparten una sola llamada por lote cuando usan el mismo modelo (la entrada se paga una vez). Verificar: sus hallazgos pasan por el Verificador. Razonamiento: cu\u00e1nto piensa el modelo antes de responder (se cobra como salida).'),
     t)));
@@ -152,6 +153,44 @@ async function mountModules(host) {
   }
   host.appendChild(el('div.card', el('h3', 'Instrucciones de cada m\u00f3dulo (avanzado)'),
     el('div.body', el('p.info', 'Lo que se le pide a la IA en cada m\u00f3dulo. Las de serie se pueden editar y restaurar. El formato de respuesta y la explicaci\u00f3n de las etiquetas se a\u00f1aden siempre: no los quite de aqu\u00ed.')), box));
+}
+
+// Semantic similarity (layer 0): engine, model, provider, sensitivity.
+async function _semanticSettings(c) {
+  const { listProviders, hasApiKey } = await import('../ai/registry.js');
+  const { embeddingsSupported, DEFAULT_LOCAL_MODEL, DEFAULT_API_MODELS } = await import('../ai/embeddings.js');
+  const save = (patch) => saveModuleConfig('local', patch).then(() => toast('Guardado.', 'ok', 1500));
+  const mode = el('select.inp', el('option', { value: 'ask' }, 'Preguntar la primera vez'), el('option', { value: 'off' }, 'Desactivada'),
+    el('option', { value: 'local' }, 'En este navegador (modelo local)'), el('option', { value: 'api' }, 'Con un proveedor (embeddings)'));
+  mode.value = c.semantic || 'ask';
+  const localModel = el('input.inp', { value: c.semModel || DEFAULT_LOCAL_MODEL, onchange: (e) => save({ semModel: e.target.value.trim() || DEFAULT_LOCAL_MODEL }) });
+  const provs = [];
+  for (const p of await listProviders()) if (embeddingsSupported(p) && (await hasApiKey(p.id) || p.trust === 'local')) provs.push(p);
+  const provSel = el('select.inp', el('option', { value: '' }, provs.length ? 'Elija un proveedor' : 'Ning\u00fan proveedor con clave admite embeddings'),
+    provs.map(p => el('option', { value: p.id }, p.name)));
+  provSel.value = c.semProvider || '';
+  const apiModel = el('input.inp', { value: c.semApiModel || '', placeholder: 'Por defecto: gemini-embedding-001, mistral-embed o text-embedding-3-small',
+    onchange: (e) => save({ semApiModel: e.target.value.trim() }) });
+  provSel.addEventListener('change', () => {
+    const p = provs.find(x => x.id === provSel.value);
+    save({ semProvider: provSel.value, semApiModel: p ? (DEFAULT_API_MODELS[p.adapter] || '') : '' });
+    if (p) apiModel.value = DEFAULT_API_MODELS[p.adapter] || '';
+  });
+  const sens = el('select.inp', el('option', { value: 'normal' }, 'Normal (menos avisos)'), el('option', { value: 'high' }, 'Alta (m\u00e1s avisos)'));
+  sens.value = c.semSensitivity || 'normal';
+  sens.addEventListener('change', () => save({ semSensitivity: sens.value }));
+  const localBox = el('div.field', el('label.lbl', 'Modelo local (Hugging Face)'), localModel,
+    el('p.info', 'La primera vez se descargan el motor (unos 22 MB, de cdn.jsdelivr.net) y el modelo (unos 120 MB, de huggingface.co); despu\u00e9s quedan en el navegador. Lee el texto real, pero no sale del ordenador.'));
+  const apiBox = el('div', el('div.form-grid', el('div.field', el('label.lbl', 'Proveedor'), provSel), el('div.field', el('label.lbl', 'Modelo de embeddings'), apiModel)),
+    el('p.info', 'Solo se env\u00eda el texto enmascarado. Cuesta muy poco (los embeddings son mucho m\u00e1s baratos que los modelos de texto) y el gasto se ve en Uso de IA.'));
+  const sync = () => { localBox.classList.toggle('hidden', mode.value !== 'local'); apiBox.classList.toggle('hidden', mode.value !== 'api'); };
+  mode.addEventListener('change', () => { save({ semantic: mode.value }); sync(); });
+  sync();
+  return el('div', { style: { marginTop: '12px', borderTop: '1px solid var(--border-soft)', paddingTop: '10px' } },
+    el('b', 'Similitud sem\u00e1ntica (omisiones y adiciones)'),
+    el('p.info', { style: { margin: '4px 0 8px' } }, 'Compara el sentido de cada oraci\u00f3n del original con las de la traducci\u00f3n: una oraci\u00f3n sin equivalente es una posible omisi\u00f3n (o adici\u00f3n). Los p\u00e1rrafos sospechosos pasan adem\u00e1s al modelo \u00aba fondo\u00bb de Integridad y Fidelidad.'),
+    el('div.form-grid', el('div.field', el('label.lbl', 'Funcionamiento'), mode), el('div.field', el('label.lbl', 'Sensibilidad'), sens)),
+    localBox, apiBox);
 }
 
 // ------------------------------------------------------------------ privacy
