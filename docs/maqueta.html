@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>UMBRA &#x2014; maqueta</title>
+<title>UMBRA &#x2014; maqueta (v2)</title>
 <style>
   /* Tokens de Final Check (COMeT standalone.html), salvo la cabecera: anil propio de UMBRA. */
   :root {
@@ -121,7 +121,7 @@
   .tk.org { background: var(--c-org); } .tk.organo { background: var(--c-organo); } .tk.cargo { background: var(--c-cargo); }
   .tk.num { background: var(--c-num); } .tk.fecha { background: var(--c-fecha); } .tk.simb { background: var(--c-simb); }
   .tk.bad { box-shadow: 0 0 0 2px var(--sev-cri); }
-  .tk sup { font-size: 9.5px; vertical-align: baseline; font-weight: 600; margin-left: 2px; padding: 0 3px; border-radius: 3px; background: rgba(255,255,255,.28); }
+  .tk .art { font-weight: 500; margin-right: 3px; opacity: .92; }
   .orig { border-bottom: 2px dotted; }
   body.show-orig .tk { display: none; } body:not(.show-orig) .orig { display: none; }
 
@@ -139,8 +139,16 @@
   .pcard { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-width: 200px; font-size: 12px; }
   .pcard .trust { font-size: 10px; font-weight: 700; border-radius: 6px; padding: 0 6px; }
   .trust.ext { background: #fef3c7; color: #92400e; } .trust.loc { background: #dcfce7; color: #166534; }
-  .rule { display: grid; grid-template-columns: 80px 1fr 1fr 1fr 70px; gap: 6px; align-items: center; font-size: 12px; padding: 5px 0; border-bottom: 1px solid #eef0f3; }
+  .rule { display: grid; grid-template-columns: 74px 1fr 1fr 1fr 70px 150px; gap: 6px; align-items: center; font-size: 12px; padding: 5px 0; border-bottom: 1px solid #eef0f3; }
   .kind { font-family: Consolas, monospace; font-size: 10px; font-weight: 700; background: var(--bg-surface-hover); border-radius: 4px; padding: 1px 5px; text-align: center; }
+  .menu-demo { width: 210px; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.12); font-size: 12px; padding: 4px 0; background: #fff; flex-shrink: 0; }
+  .menu-demo div { padding: 3px 12px; } .menu-demo .mh { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; padding-top: 6px; }
+  .menu-demo .sel { background: var(--bg-surface-hover); font-weight: 600; } .menu-demo .add { color: var(--primary); font-weight: 600; border-top: 1px solid #eef0f3; }
+  .org { font-size: 10px; font-weight: 700; border-radius: 6px; padding: 1px 6px; }
+  .org.s { background: #e0e7ff; color: #3730a3; } .org.m { background: #fef3c7; color: #92400e; } .org.u { background: #dcfce7; color: #166534; }
+  .lnk { font-size: 11px; color: var(--primary); } .newv { font-size: 10px; color: #b45309; font-weight: 700; }
+  .usage .ur { display: grid; grid-template-columns: 190px 1fr 190px; gap: 10px; align-items: center; font-size: 12px; padding: 3px 0; }
+  .usage .ur i { display: block; height: 10px; background: var(--accent); border-radius: 3px; } .usage .ur b { font-weight: 600; text-align: right; }
   .note { background: #eef2ff; border: 1px solid #c7d2fe; color: #3730a3; border-radius: 8px; padding: 8px 10px; font-size: 12px; margin-bottom: 14px; }
   .view { display: none; flex: 1; min-height: 0; min-width: 0; } .view.on { display: flex; }
   .plan { position: fixed; right: 18px; bottom: 18px; width: 330px; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 12px 14px; font-size: 12px; display: none; }
@@ -161,6 +169,7 @@
     <button class="step" data-view="settings"><span class="n">3</span>Exportar y ajustes</button>
   </div>
   <div class="spacer"></div>
+  <div class="meter" title="Archivo de sincronizaci&#xF3;n (copiado de COMeT)"><span style="color:#86efac">&#x25CF;</span> Sincronizado &#xB7; umbra-sync.json &#xB7; hace 2 min</div>
   <div class="meter" title="Lo gastado en esta sesi&#xF3;n">Sesi&#xF3;n: 14.380 tokens &#xB7; 0,012 US$</div>
   <button class="icon-btn" title="Gu&#xED;a">?</button>
   <button class="icon-btn" title="Ajustes">&#x2699;</button>
@@ -168,8 +177,8 @@
 
 <!-- BARRA SUPERIOR -->
 <div class="top">
-  <div class="drop"><div class="lbl">1 &#xB7; ORIGINAL (EN)</div><div class="fn">A_RES_79_xx_E.docx</div><div class="mt">6 p&#xE1;rrafos &#xB7; 142 palabras</div></div>
-  <div class="drop"><div class="lbl">2 &#xB7; TRADUCCI&#xD3;N (ES)</div><div class="fn">A_RES_79_xx_S.docx</div><div class="mt">6 p&#xE1;rrafos &#xB7; 161 palabras</div></div>
+  <div class="drop"><div class="lbl">1 &#xB7; ORIGINAL (EN/FR) &#xB7; DOCX, PPTX, XLSX</div><div class="fn">A_RES_79_xx_E.docx</div><div class="mt">DOCX &#xB7; 6 p&#xE1;rrafos &#xB7; 142 palabras</div></div>
+  <div class="drop"><div class="lbl">2 &#xB7; TRADUCCI&#xD3;N (ES) &#xB7; DOCX, PPTX, XLSX</div><div class="fn">A_RES_79_xx_S.docx</div><div class="mt">DOCX &#xB7; 6 p&#xE1;rrafos &#xB7; 161 palabras</div></div>
   <div class="tools" id="tools-mask">
     <span class="cat"><i style="background:var(--c-num)"></i>Cifras</span>
     <span class="cat"><i style="background:var(--c-fecha)"></i>Fechas</span>
@@ -202,7 +211,7 @@
     <button title="Hallazgos">&#x2691;<span class="badge">4</span><small>Hallaz.</small></button>
     <button title="M&#xF3;dulos">&#x25A6;<small>M&#xF3;dul.</small></button>
     <button title="Reglas">&#x2261;<small>Reglas</small></button>
-    <button title="Coste">$<small>Coste</small></button>
+    <button title="Uso de IA">$<small>Uso IA</small></button>
   </div>
 
   <!-- VISTA 1: ENMASCARAR -->
@@ -211,37 +220,37 @@
       <h4>Entidades del documento</h4>
       <div class="bubbles"><span class="bub on">Todas 9</span><span class="bub">Con problema 2</span><span class="bub">Cifras 3</span><span class="bub">&#xD3;rganos 1</span><span class="bub">Cargos 1</span></div>
       <div class="scroll">
-        <div class="ent"><div class="row"><span class="tk num">NUM_7</span><span class="st bad">Sin pareja</span></div><div class="forms">O: 1,250 (&#xD7;1) &#xB7; T: &#x2014; (&#xD7;0)</div></div>
-        <div class="ent"><div class="row"><span class="tk num">NUM_8</span><span class="st bad">Sin pareja</span></div><div class="forms">O: &#x2014; (&#xD7;0) &#xB7; T: 1.520 (&#xD7;1)</div></div>
-        <div class="ent"><div class="row"><span class="tk cargo">CARGO_4</span><span class="st ok">OK</span></div><div class="forms">O: Secretary-General (&#xD7;2) &#xB7; T: Secretario General (&#xD7;2) &#xB7; <b>m</b></div></div>
-        <div class="ent"><div class="row"><span class="tk organo">ORGANO_6</span><span class="st ok">OK</span></div><div class="forms">O: General Assembly (&#xD7;1) &#xB7; T: Asamblea General (&#xD7;1) &#xB7; <b>f</b></div></div>
-        <div class="ent"><div class="row"><span class="tk org">ORG_1</span><span class="st ok">OK</span></div><div class="forms">O: United Nations (&#xD7;1) &#xB7; T: Naciones Unidas (&#xD7;1) &#xB7; <b>fp</b></div></div>
-        <div class="ent"><div class="row"><span class="tk org">ORG_9</span><span class="st ok">OK</span></div><div class="forms">O: United Nations Development Programme &#xB7; T: Programa de las Naciones Unidas para el Desarrollo &#xB7; <b>m</b></div></div>
-        <div class="ent"><div class="row"><span class="tk simb">SIMB_2</span><span class="st ok">OK</span></div><div class="forms">O/T: 46/182</div></div>
-        <div class="ent"><div class="row"><span class="tk simb">SIMB_5</span><span class="st ok">OK</span></div><div class="forms">O/T: A/79/78</div></div>
-        <div class="ent"><div class="row"><span class="tk fecha">FECHA_3</span><span class="st ok">OK</span></div><div class="forms">O: 19 December 1991 &#xB7; T: 19 de diciembre de 1991</div></div>
+        <div class="ent"><div class="row"><span class="tk num">NUM7</span><span class="st bad">Sin pareja</span></div><div class="forms">O: 1,250 (&#xD7;1) &#xB7; T: &#x2014; (&#xD7;0)</div></div>
+        <div class="ent"><div class="row"><span class="tk num">NUM8</span><span class="st bad">Sin pareja</span></div><div class="forms">O: &#x2014; (&#xD7;0) &#xB7; T: 1.520 (&#xD7;1)</div></div>
+        <div class="ent"><div class="row"><span class="tk cargo">CARGO4</span><span class="st ok">OK</span></div><div class="forms">O: Secretary-General (&#xD7;2) &#xB7; T: Secretario General (&#xD7;2) &#xB7; <b>el</b></div></div>
+        <div class="ent"><div class="row"><span class="tk organo">ORGANO6</span><span class="st ok">OK</span></div><div class="forms">O: General Assembly (&#xD7;1) &#xB7; T: Asamblea General (&#xD7;1) &#xB7; <b>la</b></div></div>
+        <div class="ent"><div class="row"><span class="tk org">ORG1</span><span class="st ok">OK</span></div><div class="forms">O: United Nations (&#xD7;1) &#xB7; T: Naciones Unidas (&#xD7;1) &#xB7; <b>las</b></div></div>
+        <div class="ent"><div class="row"><span class="tk org">ORG9</span><span class="st ok">OK</span></div><div class="forms">O: United Nations Development Programme &#xB7; T: Programa de las Naciones Unidas para el Desarrollo &#xB7; <b>el</b></div></div>
+        <div class="ent"><div class="row"><span class="tk simb">SIMB2</span><span class="st ok">OK</span></div><div class="forms">O/T: 46/182</div></div>
+        <div class="ent"><div class="row"><span class="tk simb">SIMB5</span><span class="st ok">OK</span></div><div class="forms">O/T: A/79/78</div></div>
+        <div class="ent"><div class="row"><span class="tk fecha">FECHA3</span><span class="st ok">OK</span></div><div class="forms">O: 19 December 1991 &#xB7; T: 19 de diciembre de 1991</div></div>
         <p style="font-size:11px;color:var(--text-muted);margin-top:8px">Seleccione texto y pulse <b>Alt+E</b> para enmascararlo. Arrastre una entidad sobre otra para fusionarlas.</p>
       </div>
     </div>
     <div class="work">
       <div class="panes">
         <div class="pane"><div class="pane-head">ORIGINAL &#xB7; EN<input placeholder="Buscar&#x2026;"></div><div class="pane-body"><div class="sheet">
-          <p class="ttl">Strengthening of the coordination of emergency humanitarian assistance of the <span class="tk org">ORG_1</span><span class="orig">United Nations</span></p>
-          <p><i>Recalling</i> its resolution <span class="tk simb">SIMB_2</span><span class="orig">46/182</span> of <span class="tk fecha">FECHA_3</span><span class="orig">19 December 1991</span>,</p>
-          <p><i>Taking note</i> of the report of the <span class="tk cargo">CARGO_4</span><span class="orig">Secretary-General</span> (<span class="tk simb">SIMB_5</span><span class="orig">A/79/78</span>),</p>
-          <p>1. <i>Requests</i> the <span class="tk cargo">CARGO_4</span><span class="orig">Secretary-General</span> to submit to the <span class="tk organo">ORGANO_6</span><span class="orig">General Assembly</span> at its eightieth session a report on the implementation of the present resolution and its annex;</p>
-          <p>2. <i>Notes</i> that <span class="tk num bad">NUM_7</span><span class="orig">1,250</span> staff members of the <span class="tk org">ORG_9</span><span class="orig">United Nations Development Programme</span> were deployed in <span class="tk num">NUM_10</span><span class="orig">2024</span>;</p>
+          <p class="ttl">Strengthening of the coordination of emergency humanitarian assistance of the <span class="tk org">ORG1</span><span class="orig">United Nations</span></p>
+          <p><i>Recalling</i> its resolution <span class="tk simb">SIMB2</span><span class="orig">46/182</span> of <span class="tk fecha">FECHA3</span><span class="orig">19 December 1991</span>,</p>
+          <p><i>Taking note</i> of the report of the <span class="tk cargo">CARGO4</span><span class="orig">Secretary-General</span> (<span class="tk simb">SIMB5</span><span class="orig">A/79/78</span>),</p>
+          <p>1. <i>Requests</i> the <span class="tk cargo">CARGO4</span><span class="orig">Secretary-General</span> to submit to the <span class="tk organo">ORGANO6</span><span class="orig">General Assembly</span> at its eightieth session a report on the implementation of the present resolution and its annex;</p>
+          <p>2. <i>Notes</i> that <span class="tk num bad">NUM7</span><span class="orig">1,250</span> staff members of the <span class="tk org">ORG9</span><span class="orig">United Nations Development Programme</span> were deployed in <span class="tk num">NUM10</span><span class="orig">2024</span>;</p>
           <p>3. <i>Encourages</i> Member States:</p>
           <p class="li">(a) To strengthen national preparedness capacities;</p>
           <p class="li">(b) To promote regional cooperation;</p>
           <p class="li">(c) To develop early warning systems;</p>
         </div></div></div>
         <div class="pane"><div class="pane-head">TRADUCCI&#xD3;N &#xB7; ES<input placeholder="Buscar&#x2026;"></div><div class="pane-body"><div class="sheet">
-          <p class="ttl">Fortalecimiento de la coordinaci&#xF3;n de la asistencia humanitaria de emergencia de las <span class="tk org">ORG_1<sup>:fp</sup></span><span class="orig">Naciones Unidas</span></p>
-          <p><i>Recordando</i> su resoluci&#xF3;n <span class="tk simb">SIMB_2</span><span class="orig">46/182</span>, de <span class="tk fecha">FECHA_3</span><span class="orig">19 de diciembre de 1991</span>,</p>
-          <p><i>Tomando nota</i> del informe del <span class="tk cargo">CARGO_4<sup>:m</sup></span><span class="orig">Secretario General</span> (<span class="tk simb">SIMB_5</span><span class="orig">A/79/78</span>),</p>
-          <p>1. <i>Solicita</i> al <span class="tk cargo">CARGO_4<sup>:m</sup></span><span class="orig">Secretario General</span> que presente a la <span class="tk organo">ORGANO_6<sup>:f</sup></span><span class="orig">Asamblea General</span> en su octog&#xE9;simo per&#xED;odo de sesiones un informe sobre la aplicaci&#xF3;n de la presente resoluci&#xF3;n;</p>
-          <p>2. <i>Observa</i> que en <span class="tk num">NUM_10</span><span class="orig">2024</span> se despleg&#xF3; <span class="tk num bad">NUM_8</span><span class="orig">1.520</span> funcionarios del <span class="tk org">ORG_9<sup>:m</sup></span><span class="orig">Programa de las Naciones Unidas para el Desarrollo</span>;</p>
+          <p class="ttl">Fortalecimiento de la coordinaci&#xF3;n de la asistencia humanitaria de emergencia de las <span class="tk org"><span class="art">las</span>ORG1</span><span class="orig">Naciones Unidas</span></p>
+          <p><i>Recordando</i> su resoluci&#xF3;n <span class="tk simb">SIMB2</span><span class="orig">46/182</span>, de <span class="tk fecha">FECHA3</span><span class="orig">19 de diciembre de 1991</span>,</p>
+          <p><i>Tomando nota</i> del informe del <span class="tk cargo"><span class="art">el</span>CARGO4</span><span class="orig">Secretario General</span> (<span class="tk simb">SIMB5</span><span class="orig">A/79/78</span>),</p>
+          <p>1. <i>Solicita</i> al <span class="tk cargo"><span class="art">el</span>CARGO4</span><span class="orig">Secretario General</span> que presente a la <span class="tk organo"><span class="art">la</span>ORGANO6</span><span class="orig">Asamblea General</span> en su octog&#xE9;simo per&#xED;odo de sesiones un informe sobre la aplicaci&#xF3;n de la presente resoluci&#xF3;n;</p>
+          <p>2. <i>Observa</i> que en <span class="tk num">NUM10</span><span class="orig">2024</span> se despleg&#xF3; <span class="tk num bad">NUM8</span><span class="orig">1.520</span> funcionarios del <span class="tk org"><span class="art">el</span>ORG9</span><span class="orig">Programa de las Naciones Unidas para el Desarrollo</span>;</p>
           <p>3. <i>Alienta</i> a los Estados Miembros a:</p>
           <p class="li">a) Fortalecer la capacidad nacional de preparaci&#xF3;n;</p>
           <p class="li">b) Promover la cooperaci&#xF3;n regional;</p>
@@ -259,7 +268,7 @@
       <div class="scroll">
         <div class="iss cri sel"><div class="h"><span class="sev cri">CRI</span><span class="mod">Coherencia &#xB7; local</span><span class="seg">&#xA7;5</span></div>
           <div class="t">Cifra distinta: original <b>1,250</b> &#x2192; traducci&#xF3;n <del>1.520</del> <ins>1.250</ins></div>
-          <div class="why">NUM_7 no tiene pareja en la traducci&#xF3;n; NUM_8 no existe en el original.</div>
+          <div class="why">{NUM7} no tiene pareja en la traducci&#xF3;n; {NUM8} no existe en el original.</div>
           <div class="acts"><button class="btn sm blue">Aceptar</button><button class="btn sm">Editar</button><button class="btn sm">Rechazar</button></div>
           <div class="src">Sin IA &#xB7; 0 tokens</div></div>
         <div class="iss may"><div class="h"><span class="sev may">MAY</span><span class="mod">Integridad</span><span class="seg">&#xA7;4</span></div>
@@ -273,7 +282,7 @@
           <div class="acts"><button class="btn sm blue">Aceptar</button><button class="btn sm">Ver grupo</button><button class="btn sm">Rechazar</button></div>
           <div class="src">Sin IA &#xB7; 0 tokens</div></div>
         <div class="iss men"><div class="h"><span class="sev men">MEN</span><span class="mod">Ortograf&#xED;a y gram&#xE1;tica</span><span class="seg">&#xA7;5</span></div>
-          <div class="t">se <del>despleg&#xF3;</del> <ins>desplegaron</ins> NUM_8 funcionarios</div>
+          <div class="t">se <del>despleg&#xF3;</del> <ins>desplegaron</ins> {NUM8} funcionarios</div>
           <div class="why">Concordancia: el verbo concuerda con &#xAB;funcionarios&#xBB; (plural).</div>
           <div class="acts"><button class="btn sm blue">Aceptar</button><button class="btn sm">Editar</button><button class="btn sm">Rechazar</button></div>
           <div class="src">Gemini Flash &#xB7; cribado</div></div>
@@ -287,20 +296,22 @@
         <div class="mcard done"><div class="nm"><input type="checkbox" checked> Integridad</div><span class="in">&#x21C4; biling&#xFC;e</span><br><span class="model">DeepSeek V3 &#x2192; Gemini Pro &#x25BE;</span><div class="est">incluido arriba</div><div class="ft"><span>&#x2713; 1</span><button class="btn sm">Ejecutar</button></div></div>
         <div class="mcard"><div class="nm"><input type="checkbox"> Estilo</div><span class="in">&#xB6; solo espa&#xF1;ol</span><br><span class="model">General &#x25BE;</span><div class="est">~2.300 tokens &#xB7; 0,002 US$</div><div class="ft"><span>7 reglas</span><button class="btn sm">Ejecutar</button></div></div>
         <div class="mcard done"><div class="nm"><input type="checkbox" checked> Coherencia</div><span class="in">&#x2317; esqueleto</span><br><span class="model">Gemini Flash &#x25BE;</span><div class="est">~300 tokens</div><div class="ft"><span>&#x2713; 1</span><button class="btn sm">Ejecutar</button></div></div>
+        <div class="mcard done"><div class="nm"><input type="checkbox" checked> Convenciones ONU</div><span class="in">&#x2696; local + esqueleto</span><br><span class="model">Gemini Flash &#x25BE;</span><div class="est">~150 tokens</div><div class="ft"><span>&#x2713; 0</span><button class="btn sm">Ejecutar</button></div></div>
+        <div class="mcard"><div class="nm"><input type="checkbox"> Lectura en fr&#xED;o</div><span class="in">&#xB6; solo espa&#xF1;ol, sin original</span><br><span class="model">Mistral Large &#x25BE;</span><div class="est">~2.000 tokens &#xB7; 0,004 US$</div><div class="ft"><span>2 reglas</span><button class="btn sm">Ejecutar</button></div></div>
         <div class="mcard"><div class="nm"><input type="checkbox" checked> Verificador</div><span class="in">&#x2713; solo hallazgos</span><br><span class="model">Gemini Pro &#x25BE;</span><div class="est">~900 tokens</div><div class="ft"><span>auto</span></div></div>
       </div>
       <div class="panes">
         <div class="pane"><div class="pane-head">ORIGINAL &#xB7; EN</div><div class="pane-body"><div class="sheet">
-          <p>1. <i>Requests</i> the <span class="tk cargo">CARGO_4</span><span class="orig">Secretary-General</span> to submit to the <span class="tk organo">ORGANO_6</span><span class="orig">General Assembly</span> at its eightieth session a report on the implementation of the present resolution <mark class="f">and its annex</mark>;</p>
-          <p class="hit">2. <i>Notes</i> that <mark class="c">1,250</mark> staff members of the <span class="tk org">ORG_9</span><span class="orig">United Nations Development Programme</span> were deployed in <span class="tk num">NUM_10</span><span class="orig">2024</span>;</p>
+          <p>1. <i>Requests</i> the <span class="tk cargo">CARGO4</span><span class="orig">Secretary-General</span> to submit to the <span class="tk organo">ORGANO6</span><span class="orig">General Assembly</span> at its eightieth session a report on the implementation of the present resolution <mark class="f">and its annex</mark>;</p>
+          <p class="hit">2. <i>Notes</i> that <mark class="c">1,250</mark> staff members of the <span class="tk org">ORG9</span><span class="orig">United Nations Development Programme</span> were deployed in <span class="tk num">NUM10</span><span class="orig">2024</span>;</p>
           <p>3. <i>Encourages</i> Member States:</p>
           <p class="li">(a) To strengthen national preparedness capacities;</p>
           <p class="li">(b) To promote regional cooperation;</p>
           <p class="li">(c) <mark class="f">To develop</mark> early warning systems;</p>
         </div></div></div>
         <div class="pane"><div class="pane-head">TRADUCCI&#xD3;N &#xB7; ES</div><div class="pane-body"><div class="sheet">
-          <p>1. <i>Solicita</i> al <span class="tk cargo">CARGO_4<sup>:m</sup></span><span class="orig">Secretario General</span> que presente a la <span class="tk organo">ORGANO_6<sup>:f</sup></span><span class="orig">Asamblea General</span> en su octog&#xE9;simo per&#xED;odo de sesiones un informe sobre la aplicaci&#xF3;n de la presente resoluci&#xF3;n<span class="gap">+ y su anexo</span>;</p>
-          <p class="hit">2. <i>Observa</i> que en <span class="tk num">NUM_10</span><span class="orig">2024</span> se <mark class="m">despleg&#xF3;</mark> <mark class="c">1.520</mark> funcionarios del <span class="tk org">ORG_9<sup>:m</sup></span><span class="orig">Programa de las Naciones Unidas para el Desarrollo</span>;</p>
+          <p>1. <i>Solicita</i> al <span class="tk cargo"><span class="art">el</span>CARGO4</span><span class="orig">Secretario General</span> que presente a la <span class="tk organo"><span class="art">la</span>ORGANO6</span><span class="orig">Asamblea General</span> en su octog&#xE9;simo per&#xED;odo de sesiones un informe sobre la aplicaci&#xF3;n de la presente resoluci&#xF3;n<span class="gap">+ y su anexo</span>;</p>
+          <p class="hit">2. <i>Observa</i> que en <span class="tk num">NUM10</span><span class="orig">2024</span> se <mark class="m">despleg&#xF3;</mark> <mark class="c">1.520</mark> funcionarios del <span class="tk org"><span class="art">el</span>ORG9</span><span class="orig">Programa de las Naciones Unidas para el Desarrollo</span>;</p>
           <p>3. <i>Alienta</i> a los Estados Miembros a:</p>
           <p class="li">a) Fortalecer la capacidad nacional de preparaci&#xF3;n;</p>
           <p class="li">b) Promover la cooperaci&#xF3;n regional;</p>
@@ -313,7 +324,7 @@
   <!-- VISTA 3: EXPORTAR Y AJUSTES -->
   <div class="view" id="v-settings">
     <div class="settings">
-      <div class="note">Maqueta: los valores son de ejemplo. Ninguno de estos ajustes se comparte con COMeT; UMBRA guarda los suyos aparte.</div>
+      <div class="note">Maqueta: los valores son de ejemplo. UMBRA es una p&#xE1;gina web (GitHub Pages): sus ajustes viven en este navegador y en su propio archivo de sincronizaci&#xF3;n. Nada se comparte con COMeT.</div>
 
       <div class="card"><h3>Exportar</h3><div class="body">
         <div class="prov">
@@ -330,7 +341,8 @@
       <div class="card"><h3>Proveedores</h3><div class="body">
         <p class="info">A&#xF1;ada todos los que quiera. Solo un proveedor marcado como <b>Local</b> puede recibir texto sin enmascarar, y solo si lo activa en el proyecto.</p>
         <div class="prov">
-          <div class="pcard"><b>Google Gemini</b> <span class="trust ext">Externo</span><br>Gemini Flash, Gemini Pro<br><span style="color:var(--text-muted)">Cach&#xE9;: autom&#xE1;tica</span></div>
+          <div class="pcard"><b>Google Gemini</b> <span class="trust ext">Externo</span><br>Gemini Flash, Gemini Pro<br><span style="color:#166534">&#x2713; Conexi&#xF3;n desde la web</span></div>
+          <div class="pcard"><b>Mistral</b> <span class="trust ext">Externo</span><br>Mistral Large, Mistral Small<br><button class="btn sm" style="margin-top:3px">Probar conexi&#xF3;n</button></div>
           <div class="pcard"><b>OpenRouter (personal)</b> <span class="trust ext">Externo</span><br>DeepSeek V3, Mistral Large<br><span style="color:var(--text-muted)">Compatible con OpenAI</span></div>
           <div class="pcard"><b>Ollama (este equipo)</b> <span class="trust loc">Local</span><br>qwen-14b<br><span style="color:var(--text-muted)">http://localhost:11434/v1</span></div>
           <div class="pcard" style="border-style:dashed;display:flex;align-items:center;justify-content:center;color:var(--primary);font-weight:600">+ A&#xF1;adir proveedor</div>
@@ -338,26 +350,49 @@
       </div></div>
 
       <div class="card"><h3>Modelo por m&#xF3;dulo</h3><div class="body">
-        <p class="info">Cada m&#xF3;dulo puede usar un modelo econ&#xF3;mico para <b>cribar</b> todos los segmentos y uno potente para revisar <b>a fondo</b> solo los se&#xF1;alados. Con <b>General</b> usa el proveedor general.</p>
+        <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:10px"><p class="info" style="flex:1;margin:0">Cada m&#xF3;dulo puede usar un modelo econ&#xF3;mico para <b>cribar</b> todos los segmentos y uno potente para revisar <b>a fondo</b> solo los se&#xF1;alados. Con <b>General</b> usa el proveedor general. Cada desplegable termina en <b>+ A&#xF1;adir modelo&#x2026;</b> y <b>+ A&#xF1;adir proveedor&#x2026;</b>: lo nuevo queda elegido al momento, sin salir de aqu&#xED;.</p><div class="menu-demo"><div class="mh">Gemini</div><div>Gemini Flash</div><div>Gemini Pro</div><div class="mh">Mistral</div><div class="sel">Mistral Large &#x2713;</div><div>Mistral Small</div><div class="mh">OpenRouter (personal)</div><div>DeepSeek V3</div><div class="add">+ A&#xF1;adir modelo&#x2026;</div><div class="add">+ A&#xF1;adir proveedor&#x2026;</div></div></div>
         <table class="grid">
           <tr><th>M&#xF3;dulo</th><th>Entrada</th><th>Cribado</th><th>A fondo</th><th>Razonamiento</th><th>Lote</th><th>Fusi&#xF3;n</th><th>Tope</th><th>Reglas</th></tr>
           <tr><td><b>Ortograf&#xED;a y gram&#xE1;tica</b></td><td>&#xB6;</td><td><select><option>Gemini Flash</option></select></td><td><select><option>&#x2014;</option></select></td><td><select><option>M&#xED;nimo</option></select></td><td><select><option>Auto</option></select></td><td><input type="checkbox" checked></td><td><input class="inp" value="0,20" size="4"> US$</td><td>3</td></tr>
           <tr><td><b>Fidelidad</b></td><td>&#x21C4;</td><td><select><option>DeepSeek V3</option></select></td><td><select><option>Gemini Pro</option></select></td><td><select><option>Bajo</option></select></td><td><select><option>Auto</option></select></td><td><input type="checkbox" checked></td><td><input class="inp" value="0,50" size="4"> US$</td><td>12</td></tr>
           <tr><td><b>Integridad</b></td><td>&#x21C4;</td><td><select><option>DeepSeek V3</option></select></td><td><select><option>Gemini Pro</option></select></td><td><select><option>Bajo</option></select></td><td><select><option>Auto</option></select></td><td><input type="checkbox" checked></td><td><input class="inp" value="0,50" size="4"> US$</td><td>1</td></tr>
           <tr><td><b>Estilo</b></td><td>&#xB6;</td><td><select><option>General</option></select></td><td><select><option>&#x2014;</option></select></td><td><select><option>M&#xED;nimo</option></select></td><td><select><option>Auto</option></select></td><td><input type="checkbox" checked></td><td><input class="inp" value="0,20" size="4"> US$</td><td>7</td></tr>
+          <tr><td><b>Convenciones ONU</b></td><td>&#x2696;</td><td><select><option>Gemini Flash</option></select></td><td><select><option>&#x2014;</option></select></td><td><select><option>M&#xED;nimo</option></select></td><td><select><option>Secci&#xF3;n</option></select></td><td>&#x2014;</td><td><input class="inp" value="0,05" size="4"> US$</td><td>9</td></tr>
+          <tr><td><b>Lectura en fr&#xED;o</b></td><td>&#xB6;</td><td><select><option>Mistral Large</option></select></td><td><select><option>&#x2014;</option></select></td><td><select><option>M&#xED;nimo</option></select></td><td><select><option>Auto</option></select></td><td>&#x2014;</td><td><input class="inp" value="0,20" size="4"> US$</td><td>2</td></tr>
           <tr><td><b>Coherencia</b></td><td>&#x2317;</td><td><select><option>Gemini Flash</option></select></td><td><select><option>&#x2014;</option></select></td><td><select><option>Bajo</option></select></td><td><select><option>Secci&#xF3;n</option></select></td><td>&#x2014;</td><td><input class="inp" value="0,10" size="4"> US$</td><td>4</td></tr>
           <tr><td><b>Verificador</b></td><td>&#x2713;</td><td><select><option>&#x2014;</option></select></td><td><select><option>Gemini Pro</option></select></td><td><select><option>Alto</option></select></td><td><select><option>30 hallazgos</option></select></td><td>&#x2014;</td><td><input class="inp" value="0,20" size="4"> US$</td><td>&#x2014;</td></tr>
         </table>
       </div></div>
 
       <div class="card"><h3>Reglas &#xB7; perfil &#xAB;Resoluciones AG&#xBB; <span style="margin-left:auto;font-size:11px;color:var(--text-muted);font-weight:400">Las reglas de estilo a&#xF1;aden ~420 tokens a cada lote</span></h3><div class="body">
-        <div class="rule" style="font-weight:700;color:var(--text-muted);font-size:10px;text-transform:uppercase"><span>Tipo</span><span>Si el original dice / patr&#xF3;n</span><span>Escribir</span><span>No escribir</span><span>M&#xF3;dulos</span></div>
-        <div class="rule"><span class="kind">expr</span><span>stakeholder*</span><span>partes interesadas</span><span>actores</span><span>Fid &#xB7; Est</span></div>
-        <div class="rule"><span class="kind">forbid</span><span>&#x2014;</span><span>en relaci&#xF3;n con</span><span>en relaci&#xF3;n a</span><span>Gram</span></div>
-        <div class="rule"><span class="kind">structure</span><span>Elementos de lista con letra</span><span>Mismo arranque que sus hermanos</span><span>&#x2014;</span><span>Coh</span></div>
-        <div class="rule"><span class="kind">style</span><span>&#x2014;</span><span>Preferir la voz activa</span><span>Pasiva perifr&#xE1;stica innecesaria</span><span>Est</span></div>
-        <div class="rule"><span class="kind">ignore</span><span>&#xAB;per&#xED;odo de sesiones&#xBB;</span><span>No se&#xF1;alar la tilde</span><span>&#x2014;</span><span>Gram</span></div>
-        <div style="margin-top:10px;display:flex;gap:6px"><button class="btn blue">+ Nueva regla</button><button class="btn">Probar en el documento</button><button class="btn">Importar (JSON / Xbench)</button><button class="btn">Exportar</button></div>
+        <div class="rule" style="font-weight:700;color:var(--text-muted);font-size:10px;text-transform:uppercase"><span>Tipo</span><span>Si el original dice / patr&#xF3;n</span><span>Escribir</span><span>No escribir</span><span>M&#xF3;dulos</span><span>Origen</span></div>
+        <div class="rule"><span class="kind">expr</span><span>stakeholder*</span><span>partes interesadas</span><span>actores</span><span>Fid &#xB7; Est</span><span><span class="org u">Usuario</span></span></div>
+        <div class="rule"><span class="kind">forbid</span><span>&#x2014;</span><span>en relaci&#xF3;n con</span><span>en relaci&#xF3;n a</span><span>Gram</span><span><span class="org s">De serie</span></span></div>
+        <div class="rule"><span class="kind">structure</span><span>Elementos de lista con letra</span><span>Mismo arranque que sus hermanos</span><span>&#x2014;</span><span>Coh</span><span><span class="org m">De serie &#xB7; modificada</span> <a href="#" class="lnk">Restaurar</a></span></div>
+        <div class="rule"><span class="kind">style</span><span>&#x2014;</span><span>Preferir la voz activa</span><span>Pasiva perifr&#xE1;stica innecesaria</span><span>Est</span><span><span class="org s">De serie</span> <span class="newv" title="Hay una versi&#xF3;n nueva de serie">&#x25CF; nueva</span></span></div>
+        <div class="rule"><span class="kind">ignore</span><span>&#xAB;per&#xED;odo de sesiones&#xBB;</span><span>No se&#xF1;alar la tilde</span><span>&#x2014;</span><span>Gram</span><span><span class="org u">Usuario</span></span></div>
+        <div style="margin-top:10px;display:flex;gap:6px"><button class="btn blue">+ Nueva regla</button><button class="btn">Probar en el documento</button><button class="btn">Importar (JSON / Xbench)</button><button class="btn">Exportar</button><button class="btn">Restaurar todas las de serie</button></div>
+        <p class="info" style="margin:10px 0 0">Las reglas de serie (convenciones de la ONU, anglicismos y galicismos, puntuaci&#xF3;n de listas, prompts de los m&#xF3;dulos) se editan como las suyas. Si una versi&#xF3;n nueva de UMBRA cambia una regla que usted modific&#xF3;, se respeta la suya y se avisa con <span class="newv">&#x25CF; nueva</span>.</p>
+      </div></div>
+      <div class="card"><h3>Sincronizaci&#xF3;n <span style="margin-left:auto;font-size:11px;color:#166534;font-weight:600">&#x25CF; Al d&#xED;a &#xB7; guardado hace 2 min</span></h3><div class="body">
+        <p class="info">Un archivo &#xFA;nico, por ejemplo en OneDrive, con el mismo sistema que COMeT: pregunta al abrir, autoguardado, fusi&#xF3;n por fecha y copia local de seguridad. Es un archivo distinto del de COMeT: UMBRA rechaza un archivo de COMeT.</p>
+        <div class="prov" style="align-items:center"><span class="pcard" style="min-width:0"><b>umbra-sync.json</b> &#xB7; OneDrive/Trabajo</span>
+          <button class="btn">Elegir archivo</button><button class="btn">Crear archivo</button><button class="btn blue">Guardar ahora</button><button class="btn">Traer del archivo</button><button class="btn">Deshacer lo tra&#xED;do</button></div>
+        <div style="margin-top:10px;font-size:12px;display:flex;gap:18px;flex-wrap:wrap"><label><input type="checkbox" checked> Autoguardar</label><label><input type="checkbox"> Incluir claves de API (cifradas con contrase&#xF1;a)</label></div>
+        <p class="info" style="margin:8px 0 0">Viaja: proveedores y modelos, modelo por m&#xF3;dulo, reglas (tambi&#xE9;n sus cambios a las de serie), perfiles, diccionario de entidades, listas, gasto de IA y preferencias. No viaja: documentos, proyectos ni mapas de claves.</p>
+      </div></div>
+
+      <div class="card"><h3>Uso de IA <span style="font-size:11px;color:var(--text-muted);font-weight:400">por coste</span> <select style="margin-left:auto"><option>Este mes</option><option>Esta semana</option><option>Hoy</option></select></h3><div class="body">
+        <div class="usage">
+          <div class="ur"><span>Fidelidad + Integridad</span><i style="width:100%"></i><b>812.400 tok &#xB7; 0,61 US$</b></div>
+          <div class="ur"><span>Verificador</span><i style="width:36%"></i><b>96.300 tok &#xB7; 0,22 US$</b></div>
+          <div class="ur"><span>Ortograf&#xED;a y gram&#xE1;tica</span><i style="width:15%"></i><b>301.900 tok &#xB7; 0,09 US$</b></div>
+          <div class="ur"><span>Estilo</span><i style="width:11%"></i><b>188.000 tok &#xB7; 0,07 US$</b></div>
+          <div class="ur"><span>Lectura en fr&#xED;o</span><i style="width:8%"></i><b>102.500 tok &#xB7; 0,05 US$</b></div>
+          <div class="ur"><span>Coherencia + Convenciones</span><i style="width:2%"></i><b>14.200 tok &#xB7; 0,01 US$</b></div>
+        </div>
+        <p style="margin-top:10px;font-size:12px"><b>Total: 1.515.300 tokens &#xB7; 1,05 US$</b> &#xB7; 23 documentos &#xB7; <span style="color:var(--text-muted)">Precios de LiteLLM, editables. Desglose tambi&#xE9;n por proyecto y por modelo.</span></p>
+        <div style="margin-top:8px;display:flex;gap:6px"><button class="btn">Por proyecto</button><button class="btn">Por modelo</button><button class="btn">Precios</button><button class="btn">Exportar a Excel</button></div>
       </div></div>
     </div>
   </div>
@@ -371,6 +406,7 @@
     <li>Fidelidad + Integridad fusionados: 5 lotes con DeepSeek V3 y a fondo 2 segmentos con Gemini Pro</li>
     <li>Ortograf&#xED;a y gram&#xE1;tica: 2 lotes con Gemini Flash</li>
     <li>Coherencia: 1 llamada (esqueleto)</li>
+    <li>Convenciones ONU: local (sin llamadas)</li>
     <li>Verificador: 1 llamada</li>
   </ul>
   <p style="margin:8px 0"><b>11 llamadas &#xB7; ~9.700 tokens &#xB7; ~0,008 US$</b><br><span style="color:var(--text-muted)">Prefijo en cach&#xE9; en 8 llamadas. 3 segmentos repetidos se revisan una sola vez.</span></p>
