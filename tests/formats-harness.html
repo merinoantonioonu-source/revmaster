@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Formats harness</title>
+<script src="../app/libs/jszip.min.js"></script>
+<script type="module">
+import { parseDocument } from '../app/js/formats/parse.js';
+import { alignDocs } from '../app/js/formats/align-docs.js';
+import { writeReplacements, writeCorrected, mimeOf, textDiffReplacements } from '../app/js/formats/doc-writer.js';
+
+window.UMBRA_FMT = { parseDocument, alignDocs, writeReplacements, writeCorrected, mimeOf, textDiffReplacements };
+window.UMBRA_READY = true;
+document.body.textContent = 'Formats harness ready';
+</script>
+<style>
+  body { background: #fff; color: #222; font: 14px sans-serif; margin: 16px; }
+</style>
+</head>
+<body>Loading...</body>
+</html>

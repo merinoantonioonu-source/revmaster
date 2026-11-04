@@ -1,0 +1,28 @@
+/**
+ * guide.js - The built-in guide (the "?" button).
+ */
+
+import { el, modal } from '../util/dom.js';
+
+export function showGuide() {
+  const body = el('div',
+    el('p', el('b', 'UMBRA'), ' enmascara los datos sensibles de una traducci\u00f3n y la revisa con IA. Todo ocurre en este navegador: los documentos no se suben a ning\u00fan servidor y a la IA solo llega texto enmascarado.'),
+    el('h4', '1 \u00b7 Enmascarar'),
+    el('ul',
+      el('li', 'Cargue el original (ingl\u00e9s o franc\u00e9s) y la traducci\u00f3n (espa\u00f1ol): DOCX, PPTX o XLSX exportados de eLUNa.'),
+      el('li', 'UMBRA sustituye cifras, fechas, organismos, \u00f3rganos, pa\u00edses, lugares, personas, cargos, s\u00edmbolos y direcciones por etiquetas: ', el('code', '{CARGO1}'), ' en el original y ', el('code', '{el CARGO1}'), ' en la traducci\u00f3n. El art\u00edculo de dentro de la llave indica el g\u00e9nero y el n\u00famero.'),
+      el('li', 'La misma entidad tiene la misma etiqueta en las dos lenguas: si una cifra no coincide, aparece \u00abSin pareja\u00bb.'),
+      el('li', 'Seleccione texto y pulse ', el('b', 'Alt+E'), ' para enmascararlo; clic derecho en una etiqueta para quitarla. \u00abVer original\u00bb muestra el texto real.'),
+      el('li', '\u00abExportar enmascarado\u00bb crea el documento censurado (mismo formato), una tabla biling\u00fce o el texto listo para pegar en una IA externa.')),
+    el('h4', '2 \u00b7 Revisar'),
+    el('ul',
+      el('li', 'La ', el('b', 'Capa 0'), ' revisa sin IA y gratis: cifras, etiquetas, p\u00e1rrafos que faltan, longitud, paralelismo de listas, convenciones de resoluciones y sus reglas fijas.'),
+      el('li', 'Los m\u00f3dulos con IA (gram\u00e1tica, fidelidad, integridad, estilo, coherencia, convenciones, lectura en fr\u00edo y verificador) se ejecutan juntos o por separado. Antes de gastar, UMBRA muestra el plan con su coste estimado.'),
+      el('li', 'Acepte (A), rechace (R) o edite (E) cada hallazgo; J y K pasan al siguiente y al anterior.')),
+    el('h4', '3 \u00b7 Exportar y ajustes'),
+    el('ul',
+      el('li', 'DOCX con control de cambios para lo aceptado y comentarios de Word para lo dem\u00e1s; PPTX y XLSX con los cambios aplicados; informes en HTML y Excel.'),
+      el('li', 'Proveedores y modelos (uno por m\u00f3dulo), reglas (las de serie tambi\u00e9n se editan), listas de entidades, archivo de sincronizaci\u00f3n y uso de IA.')),
+    el('p.info', 'Ctrl+rueda del rat\u00f3n: sobre las hojas ampl\u00eda el documento; en el resto, los controles.'));
+  return modal({ title: 'Gu\u00eda r\u00e1pida', body, width: '720px', buttons: [{ label: 'Entendido', kind: 'primary' }] });
+}
