@@ -15,6 +15,20 @@ COMeT, consultado en modo de solo lectura: `main` en `04540f5` (2026-11-04).
 
 ---
 
+## Estado de la implementación (versión 1, 2026-11-04)
+
+Están hechas las fases 0 a 5 completas y parte de la 6.
+
+**Fase 6, lo que está hecho:**
+- el corrector ortográfico local (Hunspell);
+- el «puente» para proveedores sin CORS (campo `relayUrl`).
+
+**Fase 6, lo que queda pendiente:**
+- la similitud semántica local con *embeddings*;
+- el modo diferido de lotes (−50 %).
+
+Los detalles técnicos están en `docs/ARQUITECTURA.md` §9.
+
 ## 0. Decisiones tomadas (2026-11-04)
 
 | Tema | Decisión |

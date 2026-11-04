@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UMBRA</title>
+<meta name="description" content="Enmascaramiento y revisi&#xF3;n de traducciones de las Naciones Unidas (EN/FR &#x2192; ES).">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%233949AB'/%3E%3Cpath d='M12 2a10 10 0 0 0 0 20z' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/umbra.css">
+<script src="libs/jszip.min.js"></script>
+<script src="libs/xlsx.mini.min.js"></script>
+</head>
+<body>
+
+<header class="hd">
+  <div class="logo" title="Unified Masking &amp; Bilingual Review Assistant">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="#fff" fill-opacity=".85"/></svg>
+    UMBRA
+  </div>
+  <nav class="steps">
+    <button class="step on" data-view="mask"><span class="n">1</span>Enmascarar</button>
+    <button class="step" data-view="review"><span class="n">2</span>Revisar</button>
+    <button class="step" data-view="settings"><span class="n">3</span>Exportar y ajustes</button>
+  </nav>
+  <div class="spacer"></div>
+  <button class="meter" id="sync-chip" title="Archivo de sincronizaci&#xF3;n"><span class="dot"></span><span class="txt">Sin sincronizar</span></button>
+  <div class="meter" id="cost-chip" title="Gasto de IA en esta sesi&#xF3;n">Sesi&#xF3;n: 0 tokens &#xB7; 0,000 US$</div>
+  <button class="icon-btn" id="btn-projects" title="Proyectos guardados">&#x1F5C2;</button>
+  <button class="icon-btn" id="btn-dark" title="Modo oscuro">&#x25D0;</button>
+  <button class="icon-btn" id="btn-help" title="Gu&#xED;a">?</button>
+</header>
+
+<div class="top" id="topbar">
+  <div class="drop" id="drop-src" title="Pulse o arrastre aqu&#xED; el original (DOCX, PPTX o XLSX)">
+    <div class="lbl">1 &#xB7; ORIGINAL (EN/FR) &#xB7; DOCX, PPTX, XLSX</div>
+    <div class="fn">Pulse o arrastre el archivo</div>
+    <div class="mt">&nbsp;</div>
+  </div>
+  <div class="drop" id="drop-tgt" title="Pulse o arrastre aqu&#xED; la traducci&#xF3;n (DOCX, PPTX o XLSX)">
+    <div class="lbl">2 &#xB7; TRADUCCI&#xD3;N (ES) &#xB7; DOCX, PPTX, XLSX</div>
+    <div class="fn">Pulse o arrastre el archivo</div>
+    <div class="mt">&nbsp;</div>
+  </div>
+  <div class="tools" id="tools"></div>
+</div>
+
+<main class="main">
+  <nav class="rail" id="rail"></nav>
+  <section class="view" id="view-welcome"></section>
+  <section class="view" id="view-mask"></section>
+  <section class="view" id="view-review"></section>
+  <section class="view" id="view-settings"></section>
+</main>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

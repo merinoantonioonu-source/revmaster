@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI and sync harness</title>
+<link rel="stylesheet" href="../app/css/umbra.css">
+<script src="../app/libs/xlsx.mini.min.js"></script>
+<style>
+  body { display: block; overflow: auto; height: auto; background: var(--bg-app); }
+  #mount { padding: 16px 22px; max-width: 1180px; }
+</style>
+<script type="module">
+import * as storageMod from '../app/js/store/storage.js';
+import * as idb from '../app/js/store/idb.js';
+import * as cryptoMod from '../app/js/util/crypto.js';
+import * as providers from '../app/js/ai/providers.js';
+import * as registry from '../app/js/ai/registry.js';
+import * as usage from '../app/js/ai/usage.js';
+import * as gateway from '../app/js/ai/gateway.js';
+import * as syncSpec from '../app/js/sync/sync-spec.js';
+import * as syncFs from '../app/js/sync/sync-fs.js';
+import * as syncAutosave from '../app/js/sync/sync-autosave.js';
+import * as syncDevice from '../app/js/sync/sync-device.js';
+import * as uiProviders from '../app/js/ui/settings-providers.js';
+import * as uiUsage from '../app/js/ui/settings-usage.js';
+import * as uiSync from '../app/js/ui/settings-sync.js';
+
+window.H = {
+  storage: storageMod.storage, getValue: storageMod.getValue, setValue: storageMod.setValue, idb, crypto: cryptoMod,
+  providers, registry, usage, gateway, syncSpec, syncFs, syncAutosave, syncDevice,
+  ui: { providers: uiProviders, usage: uiUsage, sync: uiSync }
+};
+window.H_READY = true;
+</script>
+</head>
+<body>
+<div id="mount"></div>
+</body>
+</html>
