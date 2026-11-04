@@ -11,6 +11,7 @@ import { mountMaskView } from './ui/mask-view.js';
 import { mountReviewView } from './ui/review-view.js';
 import { mountSettingsView, showSettingsSection } from './ui/settings-view.js';
 import { showGuide } from './ui/guide.js';
+import { helpBtn, showHelp } from './ui/help.js';
 
 const VIEWS = ['welcome', 'mask', 'review', 'settings'];
 let pending = { src: null, tgt: null };
@@ -127,6 +128,7 @@ async function renderWelcome() {
       el('li', 'Paso 1: revise las ', el('b', 'entidades enmascaradas'), ' y exporte el documento censurado si quiere usarlo en una IA externa.'),
       el('li', 'Paso 2: ejecute los ', el('b', 'm\u00f3dulos de revisi\u00f3n'), ' y acepte o rechace los hallazgos.'),
       el('li', 'Paso 3: exporte la traducci\u00f3n con control de cambios y comentarios, o un informe.')),
+    el('p.info', 'Junto a cada funci\u00f3n hay un bot\u00f3n ', el('b', '?'), ' que explica al momento c\u00f3mo se usa; F1 abre la ayuda de la pantalla en la que est\u00e9.'),
     el('p.info', 'Antes de usar la IA, configure al menos un proveedor con su clave en ', el('a', { href: '#', onclick: (e) => { e.preventDefault(); setView('settings'); showSettingsSection('providers'); } }, 'Exportar y ajustes \u203a Proveedores'), '.'));
   if (recent.length) {
     box.appendChild(el('h3', { style: { margin: '14px 0 6px', fontSize: '13px' } }, 'Proyectos recientes'));
@@ -269,6 +271,24 @@ async function initZoom() {
   }, { passive: false });
 }
 
+// ------------------------------------------------------------------ F1: help of the current screen
+
+function initF1() {
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'F1') return;
+    e.preventDefault();
+    // An open dialog with its own help comes first.
+    const backs = $$('.modal-back');
+    const inModal = backs.length ? backs[backs.length - 1].querySelector('.modal-head .help-btn') : null;
+    if (inModal) { inModal.click(); return; }
+    if (state.view === 'settings') {
+      const first = $('#view-settings .settings-body .help-btn');
+      if (first) { first.click(); return; }
+    }
+    showHelp(state.view === 'mask' ? 'mask-tools' : state.view === 'review' ? 'review-tools' : 'files', null);
+  });
+}
+
 // ------------------------------------------------------------------ boot
 
 async function boot() {
@@ -277,6 +297,9 @@ async function boot() {
   setupDrop('tgt');
   $('#btn-projects').addEventListener('click', projectsDialog);
   $('#btn-help').addEventListener('click', showGuide);
+  $('#btn-help').title = 'Gu\u00eda r\u00e1pida (F1: ayuda de la pantalla en la que est\u00e1)';
+  for (const side of ['src', 'tgt']) $('#drop-' + side + ' .lbl').appendChild(helpBtn('files'));
+  initF1();
   initDark();
   initZoom();
   let busyToast = null;

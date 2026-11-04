@@ -3,6 +3,7 @@
  * cost, progress, the findings list (filters, accept/reject/edit, keyboard) and the two sheets.
  */
 
+import { helpBtn, helpItem } from './help.js';
 import { el, $, clear, toast, modal, fmtInt, fmtMoney, promptDialog, confirmDialog } from '../util/dom.js';
 import { state, on, emit, addFindings, updateFinding, saveProjectSoon, setProfile } from '../state.js';
 import { renderDoc } from './preview.js';
@@ -32,14 +33,14 @@ export function mountReviewView(host, tools) {
   root = host;
   toolsHost = tools;
   root.appendChild(el('div.list',
-    el('h4', 'Hallazgos', el('span.grow'), el('button.btn.sm', { title: 'Opciones de la lista', onclick: (e) => listMenu(e.currentTarget) }, '\u22ef')),
+    el('h4', 'Hallazgos', helpBtn('findings'), el('span.grow'), el('button.btn.sm', { title: 'Opciones de la lista', onclick: (e) => listMenu(e.currentTarget) }, '\u22ef')),
     el('div.bubbles#rv-bubbles'),
     el('div.scroll#rv-findings')));
   root.appendChild(el('div.work',
     el('div.modstrip#rv-modules'),
     el('div.panes',
       el('div.pane', el('div.pane-head', el('span#rv-src-title', 'ORIGINAL')), el('div.pane-body#rv-src')),
-      el('div.pane', el('div.pane-head', el('span', 'TRADUCCI\u00d3N \u00b7 ES'), el('span.grow'), el('span.muted#rv-unit-info')), el('div.pane-body#rv-tgt')))));
+      el('div.pane', el('div.pane-head', el('span', 'TRADUCCI\u00d3N \u00b7 ES'), helpBtn('review-sheets'), el('span.grow'), el('span.muted#rv-unit-info')), el('div.pane-body#rv-tgt')))));
   panes = { src: $('#rv-src'), tgt: $('#rv-tgt') };
   on('view', (v) => { if (v === 'review') { renderAll(); scheduleEstimates(); } });
   on('findings', () => { if (state.view === 'review') { renderTools(); renderFindings(); renderPanes(); } });
@@ -87,6 +88,7 @@ async function renderTools() {
   else toolsHost.appendChild(el('button.btn.amber', { onclick: () => runModules(Array.from(selectedModules)) }, '\u25b6 Ejecutar seleccionados'));
   toolsHost.appendChild(el('button.btn', { onclick: (e) => moreMenu(e.currentTarget) }, 'M\u00e1s \u25be'));
   toolsHost.appendChild(el('button.btn.violet', { onclick: (e) => exportMenu(e.currentTarget) }, 'Exportar \u25be'));
+  toolsHost.appendChild(helpBtn('review-tools'));
 }
 
 function moreMenu(anchor) {
@@ -96,7 +98,9 @@ function moreMenu(anchor) {
     { sep: true },
     { label: 'Verificar los hallazgos pendientes de la IA', onClick: reverify },
     { label: 'Configurar m\u00f3dulos y modelos', onClick: () => emit('goto-settings', 'modules') },
-    { label: 'Editar reglas', onClick: () => emit('goto-settings', 'rules') }
+    { label: 'Editar reglas', onClick: () => emit('goto-settings', 'rules') },
+    { sep: true },
+    helpItem('review-more', anchor)
   ]);
 }
 
@@ -111,7 +115,9 @@ function exportMenu(anchor) {
     { header: 'Informes' },
     { label: 'Informe HTML', onClick: () => exportReportHtml(f => f.state !== 'discarded') },
     { label: 'Informe Excel', onClick: () => exportReportXlsx(f => f.state !== 'discarded') },
-    { label: 'Hallazgos en JSON', onClick: exportFindingsJson }
+    { label: 'Hallazgos en JSON', onClick: exportFindingsJson },
+    { sep: true },
+    helpItem('review-export', anchor)
   ]);
 }
 
@@ -134,7 +140,9 @@ function listMenu(anchor) {
       if (!(await confirmDialog('Borrar hallazgos', 'Se borrar\u00e1n los hallazgos pendientes de la IA y de la IA externa (los aceptados y rechazados se conservan).', 'Borrar'))) return;
       state.findings = state.findings.filter(f => f.state !== 'open' || f.source === 'local' || f.source === 'rule');
       emit('findings'); saveProjectSoon();
-    } }
+    } },
+    { sep: true },
+    helpItem('findings', anchor)
   ]);
 }
 
@@ -176,7 +184,7 @@ async function renderModules() {
       if (e.target.checked) selectedModules.add(m.id); else selectedModules.delete(m.id);
     } });
     const card = el('div.mcard' + cls, { title: m.desc },
-      el('div.nm', chk, m.label),
+      el('div.nm', chk, m.label, helpBtn('mod-' + m.id)),
       el('span.in', INPUT_ICONS[m.input] + ' ' + INPUT_LABELS[m.input]));
     if (m.ai) {
       for (const role of m.roles) {
@@ -237,7 +245,7 @@ async function _semanticMode(ctx) {
   const c = ctx.cfg.local || {};
   if (c.semantic === 'local' || c.semantic === 'api') return c.semantic;
   if (c.semantic === 'off') return null;
-  const r = await modal({ title: 'Similitud sem\u00e1ntica (omisiones y adiciones)', width: '620px', body: el('div',
+  const r = await modal({ title: 'Similitud sem\u00e1ntica (omisiones y adiciones)', help: helpBtn('semantic'), width: '620px', body: el('div',
     el('p', 'La Capa 0 puede comparar el sentido de cada oraci\u00f3n del original con las de la traducci\u00f3n para encontrar omisiones y adiciones sin gastar en IA.'),
     el('ul',
       el('li', el('b', 'En este navegador:'), ' gratis y privado (lee el texto real). La primera vez descarga unos 140 MB (el motor y el modelo) y despu\u00e9s los guarda.'),
@@ -394,7 +402,7 @@ function planDialog(plan, budget, cap) {
       (nothing ? ' No hay nada nuevo que enviar: todo est\u00e1 en la cach\u00e9.' : '')),
     el('label.lbl', 'Presupuesto m\u00e1ximo de esta ejecuci\u00f3n (US$)'), budgetIn,
     defBox);
-  return modal({ title: 'Plan de ejecuci\u00f3n', body, width: '680px', buttons: [
+  return modal({ title: 'Plan de ejecuci\u00f3n', help: helpBtn('plan'), body, width: '680px', buttons: [
     { label: 'Cancelar', value: null },
     { label: 'Ejecutar', kind: 'amber', value: 'go' }] }).then(r => r === 'go' ? { budget: parseFloat(budgetIn.value) || 0, deferred: !!defChk.checked } : null);
 }
@@ -643,7 +651,7 @@ function _deferredCard() {
   const shown = recs.filter(r => r.status === 'running' || (r.finishedAt && Date.now() - r.finishedAt < 7 * 86400000 && !r.dismissed) || (!r.finishedAt && !r.dismissed));
   if (!shown.length) return null;
   const card = el('div.mcard' + (shown.some(r => r.status === 'running') ? '.run' : '.done'), { style: { minWidth: '230px', maxWidth: '260px' } },
-    el('div.nm', '\u23f3 Lotes diferidos'));
+    el('div.nm', '\u23f3 Lotes diferidos', helpBtn('deferred')));
   for (const r of shown.slice(-3)) {
     const done = r.jobs.reduce((n, j) => n + (j.done || 0), 0), total = r.jobs.reduce((n, j) => n + (j.total || 0), 0);
     card.appendChild(el('div.est', new Date(r.createdAt).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' }) + ' \u00b7 ' +

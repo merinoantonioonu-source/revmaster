@@ -7,6 +7,7 @@
  * Origin: COMeT toolbar/toolbar.js @ 04540f5 (adapted)  (the amber "Guardar" when autosave pauses)
  */
 
+import { helpBtn, helpItem } from './help.js';
 import { el, clear, toast, modal, confirmDialog, pickFiles } from '../util/dom.js';
 import { getValue, setValue, storage } from '../store/storage.js';
 import { getDevice, setDeviceName, relativeDay } from '../sync/sync-device.js';
@@ -204,7 +205,7 @@ export async function mount(container) {
       el('div.row', bDown, bUp),
       el('p.info', { style: { marginTop: '6px' } }, 'El archivo descargado se llama ' + DEFAULT_FILE_NAME + '. Al cargarlo se combina con lo de este equipo, ' +
         'como al traer del archivo vinculado. Un archivo de COMeT se rechaza.')));
-    frag.appendChild(_card('Archivo de sincronizaci\u00f3n', ...fileBody));
+    frag.appendChild(_card(['Archivo de sincronizaci\u00f3n', helpBtn('sync-file')], ...fileBody));
 
     // ---- Encrypted API keys
     const chkSec = el('input', { type: 'checkbox', checked: secretsOn ? true : null });
@@ -227,7 +228,7 @@ export async function mount(container) {
       render();
     });
     bPass.addEventListener('click', async () => { if (await setPass()) render(); });
-    frag.appendChild(_card('Claves de API',
+    frag.appendChild(_card(['Claves de API', helpBtn('sync-keys')],
       el('p.info', 'Por defecto, las claves de API no viajan: se escriben una vez en cada equipo. Si activas esta opci\u00f3n, van en el archivo ' +
         'cifradas con una contrase\u00f1a (AES-GCM, clave derivada con PBKDF2); en otro equipo se pide la contrase\u00f1a una vez al traer los datos. ' +
         'Nunca viajan en claro. La contrase\u00f1a se guarda solo en este navegador, como las propias claves.'),
@@ -238,7 +239,7 @@ export async function mount(container) {
     const tbl = el('table.grid', el('tr', el('th', 'Viaja en el archivo'), el('th', 'No viaja')));
     const n = Math.max(TRAVELS.length, DOES_NOT_TRAVEL.length);
     for (let i = 0; i < n; i++) tbl.appendChild(el('tr', el('td', TRAVELS[i] || ''), el('td', DOES_NOT_TRAVEL[i] || '')));
-    frag.appendChild(_card('Qu\u00e9 viaja y qu\u00e9 no',
+    frag.appendChild(_card(['Qu\u00e9 viaja y qu\u00e9 no', helpBtn('sync-what')],
       el('p.info', 'Al guardar o traer, los datos se combinan: en los ajustes gana el cambio m\u00e1s reciente, las listas se unen y los borrados se propagan.'),
       tbl));
 
@@ -250,7 +251,7 @@ export async function mount(container) {
       catch (e) { toast('No se ha podido guardar el nombre: ' + ((e && e.message) || e), 'err'); }
     };
     nameInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveName(); } });
-    frag.appendChild(_card('Este equipo',
+    frag.appendChild(_card(['Este equipo', helpBtn('sync-device')],
       el('p.info', 'El nombre aparece en la pregunta al abrir ("lo guard\u00f3 Oficina, ayer"), para reconocer una copia vieja que OneDrive a\u00fan no ha sustituido. No viaja.'),
       el('div.row', nameInp, el('button.btn.sm', { onclick: saveName }, 'Guardar'))));
 

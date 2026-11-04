@@ -3,6 +3,7 @@
  * "Probar en el documento", profiles, restore, import/export (JSON and Xbench .xbckl).
  */
 
+import { helpBtn, helpItem } from './help.js';
 import { el, clear, toast, modal, download, pickFiles, confirmDialog, promptDialog } from '../util/dom.js';
 import { state } from '../state.js';
 import { getEffectiveRules, upsertRule, deleteRule, restoreDefault, loadRulesStore, saveProfiles, loadDefaultRules,
@@ -41,7 +42,7 @@ async function render() {
     el('option', { value: 'all' }, 'De serie y m\u00edas'), el('option', { value: 'serie' }, 'De serie'), el('option', { value: 'mod' }, 'De serie modificadas'), el('option', { value: 'usuario' }, 'M\u00edas'));
   orSel.value = filt.origin;
   const tbody = el('tbody');
-  const card = el('div.card', el('h3', 'Reglas (' + rules.length + ')'), el('div.body',
+  const card = el('div.card', el('h3', 'Reglas (' + rules.length + ')', helpBtn('rules')), el('div.body',
     el('div.row', { style: { marginBottom: '8px' } }, q, modSel, kindSel, orSel, el('span.grow'),
       el('button.btn.primary', { onclick: () => editRule(null) }, '+ Nueva regla'),
       el('button.btn', { onclick: (e) => moreMenu(e.currentTarget) }, 'M\u00e1s \u25be')),
@@ -58,7 +59,7 @@ async function render() {
     const n = await promptDialog('Nuevo perfil', 'Nombre del perfil (por ejemplo, \u00abInformes del SG\u00bb)', '');
     if (n && n.trim()) { await saveProfiles(store.profiles.concat([n.trim()])); render(); }
   } }, '+ Perfil'));
-  host.appendChild(el('div.card', el('h3', 'Perfiles'), el('div.body',
+  host.appendChild(el('div.card', el('h3', 'Perfiles', helpBtn('profiles')), el('div.body',
     el('p.info', 'Un perfil es un juego de reglas por tipo de documento. Una regla sin perfiles se aplica siempre; con perfiles, solo cuando el proyecto usa uno de ellos (se elige en Revisar).'), profBox)));
 }
 
@@ -104,7 +105,9 @@ async function moreMenu(anchor) {
       download(new Blob([JSON.stringify({ kind: 'umbra-rules', v: 1, rules: rules.map(r => { const c = Object.assign({}, r); delete c.defaultRule; return c; }) }, null, 1)], { type: 'application/json' }), 'umbra-reglas.json');
     } },
     { label: 'Importar reglas (JSON)', onClick: () => importJson() },
-    { label: 'Importar lista de comprobaci\u00f3n de Xbench (.xbckl)', onClick: () => importXbckl() }
+    { label: 'Importar lista de comprobaci\u00f3n de Xbench (.xbckl)', onClick: () => importXbckl() },
+    { sep: true },
+    helpItem('rules', anchor)
   ]);
 }
 
@@ -218,7 +221,7 @@ async function editRule(r) {
     if (ex.length) testOut.appendChild(el('ul', ex.map(x => el('li', x))));
     if (cand.kind === 'style' || cand.kind === 'structure') testOut.appendChild(el('p', 'Esta regla la aplica la IA: no se puede probar sin ejecutar el m\u00f3dulo.'));
   };
-  const res = await modal({ title: isNew ? 'Nueva regla' : 'Editar regla', body, width: '720px', buttons: [
+  const res = await modal({ title: isNew ? 'Nueva regla' : 'Editar regla', help: helpBtn('rule-edit'), body, width: '720px', buttons: [
     { label: 'Cancelar', value: null },
     { label: 'Guardar', kind: 'primary', value: 'ok', onClick: () => {
       const c = collect();

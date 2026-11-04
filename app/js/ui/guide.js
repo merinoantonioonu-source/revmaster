@@ -25,6 +25,7 @@ export function showGuide() {
     el('ul',
       el('li', 'DOCX con control de cambios para lo aceptado y comentarios de Word para lo dem\u00e1s; PPTX y XLSX con los cambios aplicados; informes en HTML y Excel.'),
       el('li', 'Proveedores y modelos (uno por m\u00f3dulo), reglas (las de serie tambi\u00e9n se editan), listas de entidades, archivo de sincronizaci\u00f3n y uso de IA.')),
+    el('p.info', el('b', 'Ayuda al momento:'), ' junto a cada funci\u00f3n hay un bot\u00f3n ', el('b', '?'), ' que explica c\u00f3mo se usa (tambi\u00e9n en los di\u00e1logos y al final de los men\u00fas). F1 abre la ayuda de la pantalla o del di\u00e1logo en el que est\u00e9.'),
     el('p.info', 'Ctrl+rueda del rat\u00f3n: sobre las hojas ampl\u00eda el documento; en el resto, los controles.'));
   return modal({ title: 'Gu\u00eda r\u00e1pida', body, width: '720px', buttons: [{ label: 'Entendido', kind: 'primary' }] });
 }

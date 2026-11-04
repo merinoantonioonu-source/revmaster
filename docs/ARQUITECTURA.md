@@ -38,7 +38,7 @@ app/js/rules/             rules.js, powersearch.js, xbckl.js
 app/js/ai/                providers.js, registry.js, gateway.js, usage.js
 app/js/sync/              sync-fs.js, sync-autosave.js, sync-device.js, sync-spec.js
 app/js/export/            exports.js (enmascarado, tablas, informes, proyecto .umbra)
-app/js/ui/                vistas y paneles
+app/js/ui/                vistas y paneles (help.js: ayuda contextual "?" y F1)
 tests/                    pruebas (Node + Playwright), fixtures y simulador de IA
 tools/                    asciify.py, servidor local de pruebas
 .github/workflows/pages.yml  publica app/ en GitHub Pages

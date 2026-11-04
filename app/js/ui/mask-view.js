@@ -3,6 +3,7 @@
  * category switches, manual masking (Alt+E), per-entity actions and the export menu.
  */
 
+import { helpBtn, helpItem } from './help.js';
 import { el, $, clear, toast, modal, copyText, download, pickFiles, promptDialog, uid } from '../util/dom.js';
 import { state, on, emit, setMask, remaskNow, saveDictItem, addFindings } from '../state.js';
 import { renderDoc } from './preview.js';
@@ -21,12 +22,12 @@ export function mountMaskView(host, tools) {
   root = host;
   toolsHost = tools;
   root.appendChild(el('div.list#mask-list',
-    el('h4', 'Entidades del documento'),
+    el('h4', 'Entidades del documento', helpBtn('entities')),
     el('div.bubbles#mask-bubbles'),
     el('div.scroll#mask-entities')));
   const work = el('div.work',
     el('div.panes',
-      el('div.pane', el('div.pane-head', el('span#mask-src-title', 'ORIGINAL'), el('input', { placeholder: 'Buscar\u2026', 'data-side': 'src', oninput: onSearch })),
+      el('div.pane', el('div.pane-head', el('span#mask-src-title', 'ORIGINAL'), helpBtn('sheets'), el('input', { placeholder: 'Buscar\u2026', 'data-side': 'src', oninput: onSearch })),
         el('div.pane-body#mask-src')),
       el('div.pane', el('div.pane-head', el('span', 'TRADUCCI\u00d3N \u00b7 ES'), el('input', { placeholder: 'Buscar\u2026', 'data-side': 'tgt', oninput: onSearch })),
         el('div.pane-body#mask-tgt'))));
@@ -75,6 +76,7 @@ function renderTools() {
     '\ud83d\udc41 ' + (showOriginal ? 'Ver etiquetas' : 'Ver original')));
   toolsHost.appendChild(el('button.btn', { title: 'Enmascarar el texto seleccionado (Alt+E)', onclick: maskSelection }, '+ Enmascarar selecci\u00f3n'));
   toolsHost.appendChild(el('button.btn.violet', { onclick: (e) => exportMenu(e.currentTarget) }, 'Exportar enmascarado \u25be'));
+  toolsHost.appendChild(helpBtn('mask-tools'));
 }
 
 function optionsMenu(anchor) {
@@ -85,7 +87,9 @@ function optionsMenu(anchor) {
     { sep: true },
     { label: 'Volver a enmascarar todo lo que se quit\u00f3 a mano', onClick: () => { setMask({ removedKeys: [], removedOcc: [] }); toast('Restablecido.', 'ok'); } },
     { label: 'Deshacer todas las fusiones', onClick: () => setMask({ merges: {} }) },
-    { label: 'Quitar los t\u00e9rminos a\u00f1adidos a mano en este proyecto', onClick: () => setMask({ terms: [] }) }
+    { label: 'Quitar los t\u00e9rminos a\u00f1adidos a mano en este proyecto', onClick: () => setMask({ terms: [] }) },
+    { sep: true },
+    helpItem('mask-options', anchor)
   ]);
 }
 
@@ -106,7 +110,9 @@ function exportMenu(anchor) {
       const pwd = await promptDialog('Mapa de claves', 'Contrase\u00f1a para cifrarlo (vac\u00edo = sin cifrar). Gu\u00e1rdelo aparte: contiene los datos reales.', '', { type: 'password' });
       if (pwd === null) return;
       run(() => exportKeyMap(pwd || null));
-    } }
+    } },
+    { sep: true },
+    helpItem('mask-export', anchor)
   ]);
 }
 
@@ -131,7 +137,7 @@ export async function externalDialog() {
     el('p.info', 'Texto enmascarado con las instrucciones para pegarlo en una IA externa (ChatGPT, Gemini, Claude...). Su respuesta se puede importar despu\u00e9s con \u00abImportar respuesta de IA externa\u00bb y aparecer\u00e1 en la lista de hallazgos.'),
     el('div', { style: { marginBottom: '6px' } }, checks), el('label', bil, ' Incluir el original (revisi\u00f3n biling\u00fce)'),
     el('div', { style: { marginTop: '8px' } }, ta));
-  await modal({ title: 'Copiar para IA externa', body, width: '860px', buttons: [
+  await modal({ title: 'Copiar para IA externa', help: helpBtn('external-copy'), body, width: '860px', buttons: [
     { label: 'Descargar .txt', onClick: () => { download(new Blob([ta.value], { type: 'text/plain' }), state.project.name + '_PARA_IA.txt'); return false; } },
     { label: 'Copiar', kind: 'primary', onClick: async () => { await copyText(ta.value); toast('Copiado al portapapeles.', 'ok'); } }] });
 }
@@ -139,7 +145,7 @@ export async function externalDialog() {
 export async function importDialog() {
   const ta = el('textarea.inp', { rows: 14, placeholder: '12 | OMI | MAY | cita | sugerencia | motivo' });
   const body = el('div', el('p.info', 'Pegue la respuesta de la IA externa (una l\u00ednea por problema, con el formato que se le pidi\u00f3). Las etiquetas se convierten en el texto real.'), ta);
-  const r = await modal({ title: 'Importar respuesta de IA externa', body, width: '760px', buttons: [
+  const r = await modal({ title: 'Importar respuesta de IA externa', help: helpBtn('external-import'), body, width: '760px', buttons: [
     { label: 'Cancelar', value: null }, { label: 'Importar', kind: 'primary', value: 'ok' }] });
   if (r !== 'ok' || !ta.value.trim()) return;
   const res = importExternal(ta.value, state.session);
@@ -226,7 +232,7 @@ function changeArt(e, anchor) {
 async function mergeDialog(e) {
   const others = state.session.ent.entities.filter(x => x.key !== e.key);
   const sel = el('select.inp', others.map(x => el('option', { value: x.key }, x.cat + x.n + ' \u2014 ' + (mainForm(x.srcForms) || mainForm(x.tgtForms)))));
-  const r = await modal({ title: 'Fusionar ' + e.cat + e.n, body: el('div',
+  const r = await modal({ title: 'Fusionar ' + e.cat + e.n, help: helpBtn('merge'), body: el('div',
     el('p.info', 'Use esto cuando dos etiquetas son en realidad la misma entidad (por ejemplo, una sigla del original y el nombre completo de la traducci\u00f3n). La etiqueta elegida absorbe a ' + e.cat + e.n + '.'),
     el('label.lbl', 'Es la misma entidad que'), sel),
     buttons: [{ label: 'Cancelar', value: null }, { label: 'Fusionar', kind: 'primary', value: 'ok' }] });
@@ -372,7 +378,7 @@ async function maskSelection(preset) {
     el('div.field', el('label.lbl', 'Es la misma entidad que'), pairSel),
     el('div.field', el('label.lbl', side === 'src' ? 'Forma en la traducci\u00f3n' : 'Forma en el original'), other),
     el('label', dict, ' Guardar tambi\u00e9n en mi diccionario personal (para todos los documentos)'));
-  const r = await modal({ title: 'Enmascarar selecci\u00f3n', body, buttons: [{ label: 'Cancelar', value: null }, { label: 'Enmascarar', kind: 'primary', value: 'ok' }] });
+  const r = await modal({ title: 'Enmascarar selecci\u00f3n', help: helpBtn('mask-selection'), body, buttons: [{ label: 'Cancelar', value: null }, { label: 'Enmascarar', kind: 'primary', value: 'ok' }] });
   if (r !== 'ok') return;
   const term = { id: uid('t'), cat: catSel.value, art: artSel.value, src: [], tgt: [] };
   if (side === 'src') { term.src.push(text); if (other.value.trim()) term.tgt.push(other.value.trim()); }

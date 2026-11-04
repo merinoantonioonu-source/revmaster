@@ -12,6 +12,7 @@
  *   openAddModelModal({ providerId }) -> { provider, model } | null
  */
 
+import { helpBtn, helpItem } from './help.js';
 import { el, clear, modal, toast, confirmDialog, debounce } from '../util/dom.js';
 import { AI_MODULES, ROLE_LABELS, moduleById } from '../review/module-list.js';
 import { ADAPTERS, adapterLabel, testConnection } from '../ai/providers.js';
@@ -199,7 +200,7 @@ export async function openAddModelModal(opts) {
     msg);
   let result = null;
   await modal({
-    title: 'A\u00f1adir un modelo', body,
+    title: 'A\u00f1adir un modelo', help: helpBtn('model-add'), body,
     buttons: [
       { label: 'Cancelar', value: null },
       { label: 'A\u00f1adir y elegir', kind: 'primary', value: 'ok', onClick: async () => {
@@ -396,7 +397,7 @@ export async function openProviderModal(profile) {
 
   let saved = null;
   await modal({
-    title: isNew ? 'A\u00f1adir proveedor' : 'Editar ' + (p.name || 'proveedor'),
+    title: isNew ? 'A\u00f1adir proveedor' : 'Editar ' + (p.name || 'proveedor'), help: helpBtn('provider-edit'),
     body, width: '680px',
     buttons: [
       { label: 'Cancelar', value: null },
@@ -491,7 +492,7 @@ export async function mount(container) {
     cards.appendChild(el('div.pcard.add', { onclick: async () => { if (await openProviderModal(null)) render(); } }, '+ A\u00f1adir proveedor'));
     const hiddenLine = hidden.length ? el('p.info', { style: { marginTop: '8px' } }, 'Ocultos: ',
       hidden.map(p => el('button.btn.link', { onclick: async () => { await reg.unhideProvider(p.id); render(); } }, 'Mostrar ' + p.name))) : null;
-    frag.appendChild(_card('Proveedores de IA',
+    frag.appendChild(_card(['Proveedores de IA', helpBtn('providers')],
       el('div.note', 'Cada proveedor es un perfil con sus modelos. Las claves se guardan solo en este navegador. ',
         'Algunos proveedores no aceptan llamadas desde una p\u00e1gina web (CORS): "Probar conexi\u00f3n" lo dice. Gemini y Anthropic s\u00ed las aceptan.'),
       cards, hiddenLine));
@@ -499,7 +500,7 @@ export async function mount(container) {
     // General provider
     const genSel = _modelSelect(status, mm.general, async (c) => { await reg.setGeneralModel(c); render(); },
       { firstLabel: 'El primero con clave' });
-    frag.appendChild(_card('Proveedor general',
+    frag.appendChild(_card(['Proveedor general', helpBtn('general-provider')],
       el('p.info', 'Lo usa todo m\u00f3dulo que no tenga un modelo propio, y el que tenga uno sin clave. Si no eliges ninguno, se usa el primer proveedor con clave.'),
       genSel));
 
@@ -518,7 +519,7 @@ export async function mount(container) {
         el('td', el('b', m.label), el('div.muted', { style: { fontSize: '11px' } }, m.desc)),
         cell('triage'), cell('deep')));
     }
-    frag.appendChild(_card('Modelo por m\u00f3dulo',
+    frag.appendChild(_card(['Modelo por m\u00f3dulo', helpBtn('module-models')],
       el('p.info', ROLE_LABELS.triage + ': pasada econ\u00f3mica por todo el texto. ' + ROLE_LABELS.deep +
         ': modelo fuerte sobre lo que se\u00f1alan el cribado o la capa local. "General" = el proveedor general. ' +
         'Si el proveedor elegido no tiene clave, el m\u00f3dulo usa el general y lo dice.'),

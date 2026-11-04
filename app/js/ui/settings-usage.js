@@ -11,6 +11,7 @@
  * totals are those of all of them (the "Equipo" choice narrows them to one).
  */
 
+import { helpBtn, helpItem } from './help.js';
 import { el, clear, toast, download, fmtInt, fmtMoney } from '../util/dom.js';
 import { MODULES } from '../review/module-list.js';
 import * as reg from '../ai/registry.js';
@@ -345,7 +346,7 @@ export async function mount(container) {
     const tile = (label, value, sub) => el('div.pcard', { style: { minWidth: '150px' } },
       el('div.lbl', { style: { margin: '0 0 4px' } }, label), el('div', { style: { fontSize: '18px', fontWeight: '700' } }, value),
       sub ? el('div.muted', { style: { fontSize: '11px' } }, sub) : null);
-    frag.appendChild(el('div.card', el('h3', 'Uso de IA y coste'), el('div.body',
+    frag.appendChild(el('div.card', el('h3', 'Uso de IA y coste', helpBtn('usage')), el('div.body',
       el('div.row', el('span.lbl', { style: { margin: 0 } }, 'Periodo'), periodSel, devSel, el('span.grow'),
         metricBtn('cost', 'Coste'), metricBtn('tokens', 'Tokens'), lookBtn,
         el('button.btn.sm', { onclick: exportXlsx }, 'Exportar a Excel')),
@@ -364,7 +365,7 @@ export async function mount(container) {
       bars(_groupBy(list, r => r.project), (k, l) => projectName(l[0]), (k) => k ? noteEditor(k) : null))));
     frag.appendChild(el('div.card', el('h3', 'Por modelo'), el('div.body', bars(_groupBy(list, r => priceKey(r.provider, r.model)), (k, l) => modelName(l[0])))));
     frag.appendChild(el('div.card', el('h3', 'Por d\u00eda'), el('div.body', bars(_groupBy(list, r => r.day), k => k))));
-    frag.appendChild(el('div.card', el('h3', 'Precios'), el('div.body',
+    frag.appendChild(el('div.card', el('h3', 'Precios', helpBtn('prices')), el('div.body',
       el('p.info', 'US$ por mill\u00f3n de tokens. "En cach\u00e9" es el precio de los tokens que el proveedor sirve de su cach\u00e9 (vac\u00edo: el de entrada). ' +
         'El razonamiento se paga al precio de salida. "Buscar precios" no cambia los puestos a mano.'),
       priceTable())));

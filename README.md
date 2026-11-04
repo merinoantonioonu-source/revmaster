@@ -62,7 +62,7 @@ navegador: no se suben a GitHub ni a ningún servidor. A una IA solo llega texto
    Pulsa **Probar conexión**.
 3. Arrastra el original y la traducción a las dos cajas de arriba.
 4. **Paso 1 (Enmascarar):** revisa las entidades. Para enmascarar algo más, selecciona el texto y
-   pulsa **Alt+E**. Para quitar una etiqueta, haz clic derecho sobre ella.
+   pulsa **Alt+E** (o clic derecho › Enmascarar la selección). Para quitar una etiqueta, haz clic derecho sobre ella.
 5. **Paso 2 (Revisar):** elige los módulos y pulsa **Ejecutar seleccionados**. Revisa los hallazgos
    con los atajos de teclado:
    - **A** acepta;
@@ -70,6 +70,9 @@ navegador: no se suben a GitHub ni a ningún servidor. A una IA solo llega texto
    - **E** edita;
    - **J** y **K** pasan al siguiente y al anterior.
 6. **Paso 3 (Exportar y ajustes):** descarga la traducción revisada o un informe.
+
+¿Dudas sobre algo? Junto a cada función hay un botón **?** que explica al momento cómo se usa, y
+**F1** abre la ayuda de la pantalla (o del diálogo) en la que estés.
 
 En **Sincronización** puedes guardar en un archivo (por ejemplo, en OneDrive):
 - los proveedores y modelos;
