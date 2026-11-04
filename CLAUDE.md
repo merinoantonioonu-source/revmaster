@@ -48,3 +48,7 @@ See `docs/ARQUITECTURA.md` (contracts between modules) and `docs/PROPUESTA.md` (
 - Masking: the tag carries the Spanish article of the ENTITY (`{la ORGANO2}`); the article or
   contraction already in the text stays outside, so article errors remain visible.
 - A shared string in XLSX can be used by several cells: the writer clones it when the edits differ.
+- Contextual help: every feature has a "?" (`helpBtn(topic)` from `app/js/ui/help.js`; in a dialog,
+  `modal({ help: helpBtn(topic) })`; in a menu, `helpItem(topic, anchor)`). A NEW feature or setting
+  gets its topic in `help.js` and its button; update the text when behaviour changes.
+  `tests/help.e2e.mjs` fails on a missing or unused topic.

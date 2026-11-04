@@ -3,6 +3,7 @@
  * trilingual lists (countries, organs, organizations, titles, places), which are editable too.
  */
 
+import { helpBtn, helpItem } from './help.js';
 import { el, clear, toast, modal, download, pickFiles, confirmDialog } from '../util/dom.js';
 import { state, saveDictItem, saveGazetteerEdit, refreshLists } from '../state.js';
 import { getValue } from '../store/storage.js';
@@ -28,7 +29,7 @@ function render() {
     CATS.filter(c => c !== 'NUM' && c !== 'FECHA').map(c => el('option', { value: c }, CAT_LABELS[c])));
   cat.value = filt.cat;
   const tbody = el('tbody');
-  host.appendChild(el('div.card', el('h3', filt.src === 'dict' ? 'Mi diccionario' : 'Listas de serie'), el('div.body',
+  host.appendChild(el('div.card', el('h3', filt.src === 'dict' ? 'Mi diccionario' : 'Listas de serie', helpBtn('lists')), el('div.body',
     el('div.row', { style: { marginBottom: '8px' } }, q, cat, el('span.grow'),
       el('button.btn.primary', { onclick: () => editEntry(null) }, '+ A\u00f1adir'),
       filt.src === 'dict' ? el('button.btn', { onclick: exportDict }, 'Exportar') : null,
@@ -76,7 +77,7 @@ async function editEntry(e) {
     el('div.form-grid', el('div.field', el('label.lbl', 'Categor\u00eda'), cat), el('div.field', el('label.lbl', 'Art\u00edculo en espa\u00f1ol (g\u00e9nero y n\u00famero)'), art)),
     el('p.info', 'Una forma por l\u00ednea: nombre completo, forma corta y siglas.'),
     el('label.lbl', 'Ingl\u00e9s'), en, el('label.lbl', 'Franc\u00e9s'), fr, el('label.lbl', 'Espa\u00f1ol'), es);
-  const r = await modal({ title: isNew ? 'Nueva entidad' : 'Editar entidad', body, width: '640px',
+  const r = await modal({ title: isNew ? 'Nueva entidad' : 'Editar entidad', help: helpBtn('lists'), body, width: '640px',
     buttons: [{ label: 'Cancelar', value: null }, { label: 'Guardar', kind: 'primary', value: 'ok' }] });
   if (r !== 'ok') return;
   const lines = (t) => t.value.split('\n').map(s => s.trim()).filter(Boolean);

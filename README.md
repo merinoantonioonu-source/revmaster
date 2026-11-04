@@ -41,6 +41,13 @@ navegador: no se suben a GitHub ni a ningún servidor. A una IA solo llega texto
 
    Cada módulo tiene su propio proveedor, su modelo y sus reglas. Antes de gastar nada, UMBRA
    muestra el plan con su coste estimado.
+
+   Además:
+   - **Similitud semántica:** compara el sentido de cada oración del original con las de la
+     traducción para encontrar omisiones y adiciones. Funciona en tu navegador, sin coste, o con un
+     proveedor, con texto enmascarado.
+   - **Modo diferido:** la primera pasada va a la API de lotes del proveedor (Gemini, Anthropic,
+     Mistral u OpenAI). Cuesta la mitad y responde en minutos u horas.
 3. **Exportar.** La traducción revisada sale así:
    - **DOCX:** con control de cambios para lo aceptado y comentarios de Word para lo demás.
    - **PPTX y XLSX:** con los cambios ya aplicados.
@@ -55,7 +62,7 @@ navegador: no se suben a GitHub ni a ningún servidor. A una IA solo llega texto
    Pulsa **Probar conexión**.
 3. Arrastra el original y la traducción a las dos cajas de arriba.
 4. **Paso 1 (Enmascarar):** revisa las entidades. Para enmascarar algo más, selecciona el texto y
-   pulsa **Alt+E**. Para quitar una etiqueta, haz clic derecho sobre ella.
+   pulsa **Alt+E** (o clic derecho › Enmascarar la selección). Para quitar una etiqueta, haz clic derecho sobre ella.
 5. **Paso 2 (Revisar):** elige los módulos y pulsa **Ejecutar seleccionados**. Revisa los hallazgos
    con los atajos de teclado:
    - **A** acepta;
@@ -63,6 +70,9 @@ navegador: no se suben a GitHub ni a ningún servidor. A una IA solo llega texto
    - **E** edita;
    - **J** y **K** pasan al siguiente y al anterior.
 6. **Paso 3 (Exportar y ajustes):** descarga la traducción revisada o un informe.
+
+¿Dudas sobre algo? Junto a cada función hay un botón **?** que explica al momento cómo se usa, y
+**F1** abre la ayuda de la pantalla (o del diálogo) en la que estés.
 
 En **Sincronización** puedes guardar en un archivo (por ejemplo, en OneDrive):
 - los proveedores y modelos;
@@ -87,5 +97,7 @@ fusiona un cambio en `main`.
 
 - [JSZip](https://stuk.github.io/jszip/) (MIT o GPLv3) y [SheetJS](https://sheetjs.com/) (Apache 2.0), copiados de COMeT.
 - [nspell](https://github.com/wooorm/nspell) (MIT).
+- [transformers.js](https://github.com/huggingface/transformers.js) 3.7.6 (Apache 2.0), que descarga al usarse
+  el modelo [paraphrase-multilingual-MiniLM-L12-v2](https://huggingface.co/Xenova/paraphrase-multilingual-MiniLM-L12-v2) (Apache 2.0).
 - Diccionario español de Hunspell de [dictionary-es](https://github.com/wooorm/dictionaries) (GPL-3.0, LGPL-3.0 o MPL-1.1, a elegir; véase `app/data/hunspell/LICENSE.txt`).
 - Partes del código proceden de COMeT (del mismo autor) y se indican en la cabecera de cada archivo.

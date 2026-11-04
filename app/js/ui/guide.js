@@ -18,11 +18,14 @@ export function showGuide() {
     el('ul',
       el('li', 'La ', el('b', 'Capa 0'), ' revisa sin IA y gratis: cifras, etiquetas, p\u00e1rrafos que faltan, longitud, paralelismo de listas, convenciones de resoluciones y sus reglas fijas.'),
       el('li', 'Los m\u00f3dulos con IA (gram\u00e1tica, fidelidad, integridad, estilo, coherencia, convenciones, lectura en fr\u00edo y verificador) se ejecutan juntos o por separado. Antes de gastar, UMBRA muestra el plan con su coste estimado.'),
+      el('li', 'La similitud sem\u00e1ntica (Capa 0) compara el sentido de cada oraci\u00f3n con la traducci\u00f3n para encontrar omisiones y adiciones; funciona en este navegador o con un proveedor (Ajustes \u203a M\u00f3dulos).'),
+      el('li', 'Modo diferido: en el plan de gasto, marque \u00abModo diferido (lotes)\u00bb y la primera pasada costar\u00e1 la mitad; las respuestas llegan en minutos u horas y UMBRA termina la revisi\u00f3n sola cuando vuelva a abrir el proyecto.'),
       el('li', 'Acepte (A), rechace (R) o edite (E) cada hallazgo; J y K pasan al siguiente y al anterior.')),
     el('h4', '3 \u00b7 Exportar y ajustes'),
     el('ul',
       el('li', 'DOCX con control de cambios para lo aceptado y comentarios de Word para lo dem\u00e1s; PPTX y XLSX con los cambios aplicados; informes en HTML y Excel.'),
       el('li', 'Proveedores y modelos (uno por m\u00f3dulo), reglas (las de serie tambi\u00e9n se editan), listas de entidades, archivo de sincronizaci\u00f3n y uso de IA.')),
+    el('p.info', el('b', 'Ayuda al momento:'), ' junto a cada funci\u00f3n hay un bot\u00f3n ', el('b', '?'), ' que explica c\u00f3mo se usa (tambi\u00e9n en los di\u00e1logos y al final de los men\u00fas). F1 abre la ayuda de la pantalla o del di\u00e1logo en el que est\u00e9.'),
     el('p.info', 'Ctrl+rueda del rat\u00f3n: sobre las hojas ampl\u00eda el documento; en el resto, los controles.'));
   return modal({ title: 'Gu\u00eda r\u00e1pida', body, width: '720px', buttons: [{ label: 'Entendido', kind: 'primary' }] });
 }

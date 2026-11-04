@@ -65,16 +65,25 @@ export async function runPlan(plan, ctx, hooks) {
   }
 
   // ---- triage (and deep) per group
-  for (const g of plan.groups) {
+  for (let gi = 0; gi < plan.groups.length; gi++) {
+    const g = plan.groups[gi];
     if (out.stopped) break;
     const flagged = new Set();
     const groupFindings = [];
-    for (const b of g.batches) {
+    // Units the local layer already suspects (omissions, additions, meaning) go to the deep model too.
+    if (g.deep && h.localFlags) {
+      for (const b of g.batches) for (const it of b.items) if (h.localFlags.has(it.u.n)) flagged.add(it.u.n);
+    }
+    for (let bi = 0; bi < g.batches.length; bi++) {
+      const b = g.batches[bi];
       if (out.stopped) break;
-      progress('Lote ' + (g.batches.indexOf(b) + 1) + '/' + g.batches.length, g.modules.join('+'));
+      progress('Lote ' + (bi + 1) + '/' + g.batches.length, g.modules.join('+'));
+      const pre = h.prefetched ? h.prefetched.get('g' + gi + 'b' + bi) : null;
+      if (h.prefetched && !pre) continue;   // deferred run: this batch had no answer
+      if (pre && pre.error) { out.errors.push({ module: g.modules.join('+'), message: 'Lote diferido: ' + pre.error }); continue; }
       let res;
       try {
-        res = await _runBatch(b.items.map(x => x.u), g, g.tri, 'triage', b.user, b.inTok, call, ctx);
+        res = await _runBatch(b.items.map(x => x.u), g, g.tri, 'triage', b.user, b.inTok, call, ctx, pre ? pre.text : null);
       } catch (e) {
         if (e.code === 'BUDGET' || e.code === 'ABORT') break;
         out.errors.push({ module: g.modules.join('+'), message: e.message, code: e.code });
@@ -131,14 +140,18 @@ export async function runPlan(plan, ctx, hooks) {
   }
 
   // ---- skeleton modules
-  for (const s of plan.skeleton) {
+  for (let si = 0; si < plan.skeleton.length; si++) {
+    const s = plan.skeleton[si];
     if (out.stopped) break;
     progress('Esqueleto', s.module);
     try {
-      const r = await call({ module: s.module, role: 'triage', prompt: s.user, system: s.system, words: 0,
+      const pre = h.prefetched ? h.prefetched.get('s' + si) : null;
+      if (h.prefetched && !pre) continue;
+      if (pre && pre.error) { out.errors.push({ module: s.module, message: 'Lote diferido: ' + pre.error }); continue; }
+      const r = pre ? { text: pre.text, modelId: (s.tri && s.tri.modelId) || '' } : await call({ module: s.module, role: 'triage', prompt: s.user, system: s.system, words: 0,
         thinking: _thinking(ctx.cfg, s.module), maxTokens: 4096 }, s.est.cost);
       const parsed = parseFindings(r.text, s.units);
-      push(parsed.items.map(it => anchorItem(it, { session, unitByN, module: s.module, source: 'ai', model: r.modelId, role: 'triage' })));
+      push(parsed.items.map(it => anchorItem(it, { session, unitByN, module: s.module, source: 'ai', model: r.modelId + (pre ? ' \u00b7 lote' : ''), role: 'triage' })));
     } catch (e) {
       if (e.code === 'BUDGET' || e.code === 'ABORT') break;
       out.errors.push({ module: s.module, message: e.message, code: e.code });
@@ -164,13 +177,15 @@ function _thinking(cfg, moduleId) {
 }
 
 /** One batch: call, parse, re-ask the second half when the answer was cut (no FIN). */
-async function _runBatch(units, g, client, role, user, est, call, ctx) {
+async function _runBatch(units, g, client, role, user, est, call, ctx, preText) {
   const session = ctx.session;
   const valid = new Set(units.map(u => u.n));
   const moduleId = g.modules[0];
   const words = units.reduce((n, u) => n + (unitTgtMasked(session, u).match(/\S+/g) || []).length, 0);
-  const r = await call({ module: moduleId, usageModule: g.modules.join('+'), role, prompt: user, system: g.system, words,
-    thinking: _thinking(ctx.cfg, moduleId), maxTokens: 8192 }, est ? _estCost(est) : 0);
+  // A deferred batch already answered (preText): parse it; only a cut answer is completed now.
+  const r = (preText !== null && preText !== undefined) ? { text: preText }
+    : await call({ module: moduleId, usageModule: g.modules.join('+'), role, prompt: user, system: g.system, words,
+      thinking: _thinking(ctx.cfg, moduleId), maxTokens: 8192 }, est ? _estCost(est) : 0);
   const parsed = parseFindings(r.text, valid);
   const res = new Map();
   for (const n of valid) res.set(n, []);

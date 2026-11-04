@@ -112,6 +112,7 @@ function _normProfile(p) {
     builtIn: !!p.builtIn
   };
   if (p.hidden) out.hidden = true;
+  if (p.batch === true) out.batch = true;   // openai-compatible: supports the OpenAI Batch API
   const seen = new Set();
   for (const m of (Array.isArray(p.models) ? p.models : [])) {
     const nm = _normModel(m);

@@ -3,14 +3,16 @@
  * cost, progress, the findings list (filters, accept/reject/edit, keyboard) and the two sheets.
  */
 
+import { helpBtn, helpItem } from './help.js';
 import { el, $, clear, toast, modal, fmtInt, fmtMoney, promptDialog, confirmDialog } from '../util/dom.js';
 import { state, on, emit, addFindings, updateFinding, saveProjectSoon, setProfile } from '../state.js';
 import { renderDoc } from './preview.js';
 import { MODULES, moduleById, INPUT_ICONS, INPUT_LABELS, ROLE_LABELS } from '../review/module-list.js';
 import { runLocalChecks, LOCAL_SUBS } from '../review/local-checks.js';
 import { makePlan } from '../review/planner.js';
+import { deferredCapability, startDeferred, checkDeferred, cancelDeferredRecord, DEFERRED_STATUS } from '../review/deferred.js';
 import { runPlan, verifyFindings } from '../review/runner.js';
-import { loadModuleConfig } from '../review/module-config.js';
+import { loadModuleConfig, saveModuleConfig } from '../review/module-config.js';
 import { loadPrompts, CAT_LABELS } from '../review/prompts.js';
 import { getEffectiveRules, loadRulesStore, upsertRule, SEV_LABELS } from '../rules/rules.js';
 import { STATE_LABELS } from '../review/findings.js';
@@ -31,20 +33,23 @@ export function mountReviewView(host, tools) {
   root = host;
   toolsHost = tools;
   root.appendChild(el('div.list',
-    el('h4', 'Hallazgos', el('span.grow'), el('button.btn.sm', { title: 'Opciones de la lista', onclick: (e) => listMenu(e.currentTarget) }, '\u22ef')),
+    el('h4', 'Hallazgos', helpBtn('findings'), el('span.grow'), el('button.btn.sm', { title: 'Opciones de la lista', onclick: (e) => listMenu(e.currentTarget) }, '\u22ef')),
     el('div.bubbles#rv-bubbles'),
     el('div.scroll#rv-findings')));
   root.appendChild(el('div.work',
     el('div.modstrip#rv-modules'),
     el('div.panes',
       el('div.pane', el('div.pane-head', el('span#rv-src-title', 'ORIGINAL')), el('div.pane-body#rv-src')),
-      el('div.pane', el('div.pane-head', el('span', 'TRADUCCI\u00d3N \u00b7 ES'), el('span.grow'), el('span.muted#rv-unit-info')), el('div.pane-body#rv-tgt')))));
+      el('div.pane', el('div.pane-head', el('span', 'TRADUCCI\u00d3N \u00b7 ES'), helpBtn('review-sheets'), el('span.grow'), el('span.muted#rv-unit-info')), el('div.pane-body#rv-tgt')))));
   panes = { src: $('#rv-src'), tgt: $('#rv-tgt') };
   on('view', (v) => { if (v === 'review') { renderAll(); scheduleEstimates(); } });
   on('findings', () => { if (state.view === 'review') { renderTools(); renderFindings(); renderPanes(); } });
   on('finding', () => { if (state.view === 'review') { renderTools(); renderFindings(); renderPanes(); } });
   on('masked', () => { estimates = {}; if (state.view === 'review') { renderPanes(); scheduleEstimates(); } });
-  on('project', () => { progress = {}; estimates = {}; selected = null; });
+  on('project', () => {
+    progress = {}; estimates = {}; selected = null;
+    if (state.project && (state.project.deferred || []).some(r => r.status === 'running')) startDeferredPolling();
+  });
   document.addEventListener('keydown', onKey);
 }
 
@@ -83,6 +88,7 @@ async function renderTools() {
   else toolsHost.appendChild(el('button.btn.amber', { onclick: () => runModules(Array.from(selectedModules)) }, '\u25b6 Ejecutar seleccionados'));
   toolsHost.appendChild(el('button.btn', { onclick: (e) => moreMenu(e.currentTarget) }, 'M\u00e1s \u25be'));
   toolsHost.appendChild(el('button.btn.violet', { onclick: (e) => exportMenu(e.currentTarget) }, 'Exportar \u25be'));
+  toolsHost.appendChild(helpBtn('review-tools'));
 }
 
 function moreMenu(anchor) {
@@ -92,7 +98,9 @@ function moreMenu(anchor) {
     { sep: true },
     { label: 'Verificar los hallazgos pendientes de la IA', onClick: reverify },
     { label: 'Configurar m\u00f3dulos y modelos', onClick: () => emit('goto-settings', 'modules') },
-    { label: 'Editar reglas', onClick: () => emit('goto-settings', 'rules') }
+    { label: 'Editar reglas', onClick: () => emit('goto-settings', 'rules') },
+    { sep: true },
+    helpItem('review-more', anchor)
   ]);
 }
 
@@ -107,7 +115,9 @@ function exportMenu(anchor) {
     { header: 'Informes' },
     { label: 'Informe HTML', onClick: () => exportReportHtml(f => f.state !== 'discarded') },
     { label: 'Informe Excel', onClick: () => exportReportXlsx(f => f.state !== 'discarded') },
-    { label: 'Hallazgos en JSON', onClick: exportFindingsJson }
+    { label: 'Hallazgos en JSON', onClick: exportFindingsJson },
+    { sep: true },
+    helpItem('review-export', anchor)
   ]);
 }
 
@@ -130,7 +140,9 @@ function listMenu(anchor) {
       if (!(await confirmDialog('Borrar hallazgos', 'Se borrar\u00e1n los hallazgos pendientes de la IA y de la IA externa (los aceptados y rechazados se conservan).', 'Borrar'))) return;
       state.findings = state.findings.filter(f => f.state !== 'open' || f.source === 'local' || f.source === 'rule');
       emit('findings'); saveProjectSoon();
-    } }
+    } },
+    { sep: true },
+    helpItem('findings', anchor)
   ]);
 }
 
@@ -162,6 +174,8 @@ async function renderModules() {
   const cfg = await loadModuleConfig();
   if (gen !== _modsGen) return;   // a newer call is drawing the cards
   clear(host);
+  const defCard = _deferredCard();
+  if (defCard) host.appendChild(defCard);
   for (const m of MODULES) {
     const p = progress[m.id];
     const cls = p ? (p.state === 'run' ? '.run' : (p.state === 'err' ? '.err' : '.done')) : '';
@@ -170,7 +184,7 @@ async function renderModules() {
       if (e.target.checked) selectedModules.add(m.id); else selectedModules.delete(m.id);
     } });
     const card = el('div.mcard' + cls, { title: m.desc },
-      el('div.nm', chk, m.label),
+      el('div.nm', chk, m.label, helpBtn('mod-' + m.id)),
       el('span.in', INPUT_ICONS[m.input] + ' ' + INPUT_LABELS[m.input]));
     if (m.ai) {
       for (const role of m.roles) {
@@ -226,6 +240,38 @@ async function computeEstimates() {
 
 // ------------------------------------------------------------------ running
 
+// The semantic check needs a choice the first time (the local model is a large download).
+async function _semanticMode(ctx) {
+  const c = ctx.cfg.local || {};
+  if (c.semantic === 'local' || c.semantic === 'api') return c.semantic;
+  if (c.semantic === 'off') return null;
+  const r = await modal({ title: 'Similitud sem\u00e1ntica (omisiones y adiciones)', help: helpBtn('semantic'), width: '620px', body: el('div',
+    el('p', 'La Capa 0 puede comparar el sentido de cada oraci\u00f3n del original con las de la traducci\u00f3n para encontrar omisiones y adiciones sin gastar en IA.'),
+    el('ul',
+      el('li', el('b', 'En este navegador:'), ' gratis y privado (lee el texto real). La primera vez descarga unos 140 MB (el motor y el modelo) y despu\u00e9s los guarda.'),
+      el('li', el('b', 'Con un proveedor:'), ' muy barato y r\u00e1pido; solo env\u00eda texto enmascarado. Se elige en Ajustes \u203a M\u00f3dulos.')),
+    el('p.info', 'Puede cambiarlo cuando quiera en Ajustes \u203a M\u00f3dulos \u203a Capa 0.')),
+    buttons: [{ label: 'No usarla', value: 'off' }, { label: 'Con un proveedor', value: 'api' }, { label: 'En este navegador', kind: 'primary', value: 'local' }] });
+  if (!r) return null;
+  await saveModuleConfig('local', { semantic: r });
+  ctx.cfg.local = Object.assign({}, c, { semantic: r });
+  if (r === 'api' && !c.semProvider) { toast('Elija el proveedor de la similitud sem\u00e1ntica en Ajustes \u203a M\u00f3dulos.', 'warn', 7000); emit('goto-settings', 'modules'); return null; }
+  return r === 'off' ? null : r;
+}
+
+/** Units the local layer suspects of an omission, an addition or a change of meaning. */
+function _localFlags() {
+  const flags = new Set();
+  for (const f of state.findings) {
+    if (f.module !== 'local' || f.state !== 'open') continue;
+    if (['semantic', 'sentences', 'length', 'numbers', 'tags'].includes(f.sub) && ['OMI', 'ADD', 'MIST'].includes(f.cat)) {
+      const u = state.session.units[f.unit];
+      if (u) flags.add(u.n);
+    }
+  }
+  return flags;
+}
+
 async function runModules(ids) {
   if (!state.session || running) return;
   const ctx = await _ctx();
@@ -241,6 +287,20 @@ async function runModules(ids) {
         list = list.concat(await spellFindings(state.session, { rules: ctx.rules }));
       } catch (e) { console.warn('spell', e); toast('No se pudo cargar el corrector ortogr\u00e1fico local: ' + e.message, 'warn'); }
     }
+    const sem = await _semanticMode(ctx);
+    if (sem) {
+      progress.local = { state: 'run', msg: 'Similitud sem\u00e1ntica\u2026' };
+      renderModules();
+      try {
+        const { semanticFindings } = await import('../review/semantic.js');
+        const r = await semanticFindings(state.session, Object.assign({}, ctx.cfg.local, { semantic: sem }), {
+          project: { name: state.project.name, file: state.project.tgtName },
+          onStatus: (msg) => { progress.local = { state: 'run', msg }; renderModules(); } });
+        // The semantic finding names the missing sentence: it replaces the coarser ones of that paragraph.
+        const semUnits = new Set(r.findings.filter(f => f.cat === 'OMI' || f.cat === 'MIST').map(f => f.unit));
+        list = list.filter(f => !(semUnits.has(f.unit) && f.cat === 'OMI' && (f.sub === 'sentences' || f.sub === 'length'))).concat(r.findings);
+      } catch (e) { console.warn('semantic', e); toast('Similitud sem\u00e1ntica: ' + e.message, 'warn', 9000); }
+    }
     addFindings(list, ['local']);
     progress.local = { state: 'done', msg: list.length + ' hallazgos' };
     if (!ai.length) { toast('Capa 0: ' + list.length + ' hallazgos.', 'ok'); renderModules(); return; }
@@ -253,8 +313,20 @@ async function runModules(ids) {
     return;
   }
   const budgetDefault = Math.min(...ai.map(id => ctx.cfg[id].budget || Infinity));
-  const ok = await planDialog(plan, isFinite(budgetDefault) ? budgetDefault : 0);
+  const cap = await deferredCapability(plan).catch(() => ({ ok: false, parts: [], missing: [] }));
+  const ok = await planDialog(plan, isFinite(budgetDefault) ? budgetDefault : 0, cap);
   if (!ok) return;
+  if (ok.deferred) {
+    try {
+      const rec = await startDeferred(plan, { session: state.session, cfg: ctx.cfg });
+      state.project.deferred = (state.project.deferred || []).concat([rec]);
+      saveProjectSoon();
+      toast('Enviado en modo diferido (' + rec.jobs.length + ' lote' + (rec.jobs.length > 1 ? 's' : '') + '). UMBRA comprobar\u00e1 cada minuto si ya hay respuesta; puede cerrar la p\u00e1gina y volver despu\u00e9s.', 'ok', 9000);
+      startDeferredPolling();
+    } catch (e) { console.error(e); toast('No se pudo enviar el lote: ' + e.message, 'err', 9000); }
+    renderModules();
+    return;
+  }
   running = { abort: new AbortController(), modules: ai };
   for (const id of ai) progress[id] = { state: 'run', done: 0, total: 1, msg: 'En cola' };
   // A new run replaces the open findings of these modules.
@@ -266,7 +338,7 @@ async function runModules(ids) {
   try {
     res = await runPlan(plan, { session: state.session, project: { name: state.project.name, file: state.project.tgtName },
       prompts: ctx.prompts, cfg: ctx.cfg, rules: ctx.rules }, {
-      signal: running.abort.signal, budget: ok.budget,
+      signal: running.abort.signal, budget: ok.budget, localFlags: _localFlags(),
       onProgress: (p) => {
         const mods = p.module ? String(p.module).split('+') : ai;
         for (const id of mods) if (progress[id]) Object.assign(progress[id], { done: p.done, total: p.total, msg: p.label });
@@ -297,7 +369,7 @@ async function runModules(ids) {
   for (const e of res.errors || []) toast((moduleById(String(e.module).split('+')[0]) || { label: e.module }).label + ': ' + e.message, 'err', 9000);
 }
 
-function planDialog(plan, budget) {
+function planDialog(plan, budget, cap) {
   const rows = [];
   for (const g of plan.groups) {
     rows.push(el('li', g.modules.map(id => moduleById(id).label).join(' + ') + (g.modules.length > 1 ? ' (fusionados)' : '') + ': ' +
@@ -311,15 +383,28 @@ function planDialog(plan, budget) {
   for (const e of plan.errors) rows.push(el('li.err-t', moduleById(e.module).label + ': ' + e.message));
   const budgetIn = el('input.inp', { type: 'number', min: 0, step: 0.05, value: budget || '', placeholder: 'Sin l\u00edmite', style: { width: '110px' } });
   const nothing = !plan.groups.some(g => g.batches.length) && !plan.skeleton.length;
+  // Deferred mode: the first pass (and the skeleton calls) at about half the price; the deep pass and
+  // the Verifier, which are small, run when the answers arrive, at the normal price.
+  const firstPass = plan.groups.reduce((n, g) => n + (g.est.cost || 0) - ((g.est.deep && g.est.deep.cost) || 0), 0) +
+    plan.skeleton.reduce((n, s) => n + (s.est.cost || 0), 0);
+  const deferredCost = plan.totals.cost - firstPass * 0.5;
+  const c = cap || { ok: false, parts: [], missing: [] };
+  const defChk = el('input', { type: 'checkbox', disabled: !c.ok || nothing ? true : null });
+  const defBox = el('div.note' + (c.ok ? '' : '.warn'), { style: { marginTop: '10px' } },
+    el('label', defChk, ' ', el('b', 'Modo diferido (lotes)'), c.ok ? ' \u00b7 ~' + fmtMoney(deferredCost) + ' en lugar de ~' + fmtMoney(plan.totals.cost) : ''),
+    el('div', { style: { marginTop: '4px' } }, c.ok
+      ? 'La primera pasada va a la API de lotes del proveedor: cuesta la mitad y responde en minutos u horas (hasta 24 h). Puede cerrar la p\u00e1gina: al volver, UMBRA recoge las respuestas y termina la revisi\u00f3n (la parte a fondo y el verificador, que son peque\u00f1os, se hacen entonces al precio normal).'
+      : (nothing ? 'No hay nada que enviar.' : 'No disponible: ' + (c.missing.join(', ') || 'ning\u00fan proveedor') + ' no tiene API de lotes en UMBRA (Gemini, Anthropic, Mistral y OpenAI s\u00ed la tienen; en un proveedor compatible con OpenAI se activa en su perfil).')));
   const body = el('div',
     el('ul', rows),
     el('p', el('b', fmtInt(plan.totals.calls) + ' llamadas \u00b7 ~' + fmtInt(plan.totals.inTok + plan.totals.outTok) + ' tokens \u00b7 ~' + fmtMoney(plan.totals.cost))),
     el('p.info', 'Estimaci\u00f3n orientativa: el gasto real se registra en Uso de IA. Solo se env\u00eda texto enmascarado.' +
       (nothing ? ' No hay nada nuevo que enviar: todo est\u00e1 en la cach\u00e9.' : '')),
-    el('label.lbl', 'Presupuesto m\u00e1ximo de esta ejecuci\u00f3n (US$)'), budgetIn);
-  return modal({ title: 'Plan de ejecuci\u00f3n', body, width: '640px', buttons: [
+    el('label.lbl', 'Presupuesto m\u00e1ximo de esta ejecuci\u00f3n (US$)'), budgetIn,
+    defBox);
+  return modal({ title: 'Plan de ejecuci\u00f3n', help: helpBtn('plan'), body, width: '680px', buttons: [
     { label: 'Cancelar', value: null },
-    { label: 'Ejecutar', kind: 'amber', value: 'go' }] }).then(r => r === 'go' ? { budget: parseFloat(budgetIn.value) || 0 } : null);
+    { label: 'Ejecutar', kind: 'amber', value: 'go' }] }).then(r => r === 'go' ? { budget: parseFloat(budgetIn.value) || 0, deferred: !!defChk.checked } : null);
 }
 
 async function reverify() {
@@ -554,4 +639,86 @@ function _flatten(list, selectedId) {
       attrs: { 'data-fids': cover.map(f => f.id).join(','), title: cover.map(f => (f.reason || '')).join(' \u2022 ') } });
   }
   return out;
+}
+
+// ------------------------------------------------------------------ deferred batches
+
+let _pollTimer = null;
+let _polling = false;
+
+function _deferredCard() {
+  const recs = (state.project && state.project.deferred) || [];
+  const shown = recs.filter(r => r.status === 'running' || (r.finishedAt && Date.now() - r.finishedAt < 7 * 86400000 && !r.dismissed) || (!r.finishedAt && !r.dismissed));
+  if (!shown.length) return null;
+  const card = el('div.mcard' + (shown.some(r => r.status === 'running') ? '.run' : '.done'), { style: { minWidth: '230px', maxWidth: '260px' } },
+    el('div.nm', '\u23f3 Lotes diferidos', helpBtn('deferred')));
+  for (const r of shown.slice(-3)) {
+    const done = r.jobs.reduce((n, j) => n + (j.done || 0), 0), total = r.jobs.reduce((n, j) => n + (j.total || 0), 0);
+    card.appendChild(el('div.est', new Date(r.createdAt).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' }) + ' \u00b7 ' +
+      (DEFERRED_STATUS[r.status] || r.status) + (r.status === 'running' ? ' \u00b7 ' + done + '/' + (total || '?') : (r.status === 'done' ? ' \u00b7 ' + r.findings + ' hallazgos \u00b7 ' + fmtMoney(r.spent || 0) : ''))));
+    if (r.status === 'running') {
+      const j = r.jobs.find(x => x.message);
+      if (j) card.appendChild(el('div.est', j.message));
+      card.appendChild(el('div.bar', el('i', { style: { width: Math.round(100 * done / Math.max(1, total)) + '%' } })));
+    }
+    if (r.stale) card.appendChild(el('div.est.warn-t', 'El documento cambi\u00f3 tras el env\u00edo: revise los hallazgos sin localizar.'));
+    if (r.error) card.appendChild(el('div.est.err-t', r.error));
+    const acts = el('div.ft');
+    if (r.status === 'running') {
+      acts.appendChild(el('button.btn.sm', { disabled: _polling ? true : null, onclick: () => pollDeferredNow(true) }, 'Comprobar'));
+      acts.appendChild(el('button.btn.sm.danger', { onclick: async () => {
+        if (!(await confirmDialog('Cancelar lote', 'Se cancelar\u00e1 el lote en el proveedor. Lo ya procesado puede facturarse igualmente.', 'Cancelar lote'))) return;
+        await cancelDeferredRecord(r); saveProjectSoon(); renderModules();
+      } }, 'Cancelar'));
+    } else {
+      acts.appendChild(el('button.btn.sm', { onclick: () => { r.dismissed = true; saveProjectSoon(); renderModules(); } }, 'Quitar'));
+    }
+    card.appendChild(acts);
+  }
+  return card;
+}
+
+export function startDeferredPolling() {
+  if (!_pollTimer) _pollTimer = setInterval(() => pollDeferredNow(false), 60000);
+  setTimeout(() => pollDeferredNow(false), 1500);
+}
+
+async function pollDeferredNow(manual) {
+  if (_polling || !state.project || !state.session) return;
+  const recs = (state.project.deferred || []).filter(r => r.status === 'running');
+  if (!recs.length) { if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; } return; }
+  _polling = true;
+  if (state.view === 'review') renderModules();
+  try {
+    const ctx = await _ctx();
+    for (const rec of recs) {
+      let cleared = false;
+      const r = await checkDeferred(rec, { session: state.session, prompts: ctx.prompts, cfg: ctx.cfg, rules: ctx.rules }, {
+        project: { name: state.project.name, file: state.project.tgtName }, localFlags: _localFlags(),
+        onFindings: (list) => {
+          if (!cleared) {
+            cleared = true;
+            state.findings = state.findings.filter(f => !(rec.modules.includes(f.module) && f.state === 'open' && f.source === 'ai'));
+          }
+          addFindings(list);
+        }
+      });
+      if (r.changed) saveProjectSoon();
+      if (r.finished) {
+        if (rec.status === 'done') toast('Lote diferido terminado: ' + rec.findings + ' hallazgos \u00b7 ' + fmtMoney(rec.spent || 0) + '.', 'ok', 9000);
+        else toast('El lote diferido no se complet\u00f3: ' + (rec.error || rec.status), 'err', 9000);
+        estimates = {};
+      } else if (manual) {
+        const done = rec.jobs.reduce((n, j) => n + (j.done || 0), 0), total = rec.jobs.reduce((n, j) => n + (j.total || 0), 0);
+        toast('El lote sigue en curso (' + done + '/' + (total || '?') + ').', '', 4000);
+      }
+    }
+  } catch (e) {
+    console.error('deferred', e);
+    if (manual) toast('No se pudo comprobar el lote: ' + e.message, 'err', 8000);
+  } finally {
+    _polling = false;
+    emit('findings');
+    if (state.view === 'review') renderAll();
+  }
 }

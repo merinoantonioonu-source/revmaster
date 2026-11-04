@@ -231,3 +231,47 @@ function _flat(s) { return String(s || '').replace(/[\t\r\n]+/g, ' ').replace(/ 
 export function moduleCats(moduleId) { return TASKS[moduleId] ? TASKS[moduleId].cats : []; }
 
 export { AI_MODULES };
+
+// ------------------------------------------------------------------ deferred mode (plan kept for later)
+
+/** A plan as plain data (for project.deferred): enough to finish it when the batch answers arrive. */
+export function serializePlan(plan) {
+  const ref = (c) => c ? { providerId: c.providerId, modelId: c.modelId, name: c.profile ? c.profile.name : '' } : null;
+  return {
+    v: 1,
+    groups: plan.groups.map(g => ({
+      modules: g.modules, input: g.input, tri: ref(g.tri), deep: ref(g.deep), system: g.system, rules: g.rules, rh: g.rh, pv: g.pv,
+      batches: g.batches.map(b => ({ units: b.items.map(x => x.u.idx), uks: b.items.map(x => x.uk), words: b.items.map(x => x.words),
+        user: b.user, inTok: b.inTok, outTok: b.outTok })),
+      dupOf: Array.from(g.dupOf.entries()), est: g.est
+    })),
+    skeleton: plan.skeleton.map(s => ({ module: s.module, tri: ref(s.tri), system: s.system, user: s.user, units: Array.from(s.units), est: s.est })),
+    verify: plan.verify ? { modules: plan.verify.modules, client: ref(plan.verify.client), est: plan.verify.est } : null,
+    totals: plan.totals
+  };
+}
+
+/** The serialized plan, back as a plan runPlan() accepts (cached hits are not replayed). */
+export function restorePlan(data, session) {
+  const unit = (idx) => session.units[idx];
+  return {
+    groups: (data.groups || []).map(g => ({
+      modules: g.modules, input: g.input, tri: g.tri, deep: g.deep, system: g.system, rules: g.rules || [], rh: g.rh, pv: g.pv || {},
+      batches: g.batches.map(b => ({ items: b.units.map((idx, k) => ({ u: unit(idx), uk: b.uks[k], words: b.words[k] })).filter(x => x.u),
+        user: b.user, inTok: b.inTok, outTok: b.outTok })),
+      dupOf: new Map(g.dupOf || []), cachedHits: [], est: g.est || {}
+    })),
+    skeleton: (data.skeleton || []).map(s => Object.assign({}, s, { units: new Set(s.units) })),
+    verify: data.verify || null,
+    totals: data.totals || { calls: 0 },
+    errors: []
+  };
+}
+
+/** Keys of the deferrable calls of a plan, in the order runPlan() makes them. */
+export function deferredKeys(plan) {
+  const out = [];
+  plan.groups.forEach((g, gi) => g.batches.forEach((b, bi) => out.push({ key: 'g' + gi + 'b' + bi, gi, bi, kind: 'batch' })));
+  plan.skeleton.forEach((s, si) => out.push({ key: 's' + si, si, kind: 'skel' }));
+  return out;
+}

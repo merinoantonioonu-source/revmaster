@@ -39,6 +39,8 @@ async function newApp(browser, base) {
   await page.goto(base + '/app/index.html');
   await page.waitForSelector('.modal', { timeout: 15000 });   // the guide on first run
   await page.click('.modal-foot .btn');
+  // The semantic check asks before its first use (large download): not part of this test (phase6.e2e.mjs).
+  await page.evaluate(async () => { const mc = await import('/app/js/review/module-config.js'); await mc.saveModuleConfig('local', { semantic: 'off' }); });
   return { ctx, page, errors };
 }
 
@@ -201,6 +203,30 @@ async function main() {
     await page.waitForTimeout(400);
     const xEnt = await page.evaluate(async () => { const { state } = await import('/app/js/state.js'); return state.session.ent.entities.filter(e => e.cat === 'X').map(e => e.tagTgt + ':' + Object.keys(e.tgtForms).join('/')); });
     ok(xEnt.some(x => /Primera l\u00ednea/.test(x)), 'Alt+E masked the selection (' + xEnt.join(', ') + ')');
+
+    // Right click on a selection of the source -> "Enmascarar la seleccion..."
+    await page.evaluate(() => {
+      const p = Array.from(document.querySelectorAll('#mask-src .p')).find(n => /First line of the address/.test(n.textContent));
+      const walker = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+      let node;
+      while ((node = walker.nextNode())) {
+        const i = node.textContent.indexOf('First line');
+        if (i >= 0) { const r = document.createRange(); r.setStart(node, i); r.setEnd(node, i + 'First line'.length);
+          const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); return; }
+      }
+    });
+    const box = await page.locator('#mask-src .p', { hasText: 'First line of the address' }).first().boundingBox();
+    await page.mouse.click(box.x + 40, box.y + 8, { button: 'right' });
+    await page.click('.menu .mi:has-text("Enmascarar la selecci")');
+    await page.waitForSelector('.modal:has-text("Enmascarar selecci")');
+    await page.fill('.modal input.inp', 'Primera l\u00ednea');
+    // The translation is already masked (Alt+E above): typing its form selects that entity.
+    const autoPair = await page.locator('.modal select.inp').nth(2).inputValue();
+    ok(!!autoPair, 'Typing an already masked translation pairs it automatically (' + autoPair + ')');
+    await page.click('.modal-foot .btn.primary');
+    await page.waitForTimeout(400);
+    const pair = await page.evaluate(async () => { const { state } = await import('/app/js/state.js'); return state.session.ent.entities.filter(e => Object.keys(e.srcForms).includes('First line')).map(e => e.status + ':' + Object.keys(e.tgtForms).join('/')); });
+    ok(pair.length === 1 && /Primera l\u00ednea/.test(pair[0]), 'Right-click masking of a source selection, paired with its translation (' + pair.join(', ') + ')');
 
     // External AI answer imported through the dialog
     await menuItem(page, 'Exportar enmascarado', 'Importar respuesta de IA externa');

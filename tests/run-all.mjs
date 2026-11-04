@@ -14,7 +14,9 @@ const steps = [
   ['ASCII', 'python3', ['-I', path.join(ROOT, 'tools', 'asciify.py'), '--check']],
   ['Formatos', 'node', [path.join(HERE, 'formats.test.mjs')]],
   ['IA y sincronizacion', 'node', [path.join(HERE, 'ai-sync.test.mjs')]],
-  ['Aplicacion completa', 'node', [path.join(HERE, 'app.e2e.mjs')]]
+  ['Aplicacion completa', 'node', [path.join(HERE, 'app.e2e.mjs')]],
+  ['Fase 6 (lotes y similitud)', 'node', [path.join(HERE, 'phase6.e2e.mjs')]],
+  ['Ayuda contextual', 'node', [path.join(HERE, 'help.e2e.mjs')]]
 ];
 
 let failed = 0;

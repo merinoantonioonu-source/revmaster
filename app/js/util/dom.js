@@ -76,7 +76,8 @@ export function toast(text, type, ms) {
 // ---- Modal dialog ----
 /**
  * modal({ title, body: Node|string, buttons:[{ label, kind:'primary'|'amber'|'danger'|'', value, onClick }],
- *         width, onClose }) -> Promise<value of the pressed button | null>
+ *         width, onClose, help }) -> Promise<value of the pressed button | null>
+ * help: a node shown in the title bar, before the close button (the "?" of ui/help.js).
  * A button whose onClick returns false keeps the dialog open.
  */
 export function modal(opts) {
@@ -92,7 +93,7 @@ export function modal(opts) {
     };
     const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(null); } };
     document.addEventListener('keydown', onKey, true);
-    box.appendChild(el('div.modal-head', el('span', o.title || ''),
+    box.appendChild(el('div.modal-head', el('span', o.title || ''), o.help || null,
       el('button.icon-btn.modal-x', { title: 'Cerrar', onclick: () => close(null) }, '\u00d7')));
     const body = el('div.modal-body');
     if (typeof o.body === 'string') body.innerHTML = o.body; else if (o.body) body.appendChild(o.body);
