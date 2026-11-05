@@ -8,6 +8,10 @@
  * }
  * Each paragraph is a div.p[data-pid]; tables keep their grid; XLSX sheets get their name; PPTX slide
  * separators are shown as small headers; footnotes/endnotes go at the end.
+ *
+ * Every text node written from para.text carries its offset in para.text (node.__o), and every pill
+ * that replaces text carries __o/__e: ui/nav.js uses them to turn para.text offsets into DOM ranges
+ * (sentence highlights) and a click position back into an offset.
  */
 
 import { el, clear } from '../util/dom.js';
@@ -149,6 +153,8 @@ export function appendRich(node, p, decos, gaps) {
         if (d.replace) {
           if (d.start === a) {
             const pill = d.replace;
+            pill.__o = d.start;
+            pill.__e = d.end;
             node.appendChild(pill);
           }
           curHost = null;
@@ -164,14 +170,15 @@ export function appendRich(node, p, decos, gaps) {
     if (!curHost) continue;
     const f = fmtAt.find(x => x.start <= a && x.end >= b);
     const piece = text.slice(a, b);
-    curHost.appendChild(_fmt(piece, f ? f.r : {}));
+    curHost.appendChild(_fmt(piece, f ? f.r : {}, a));
   }
   while (gi < gs.length) { node.appendChild(el('span.gap', { title: gs[gi].title || '' }, gs[gi].label)); gi++; }
   if (!text) node.appendChild(document.createTextNode('\u200b'));
 }
 
-function _fmt(text, r) {
+function _fmt(text, r, at) {
   let n = document.createTextNode(text);
+  n.__o = at;
   if (r.sup) n = _wrap('sup', n);
   if (r.sub) n = _wrap('sub', n);
   if (r.u) n = _wrap('u', n);

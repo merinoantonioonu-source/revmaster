@@ -155,6 +155,72 @@ export function exportReportXlsx(filter) {
   download(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), _base(state.project.tgtName) + '_INFORME_UMBRA.xlsx');
 }
 
+/**
+ * Findings to be judged by the translator (and sent back to whoever tunes the rules and prompts):
+ * one row per finding with its context, plus empty columns "Valoracion" (a drop-down list),
+ * "Gravedad correcta" and "Comentario". opts = { masked: bool, filter: fn, segText: fn(f) -> {src, tgt} }
+ */
+export const FEEDBACK_VERDICTS = ['Correcto', 'Falso positivo', 'Gravedad excesiva', 'Gravedad insuficiente', 'Propuesta mejorable', 'Dudoso'];
+
+export async function exportFeedbackXlsx(opts) {
+  const o = opts || {};
+  const s = state.session;
+  const list = state.findings.filter(o.filter || (() => true))
+    .sort((a, b) => (a.unit - b.unit) || ((a.start == null ? 1e9 : a.start) - (b.start == null ? 1e9 : b.start)));
+  const head = ['ID', '\u00a7', 'M\u00f3dulo', 'Comprobaci\u00f3n', 'Categor\u00eda', 'Gravedad', 'Estado', 'Origen', 'Cita', 'Propuesta', 'Motivo',
+    'Verificador', 'Original', 'Traducci\u00f3n', 'Su valoraci\u00f3n', 'Gravedad correcta', 'Comentario'];
+  const rows = list.map(f => {
+    const u = s.units[f.unit];
+    const mod = moduleById(f.module);
+    const ctx = (o.segText && o.segText(f, !!o.masked)) || null;
+    const src = ctx ? ctx.src : (u ? (o.masked ? unitSrcMasked(s, u) : unitSrc(s, u)) : '');
+    const tgt = ctx ? ctx.tgt : (u ? (o.masked ? unitTgtMasked(s, u) : unitTgt(s, u)) : '');
+    const sug = (f.edited != null ? f.edited : (o.masked ? (f.suggestionMasked != null ? f.suggestionMasked : f.suggestion) : f.suggestion)) || '';
+    const origin = f.source === 'local' ? 'Sin IA' : f.source === 'rule' ? 'Regla' : f.source === 'external' ? 'IA externa'
+      : (f.model || 'IA') + (f.role === 'deep' ? ' (a fondo)' : f.role === 'cache' ? ' (cach\u00e9)' : '');
+    return [f.id, (ctx && ctx.label) || (u ? u.n : ''), mod ? mod.label : f.module, f.sub ? (o.subLabels && o.subLabels[f.sub]) || f.sub : '',
+      CAT_LABELS[f.cat] || f.cat, SEV_LABELS[f.sev] || f.sev, STATE_LABELS[f.state] || f.state, origin,
+      (o.masked ? (f.quoteMasked != null ? f.quoteMasked : f.quote) : f.quote) || '', sug, f.reason || '',
+      f.verified ? (f.verified === 'no' ? 'Descartado' : f.verified === 'edit' ? 'Corregido' : 'Confirmado') + (f.verifierReason ? ': ' + f.verifierReason : '') : '',
+      src, tgt, '', '', ''];
+  });
+  const XLSX = window.XLSX;
+  const ws = XLSX.utils.aoa_to_sheet([head].concat(rows));
+  ws['!cols'] = [12, 7, 14, 14, 16, 10, 11, 18, 30, 30, 40, 24, 60, 60, 18, 16, 40].map(w => ({ wch: w }));
+  ws['!autofilter'] = { ref: 'A1:Q' + (rows.length + 1) };
+  const info = [['Hallazgos de UMBRA para valorar'], [],
+    ['Proyecto', state.project.name], ['Original', state.project.srcName], ['Traducci\u00f3n', state.project.tgtName],
+    ['Fecha', new Date().toLocaleString('es')], ['Texto', o.masked ? 'Enmascarado (sin datos reales)' : 'Real'],
+    ['Perfil de reglas', state.project.profile || 'Todas las reglas'], ['Hallazgos', rows.length], [],
+    ['C\u00f3mo rellenarlo'],
+    ['Su valoraci\u00f3n', 'Elija en la lista: ' + FEEDBACK_VERDICTS.join(', ') + '.'],
+    ['Gravedad correcta', 'Si la gravedad no es la adecuada: Cr\u00edtica, Mayor, Menor o Sugerencia.'],
+    ['Comentario', 'Lo que haya que cambiar: por qu\u00e9 es un falso positivo, qu\u00e9 regla falta, qu\u00e9 propuesta ser\u00eda la buena...'],
+    [], ['No cambie las columnas ID ni \u00a7: sirven para encontrar cada hallazgo.']];
+  const wsInfo = XLSX.utils.aoa_to_sheet(info);
+  wsInfo['!cols'] = [{ wch: 20 }, { wch: 100 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Hallazgos');
+  XLSX.utils.book_append_sheet(wb, wsInfo, 'Instrucciones');
+  let out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  // SheetJS (community) writes no drop-down lists: add the one of "Su valoracion" to the first sheet.
+  try {
+    const zip = await window.JSZip.loadAsync(out);
+    const path = 'xl/worksheets/sheet1.xml';
+    let xml = await zip.file(path).async('string');
+    const dv = '<dataValidations count="2"><dataValidation type="list" allowBlank="1" showErrorMessage="0" sqref="O2:O' + (rows.length + 200) + '">' +
+      '<formula1>"' + FEEDBACK_VERDICTS.join(',') + '"</formula1></dataValidation>' +
+      '<dataValidation type="list" allowBlank="1" showErrorMessage="0" sqref="P2:P' + (rows.length + 200) + '"><formula1>"Cr\u00edtica,Mayor,Menor,Sugerencia"</formula1></dataValidation></dataValidations>';
+    const at = xml.search(/<(hyperlinks|printOptions|pageMargins|pageSetup|headerFooter|drawing|legacyDrawing|tableParts|extLst)\b/);
+    xml = at >= 0 ? xml.slice(0, at) + dv + xml.slice(at) : xml.replace('</worksheet>', dv + '</worksheet>');
+    zip.file(path, xml);
+    out = await zip.generateAsync({ type: 'uint8array' });
+  } catch (e) { console.warn('feedback drop-down', e); }
+  download(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+    _base(state.project.tgtName) + '_HALLAZGOS_PARA_VALORAR' + (o.masked ? '_ENMASCARADO' : '') + '.xlsx');
+  return rows.length;
+}
+
 export function exportFindingsJson() {
   const payload = { kind: 'umbra-findings', project: state.project.name, at: new Date().toISOString(), findings: state.findings };
   download(new Blob([JSON.stringify(payload, null, 1)], { type: 'application/json' }), _base(state.project.tgtName) + '_HALLAZGOS.json');

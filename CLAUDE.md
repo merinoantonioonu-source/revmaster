@@ -52,3 +52,9 @@ See `docs/ARQUITECTURA.md` (contracts between modules) and `docs/PROPUESTA.md` (
   `modal({ help: helpBtn(topic) })`; in a menu, `helpItem(topic, anchor)`). A NEW feature or setting
   gets its topic in `help.js` and its button; update the text when behaviour changes.
   `tests/help.e2e.mjs` fails on a missing or unused topic.
+- Navigation between the sheets is by SENTENCE (`app/js/ui/nav.js`, emulating COMeT Final Check):
+  offsets are those of `para.text`, stored on rendered nodes by `preview.js` (`__o`, `__e`); marks are
+  CSS highlights (`um-seg`, `um-focus`). Do not re-render the sheets to show a selection; after a
+  re-render call `nav.refresh()`. `tests/nav.e2e.mjs` covers it.
+- The spell checker (Hunspell) was removed on purpose: spelling is left to Word; Grammar does not
+  check it either.

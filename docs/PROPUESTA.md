@@ -18,7 +18,7 @@ COMeT, consultado en modo de solo lectura: `main` en `04540f5` (2026-11-04).
 ## Estado de la implementación (versión 1, 2026-11-04)
 
 Están hechas todas las fases, de la 0 a la 6. La fase 6 incluye:
-- el corrector ortográfico local (Hunspell);
+- el corrector ortográfico local (Hunspell), retirado después (2026-11-05): la ortografía la corrige Word;
 - el «puente» para proveedores sin CORS (campo `relayUrl`);
 - la **similitud semántica**, en el navegador o con un proveedor;
 - el **modo diferido** de lotes (−50 %) con Gemini, Anthropic, Mistral y OpenAI.
@@ -354,9 +354,9 @@ delatar de qué se habla.
 
 ### 7.2 Los ocho módulos
 
-#### M1. Ortografía y gramática (solo la traducción)
-- **Sin IA:** diccionario español (Hunspell `es_ES` en el navegador) y diccionario personal;
-  palabras repetidas, espacios, ¿ ¡ y comillas o paréntesis sin cerrar. Las etiquetas evitan los
+#### M1. Gramática (solo la traducción)
+*(2026-11-05: la ortografía se deja a Word; el módulo ya no la revisa.)*
+- **Sin IA:** palabras repetidas, espacios, ¿ ¡ y comillas o paréntesis sin cerrar. Las etiquetas evitan los
   falsos positivos con nombres propios.
 - **Con IA:**
   - concordancia, que aprovecha el artículo de las etiquetas: "el {la ORGANO2}";

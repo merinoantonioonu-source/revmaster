@@ -102,12 +102,12 @@ async function main() {
     await load(page, 'e2e_en.docx', 'e2e_es.docx');
     await page.evaluate(async (pid) => {
       const mc = await import('/app/js/review/module-config.js');
-      await mc.saveModuleConfig('local', { semantic: 'api', semProvider: pid, semApiModel: 'emb', spell: false });
+      await mc.saveModuleConfig('local', { semantic: 'api', semProvider: pid, semApiModel: 'emb' });
     }, emb.pid);
     await page.click('.step[data-view="review"]');
-    await page.waitForSelector('#rv-modules .mcard');
-    await page.click('#rv-modules .mcard:has-text("Capa 0") button:has-text("Ejecutar")');
-    await page.waitForSelector('#rv-modules .mcard:has-text("Capa 0"):has-text("hallazgos")', { timeout: 30000 });
+    await page.waitForSelector('#rv-modules .mchip');
+    await page.click('#rv-modules .mchip[data-mod="local"] .run');
+    await page.waitForSelector('#rv-modules .mchip[data-mod="local"].done', { timeout: 30000 });
     const sem = await page.evaluate(async () => {
       const { state } = await import('/app/js/state.js');
       return state.findings.filter(f => f.sub === 'semantic').map(f => ({ cat: f.cat, reason: f.reason, unit: state.session.units[f.unit].n }));
@@ -137,8 +137,8 @@ async function main() {
       { match: 'HALLAZGOS A VERIFICAR', response: 'H1 | OK |  | Correcto.\nFIN 1' }
     ], def: 'FIN 0' });
     // Only grammar+style (fused) to keep it short.
-    await page.evaluate(() => { document.querySelectorAll('#rv-modules .mcard input[type=checkbox]').forEach(c => { if (c.checked) c.click(); }); });
-    for (const name of ['Ortograf\u00eda y gram\u00e1tica', 'Estilo']) await page.click('#rv-modules .mcard:has-text("' + name + '") input[type=checkbox]');
+    await page.evaluate(() => { document.querySelectorAll('#rv-modules .mchip input[type=checkbox]').forEach(c => { if (c.checked) c.click(); }); });
+    for (const name of ['Gram\u00e1tica', 'Estilo']) await page.click('#rv-modules .mchip:has-text("' + name + '") input[type=checkbox]');
     await page.click('#tools button:has-text("Ejecutar seleccionados")');
     await page.waitForSelector('.modal:has-text("Plan de ejecuci")', { timeout: 15000 });
     const defText = await page.textContent('.modal');

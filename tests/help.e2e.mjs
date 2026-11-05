@@ -59,12 +59,9 @@ async function main() {
 
     const topics = await page.evaluate(async () => {
       const h = await import('/app/js/ui/help.js');
-      const { MODULES } = await import('/app/js/review/module-list.js');
-      return { all: Object.keys(h.HELP_TOPICS), empty: Object.keys(h.HELP_TOPICS).filter(k => !h.HELP_TOPICS[k].t || !h.HELP_TOPICS[k].b.length),
-        modules: MODULES.map(m => 'mod-' + m.id) };
+      return { all: Object.keys(h.HELP_TOPICS), empty: Object.keys(h.HELP_TOPICS).filter(k => !h.HELP_TOPICS[k].t || !h.HELP_TOPICS[k].b.length) };
     });
     const defined = new Set(topics.all);
-    for (const m of topics.modules) used.add(m);
     const missing = [...used].filter(t => !defined.has(t));
     ok(!missing.length, 'Every topic used in the code exists (' + (missing.join(', ') || used.size + ' topics') + ')');
     const orphans = topics.all.filter(t => !used.has(t));
@@ -163,14 +160,12 @@ async function main() {
 
     // Step 2
     await page.click('.step[data-view="review"]');
-    await page.waitForSelector('#rv-modules .mcard');
+    await page.waitForSelector('#rv-modules .mchip');
     await page.waitForTimeout(400);
     const revSeen = await sweep('#topbar', 'Review bar');
     revSeen.push(...await sweep('#view-review', 'Review view'));
-    const modsMissing = topics.modules.filter(t => !revSeen.includes(t));
-    ok(!modsMissing.length, 'Every module card has its "?" (' + (modsMissing.join(', ') || topics.modules.length + ' modules') + ')');
-    ok(['review-tools', 'findings', 'review-sheets'].every(t => revSeen.includes(t)), 'Step 2 has its "?"');
-    await page.locator('#rv-modules .mcard .help-btn[data-help="mod-fidelity"]').click();
+    ok(['review-tools', 'findings', 'review-sheets', 'modules'].every(t => revSeen.includes(t)), 'Step 2 has its "?" (' + revSeen.join(', ') + ')');
+    await page.locator('#rv-modules .help-btn[data-help="modules"]').click();
     await page.screenshot({ path: path.join(OUT, '4-module.png') });
     await closePop();
     for (const [btn, topic] of [['M\u00e1s', 'review-more'], ['Exportar', 'review-export']]) {

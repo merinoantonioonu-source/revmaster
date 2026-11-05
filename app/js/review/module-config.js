@@ -12,7 +12,7 @@ import { MODULES } from './module-list.js';
 export const CFG_KEY = 'module_cfg';
 
 export const DEFAULTS = {
-  local: { enabled: true, spell: true, semantic: 'ask', semModel: '', semProvider: '', semApiModel: '', semSensitivity: 'normal' },
+  local: { enabled: true, semantic: 'off', semModel: '', semProvider: '', semApiModel: '', semSensitivity: 'normal' },
   grammar: { enabled: true, thinking: 'minimal', batchWords: 0, merge: true, verify: true, budget: 0, scope: 'all' },
   fidelity: { enabled: true, thinking: 'low', batchWords: 0, merge: true, verify: true, budget: 0, scope: 'all' },
   integrity: { enabled: true, thinking: 'low', batchWords: 0, merge: true, verify: true, budget: 0, scope: 'all' },

@@ -299,3 +299,51 @@ table.grid.rules td { word-break: break-word; overflow-wrap: anywhere; }
   font: 600 11px Consolas, 'Courier New', monospace; background: var(--bg-app); white-space: nowrap; }
 .help-pop .hf { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 12px 9px; font-size: 11px; }
 .menu .mi.help { color: var(--primary); font-size: 12px; }
+
+/* Segment navigation (ui/nav.js), as in COMeT Final Check: steady marks, no blinking */
+::highlight(um-seg) { background-color: #ffe9a8; color: #111827; }
+::highlight(um-focus) { background-color: #fde047; color: #111827; }
+.pane-body .sheet .p { cursor: pointer; transition: background .15s; }
+.pane-body .sheet .p:hover, .pane-body .sheet .p.peer-hover { outline: 1px dashed var(--accent); outline-offset: 1px; }
+.pane-body .sheet .p.flash { background: rgba(255,213,79,.38); }
+.pairlist { max-height: 300px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; margin-top: 8px; }
+.pairrow { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--border-soft); cursor: pointer; font-size: 12px; }
+.pairrow:hover { background: var(--bg-surface-hover); }
+.pairrow.on { background: #e0f2fe; }
+.pairrow .pairforms { flex: 1; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Entity list: problem filter and explanations */
+.seg2 { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg2 button { border: none; background: #fff; padding: 4px 10px; font-size: 11px; font-weight: 600; color: var(--text-muted); display: inline-flex; gap: 6px; align-items: center; }
+.seg2 button + button { border-left: 1px solid var(--border); }
+.seg2 button.on { background: var(--primary); color: #fff; }
+.seg2 .n { background: rgba(0,0,0,.08); border-radius: 8px; padding: 0 6px; font-size: 10px; }
+.seg2 button.on .n { background: rgba(255,255,255,.25); }
+.fsel { border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px; font-size: 11px; background: #fff; max-width: 100%; }
+#mask-bubbles { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ent .why { font-size: 11px; color: #92400e; background: #fffbeb; border-left: 3px solid #f59e0b; padding: 3px 7px; margin-top: 5px; border-radius: 0 5px 5px 0; }
+.ent .where { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; margin-top: 5px; font-size: 11px; }
+/* Review: the module bar (one chip per module) */
+.modstrip { flex-wrap: wrap; align-items: center; gap: 6px; padding: 7px 10px; overflow-x: visible; }
+.mchip { position: relative; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 16px;
+  padding: 3px 4px 3px 9px; font-size: 12px; background: #fff; cursor: pointer; user-select: none; overflow: hidden; white-space: nowrap; }
+.mchip:hover { border-color: var(--accent); }
+.mchip.on { border-color: var(--primary); background: #eff6ff; }
+.mchip.off { opacity: .5; cursor: default; }
+.mchip input { margin: 0; }
+.mchip .nm { font-weight: 600; }
+.mchip .cost { font-size: 10px; color: var(--text-muted); }
+.mchip .stat { font-size: 10px; font-weight: 800; color: var(--sev-may); }
+.mchip.done .stat { color: #166534; }
+.mchip.err { border-color: #fca5a5; } .mchip.err .stat { color: var(--sev-cri); }
+.mchip.run { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.mchip .run { border: none; background: var(--bg-surface-hover); border-radius: 50%; width: 20px; height: 20px; font-size: 8px; color: var(--primary); padding: 0; }
+.mchip .run:hover:not([disabled]) { background: var(--primary); color: #fff; }
+.mchip .run[disabled] { opacity: .4; cursor: default; }
+.mchip .bar { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--accent); }
+.mtotal { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.modstrip .mcard { min-width: 200px; max-width: 260px; padding: 5px 8px; }
+/* Findings: labelled filters */
+.filters { display: grid; grid-template-columns: auto 1fr; gap: 4px 8px; align-items: center; padding: 2px 12px 8px; border-bottom: 1px solid var(--border); }
+.ffield { display: contents; }
+.ffield > span { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--text-muted); }
+.ffield .fsel { width: 100%; }

@@ -11,12 +11,16 @@ import { CATS, CAT_LABELS, CAT_SINGULAR, ARTICLES, STATUS_LABELS, mainForm } fro
 import { exportMasked, exportBilingualXlsx, exportBilingualHtml, exportKeyMap } from '../export/exports.js';
 import { buildExternalText, importExternal } from '../review/external.js';
 import { openMenu } from './menu.js';
+import { createNav } from './nav.js';
 
 let root, toolsHost;
 let showOriginal = false;
-let filter = 'all';
+let showBad = null;      // entity list: true = only the ones with a problem (default when there are any)
+let catFilter = 'all';
+let placeIdx = {};       // entity key -> index of the problem place shown last ('Ver donde')
 let selectedKey = null;
 let panes = {};
+let nav = null;
 
 export function mountMaskView(host, tools) {
   root = host;
@@ -33,11 +37,19 @@ export function mountMaskView(host, tools) {
         el('div.pane-body#mask-tgt'))));
   root.appendChild(work);
   panes = { src: $('#mask-src'), tgt: $('#mask-tgt') };
+  nav = createNav({ panes, session: () => state.session });
+  nav.attachHover();
   on('masked', render);
   on('view', (v) => { if (v === 'mask') { renderTools(); render(); } });
   document.addEventListener('keydown', (e) => {
     if (state.view !== 'mask') return;
-    if (e.altKey && (e.key === 'e' || e.key === 'E')) { e.preventDefault(); maskSelection(); }
+    if (e.altKey && (e.key === 'e' || e.key === 'E')) { e.preventDefault(); maskSelection(); return; }
+    // Left/Right arrows: next/previous sentence (as in Final Check).
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.ctrlKey && !e.metaKey && !e.shiftKey &&
+        !(e.target.closest && e.target.closest('input, textarea, select, [contenteditable], .modal'))) {
+      e.preventDefault();
+      nav.step(e.key === 'ArrowRight' ? 1 : -1);
+    }
   });
 }
 
@@ -65,7 +77,7 @@ function renderTools() {
   const numBad = ents.filter(e => e.cat === 'NUM' && e.status === 'nopair').length;
   toolsHost.appendChild(el('div.summary',
     el('span.pill.ok', ents.length + ' entidades'),
-    bad ? el('span.pill.warn', bad + ' por revisar') : null,
+    bad ? el('span.pill.warn', bad + ' con problemas') : null,
     numBad ? el('span.pill.err', numBad + ' cifras sin pareja') : null));
   const lang = el('select', { title: 'Lengua del original', onchange: (e) => { state.project.srcLang = e.target.value; state.session.srcLang = e.target.value; remaskNow(); } },
     el('option', { value: 'en' }, 'Original: ingl\u00e9s'), el('option', { value: 'fr' }, 'Original: franc\u00e9s'));
@@ -86,7 +98,7 @@ function optionsMenu(anchor) {
     { label: (mask.acronyms !== false ? '\u2713 ' : '') + 'Enmascarar siglas desconocidas presentes en ambos textos', onClick: () => { setMask({ acronyms: mask.acronyms === false }); renderTools(); } },
     { sep: true },
     { label: 'Volver a enmascarar todo lo que se quit\u00f3 a mano', onClick: () => { setMask({ removedKeys: [], removedOcc: [] }); toast('Restablecido.', 'ok'); } },
-    { label: 'Deshacer todas las fusiones', onClick: () => setMask({ merges: {} }) },
+    { label: 'Deshacer todos los emparejamientos', onClick: () => setMask({ merges: {} }) },
     { label: 'Quitar los t\u00e9rminos a\u00f1adidos a mano en este proyecto', onClick: () => setMask({ terms: [] }) },
     { sep: true },
     helpItem('mask-options', anchor)
@@ -121,7 +133,7 @@ async function run(fn) {
 }
 
 export async function externalDialog() {
-  const mods = [['grammar', 'Ortograf\u00eda y gram\u00e1tica'], ['fidelity', 'Fidelidad'], ['integrity', 'Omisiones y adiciones'], ['style', 'Estilo'], ['coldread', 'Lectura en fr\u00edo']];
+  const mods = [['grammar', 'Gram\u00e1tica'], ['fidelity', 'Fidelidad'], ['integrity', 'Omisiones y adiciones'], ['style', 'Estilo'], ['coldread', 'Lectura en fr\u00edo']];
   const checks = mods.map(([id, label]) => el('label', { style: { marginRight: '12px' } },
     el('input', { type: 'checkbox', value: id, checked: id !== 'coldread' }), ' ' + label));
   const bil = el('input', { type: 'checkbox', checked: true });
@@ -164,43 +176,106 @@ function render() {
   renderPanes();
 }
 
+const STATUS_ORDER = { nopair: 0, count: 1, forms: 2, ok: 3 };
+
 function renderList() {
   const ents = state.session.ent.entities;
-  const bubbles = $('#mask-bubbles');
-  clear(bubbles);
-  const counts = { all: ents.length, bad: ents.filter(e => e.status !== 'ok').length };
-  for (const c of CATS) counts[c] = ents.filter(e => e.cat === c).length;
-  const mk = (id, label) => el('span.bub' + (filter === id ? '.on' : ''), { onclick: () => { filter = id; renderList(); } }, label + ' ' + counts[id]);
-  bubbles.appendChild(mk('all', 'Todas'));
-  if (counts.bad) bubbles.appendChild(mk('bad', 'Por revisar'));
-  for (const c of CATS) if (counts[c]) bubbles.appendChild(mk(c, CAT_LABELS[c]));
+  const bad = ents.filter(e => e.status !== 'ok');
+  if (showBad === null || (showBad && !bad.length)) showBad = bad.length > 0;
+  const head = $('#mask-bubbles');
+  clear(head);
+  const pool = showBad ? bad : ents;
+  const catSel = el('select.fsel', { title: 'Categor\u00eda', onchange: (e) => { catFilter = e.target.value; renderList(); } },
+    el('option', { value: 'all' }, 'Todas las categor\u00edas'),
+    CATS.filter(c => pool.some(e => e.cat === c)).map(c => el('option', { value: c }, CAT_LABELS[c] + ' (' + pool.filter(e => e.cat === c).length + ')')));
+  if (catFilter !== 'all' && !pool.some(e => e.cat === catFilter)) catFilter = 'all';
+  catSel.value = catFilter;
+  head.appendChild(el('div.seg2',
+    el('button' + (showBad ? '.on' : ''), { title: 'Sin pareja, recuento distinto o formas distintas', onclick: () => { showBad = true; renderList(); } },
+      'Con problemas', el('span.n', String(bad.length))),
+    el('button' + (!showBad ? '.on' : ''), { onclick: () => { showBad = false; renderList(); } }, 'Todas', el('span.n', String(ents.length)))));
+  head.appendChild(catSel);
   const list = $('#mask-entities');
   clear(list);
-  const shown = ents.filter(e => filter === 'all' || (filter === 'bad' ? e.status !== 'ok' : e.cat === filter));
-  if (!shown.length) list.appendChild(el('div.empty', 'No hay entidades en esta vista.'));
+  const shown = pool.filter(e => catFilter === 'all' || e.cat === catFilter)
+    .sort((x, y) => showBad ? (STATUS_ORDER[x.status] - STATUS_ORDER[y.status]) || ((x.firstUnit || 0) - (y.firstUnit || 0)) : 0);
+  if (!shown.length) list.appendChild(el('div.empty', showBad ? 'Ninguna entidad tiene problemas.' : 'No hay entidades en esta vista.'));
   for (const e of shown) list.appendChild(entityCard(e));
-  list.appendChild(el('p.info', { style: { marginTop: '8px' } }, 'Seleccione texto en una hoja y pulse Alt+E para enmascararlo. Pulse una etiqueta para ver la entidad.'));
+  list.appendChild(el('p.info', { style: { marginTop: '8px' } }, 'Seleccione texto en una hoja y pulse Alt+E (o clic derecho) para enmascararlo. Pulse una etiqueta para ver la entidad.'));
 }
 
 function _forms(forms) {
   return Object.keys(forms).map(f => f + (forms[f] > 1 ? ' (\u00d7' + forms[f] + ')' : '')).join(' \u00b7 ') || '\u2014';
 }
 
+/** Where an entity does not add up: the paragraph pairs with a different count on each side (or, for
+ *  'forms', those using a less frequent translation). -> [{ unit, src, tgt }] */
+function problemPlaces(e) {
+  const s = state.session;
+  const occs = (side, pid) => (pid === null || pid === undefined) ? [] : (s.ent.occ[side].get(pid) || []).filter(o => o.key === e.key);
+  const out = [];
+  if (e.status === 'forms') {
+    const main = mainForm(e.tgtForms);
+    for (const u of s.units) {
+      const t = occs('tgt', u.tgtPara);
+      if (t.some(o => o.surface !== main)) out.push({ unit: u.idx, src: occs('src', u.srcPara).length, tgt: t.length, form: t.find(o => o.surface !== main).surface });
+    }
+    return out;
+  }
+  for (const u of s.units) {
+    const a = occs('src', u.srcPara).length, b = occs('tgt', u.tgtPara).length;
+    if (a !== b) out.push({ unit: u.idx, src: a, tgt: b });
+  }
+  return out;
+}
+
+function _problemText(e) {
+  if (e.status === 'nopair') return e.srcCount ? 'Solo est\u00e1 en el original (' + e.srcCount + ' ' + (e.srcCount > 1 ? 'veces' : 'vez') + '): \u00bffalta en la traducci\u00f3n o se tradujo de otra forma? Si es otra entidad, use \u00abEmparejar\u00bb.'
+    : 'Solo est\u00e1 en la traducci\u00f3n (' + e.tgtCount + ' ' + (e.tgtCount > 1 ? 'veces' : 'vez') + '): \u00bfsobra, o en el original tiene otra forma (una sigla, por ejemplo)? Si es otra entidad, use \u00abEmparejar\u00bb.';
+  if (e.status === 'count') return 'Aparece ' + e.srcCount + ' ' + (e.srcCount > 1 ? 'veces' : 'vez') + ' en el original y ' + e.tgtCount + ' en la traducci\u00f3n.';
+  if (e.status === 'forms') return 'Se traduce de ' + Object.keys(e.tgtForms).length + ' formas distintas.';
+  return '';
+}
+
 function entityCard(e) {
   const sel = selectedKey === e.key;
   const stCls = e.status === 'ok' ? 'ok' : (e.status === 'nopair' ? 'bad' : 'mid');
-  const card = el('div.ent' + (sel ? '.sel' : ''), { onclick: (ev) => { if (ev.target.closest('.acts')) return; selectEntity(sel ? null : e.key, true); } },
+  const card = el('div.ent' + (sel ? '.sel' : ''), { 'data-key': e.key, onclick: (ev) => { if (ev.target.closest('.acts, .where')) return; selectEntity(sel ? null : e.key, true); } },
     el('div.row', el('span.tk.' + e.cat, e.art ? el('span.art', e.art) : null, e.cat + e.n), el('span.st.' + stCls, STATUS_LABELS[e.status])),
     el('div.forms', 'O: ' + _forms(e.srcForms)),
     el('div.forms', 'T: ' + _forms(e.tgtForms) + (e.art ? ' \u00b7 ' + e.art : '')));
+  if (e.status !== 'ok') {
+    const places = problemPlaces(e);
+    const i = placeIdx[e.key];
+    const at = (i !== undefined && places[i]) ? places[i] : null;
+    card.appendChild(el('div.why', _problemText(e)));
+    if (places.length) {
+      card.appendChild(el('div.where',
+        el('button.btn.sm.primary', { title: 'Lleva a cada p\u00e1rrafo en el que no cuadra y resalta los dos lados', onclick: () => gotoPlace(e, places, +1) },
+          at ? 'Siguiente \u203a' : 'Ver d\u00f3nde no cuadra \u203a'),
+        places.length > 1 && at ? el('button.btn.sm', { title: 'Anterior', onclick: () => gotoPlace(e, places, -1) }, '\u2039') : null,
+        el('span.muted', at ? ' \u00a7' + state.session.units[at.unit].n + ' \u00b7 ' + (at.form ? '\u00ab' + at.form + '\u00bb' : at.src + ' en el original, ' + at.tgt + ' en la traducci\u00f3n') + ' \u00b7 ' + (i + 1) + '/' + places.length
+          : ' ' + places.length + (places.length > 1 ? ' lugares' : ' lugar'))));
+    }
+  }
   const acts = el('div.acts',
     el('button.btn.sm', { onclick: () => changeCat(e) }, 'Categor\u00eda'),
     el('button.btn.sm', { onclick: (ev) => changeArt(e, ev.currentTarget) }, 'Art\u00edculo'),
-    el('button.btn.sm', { onclick: () => mergeDialog(e) }, 'Fusionar\u2026'),
+    el('button.btn.sm', { title: 'Es la misma entidad que otra etiqueta (por ejemplo, la sigla del original y el nombre completo de la traducci\u00f3n)', onclick: () => mergeDialog(e) }, 'Emparejar\u2026'),
     el('button.btn.sm', { onclick: () => saveToDict(e) }, 'A mi diccionario'),
     el('button.btn.sm.danger', { onclick: () => { setMask({ removedKeys: (state.project.mask.removedKeys || []).concat([e.key]) }); toast('Ya no se enmascara ' + e.cat + e.n + '.', 'ok'); } }, 'No enmascarar'));
   card.appendChild(acts);
   return card;
+}
+
+function gotoPlace(e, places, step) {
+  const cur = placeIdx[e.key];
+  const i = cur === undefined ? (step > 0 ? 0 : places.length - 1) : (cur + step + places.length) % places.length;
+  placeIdx[e.key] = i;
+  selectedKey = e.key;
+  renderList();
+  renderPanes();
+  focusUnit(places[i].unit, { key: e.key });
 }
 
 function selectEntity(key, scroll) {
@@ -230,14 +305,43 @@ function changeArt(e, anchor) {
 }
 
 async function mergeDialog(e) {
+  // The usual case: an entity found on one side only whose counterpart got a tag of its own
+  // (UNDP in the original, PNUD in the translation). Those come first.
+  const onlySrc = e.srcCount > 0 && !e.tgtCount, onlyTgt = e.tgtCount > 0 && !e.srcCount;
+  const fits = (x) => (onlySrc && x.tgtCount > 0 && !x.srcCount) || (onlyTgt && x.srcCount > 0 && !x.tgtCount);
   const others = state.session.ent.entities.filter(x => x.key !== e.key);
-  const sel = el('select.inp', others.map(x => el('option', { value: x.key }, x.cat + x.n + ' \u2014 ' + (mainForm(x.srcForms) || mainForm(x.tgtForms)))));
-  const r = await modal({ title: 'Fusionar ' + e.cat + e.n, help: helpBtn('merge'), body: el('div',
-    el('p.info', 'Use esto cuando dos etiquetas son en realidad la misma entidad (por ejemplo, una sigla del original y el nombre completo de la traducci\u00f3n). La etiqueta elegida absorbe a ' + e.cat + e.n + '.'),
-    el('label.lbl', 'Es la misma entidad que'), sel),
-    buttons: [{ label: 'Cancelar', value: null }, { label: 'Fusionar', kind: 'primary', value: 'ok' }] });
-  if (r !== 'ok' || !sel.value) return;
-  setMask({ merges: Object.assign({}, state.project.mask.merges, { [e.key]: sel.value }) });
+  const score = (x) => (fits(x) ? 0 : 2) + (x.cat === e.cat ? 0 : 1);
+  others.sort((x, y) => score(x) - score(y) || (Math.abs((x.firstUnit || 0) - (e.firstUnit || 0)) - Math.abs((y.firstUnit || 0) - (e.firstUnit || 0))));
+  let chosen = null;
+  const listBox = el('div.pairlist');
+  let showAll = false;
+  const draw = () => {
+    clear(listBox);
+    const shown = showAll ? others : others.filter(x => fits(x) || x.cat === e.cat);
+    if (!shown.length) listBox.appendChild(el('div.empty', 'No hay ninguna entidad que encaje. Pulse \u00abVer todas\u00bb.'));
+    for (const x of shown.slice(0, 200)) {
+      const row = el('label.pairrow' + (chosen === x.key ? '.on' : ''),
+        el('input', { type: 'radio', name: 'pairpick', checked: chosen === x.key ? true : null, onchange: () => { chosen = x.key; draw(); } }),
+        el('span.tk.' + x.cat, x.art ? el('span.art', x.art) : null, x.cat + x.n),
+        el('span.pairforms', x.srcCount ? 'O: ' + Object.keys(x.srcForms).join(' \u00b7 ') : '', x.srcCount && x.tgtCount ? '  ' : '', x.tgtCount ? 'T: ' + Object.keys(x.tgtForms).join(' \u00b7 ') : ''),
+        fits(x) ? el('span.pill.ok', 'Encaja') : null);
+      listBox.appendChild(row);
+    }
+  };
+  draw();
+  const where = onlySrc ? 'solo en el original' : onlyTgt ? 'solo en la traducci\u00f3n' : 'en las dos lenguas';
+  const r = await modal({ title: 'Emparejar ' + e.cat + e.n, help: helpBtn('merge'), width: '640px', body: el('div',
+    el('p', el('span.tk.' + e.cat, e.art ? el('span.art', e.art) : null, e.cat + e.n), ' ',
+      el('b', Object.keys(e.srcForms).concat(Object.keys(e.tgtForms)).join(' \u00b7 ')), ' est\u00e1 ', where, '.'),
+    el('p.info', 'Elija la etiqueta que es la MISMA entidad en la otra lengua (por ejemplo, \u00abUNDP\u00bb en el original y \u00abPNUD\u00bb en la traducci\u00f3n). ' +
+      'Las dos pasar\u00e1n a llevar la misma etiqueta y dejar\u00e1n de salir como \u00absin pareja\u00bb. Arriba, las que encajan: est\u00e1n solo en la otra lengua.'),
+    listBox,
+    el('div', { style: { marginTop: '6px' } }, el('button.btn.link', { type: 'button', onclick: (ev) => { showAll = !showAll; ev.currentTarget.textContent = showAll ? 'Ver solo las que encajan' : 'Ver todas'; draw(); } }, 'Ver todas'))),
+    buttons: [{ label: 'Cancelar', value: null }, { label: 'Emparejar', kind: 'primary', value: 'ok', onClick: () => { if (!chosen) { toast('Elija una entidad de la lista.', 'warn'); return false; } } }] });
+  if (r !== 'ok' || !chosen) return;
+  // The entity that is paired keeps the tag of the one chosen.
+  setMask({ merges: Object.assign({}, state.project.mask.merges, { [e.key]: chosen }) });
+  toast('Emparejadas: ahora son la misma etiqueta.', 'ok');
 }
 
 async function saveToDict(e) {
@@ -275,8 +379,8 @@ function renderPanes() {
       }).filter(Boolean),
       onParaClick: (p, ev) => {
         const t = ev.target.closest('[data-key]');
-        if (t) { selectEntity(t.dataset.key === selectedKey ? null : t.dataset.key, false); return; }
-        highlightCounterpart(side, p.id);
+        nav.clickAt(side, ev);
+        if (t) selectEntity(t.dataset.key === selectedKey ? null : t.dataset.key, false);
       }
     });
     panes[side].scrollTop = keep;
@@ -299,6 +403,7 @@ function renderPanes() {
       occMenu(ev, t.dataset.key, t.dataset.occ);
     };
   }
+  nav.refresh();
 }
 
 function occMenu(ev, key, occ) {
@@ -311,20 +416,6 @@ function occMenu(ev, key, occ) {
   ]);
 }
 
-function highlightCounterpart(side, pid) {
-  const s = state.session;
-  const u = s.units.find(x => (side === 'src' ? x.srcPara : x.tgtPara) === pid);
-  for (const pane of Object.values(panes)) pane.querySelectorAll('.p.hit').forEach(n => n.classList.remove('hit'));
-  if (!u) return;
-  const other = side === 'src' ? 'tgt' : 'src';
-  const opid = other === 'src' ? u.srcPara : u.tgtPara;
-  const a = panes[side].querySelector('.p[data-pid="' + pid + '"]');
-  if (a) a.classList.add('hit');
-  if (opid === null) return;
-  const b = panes[other].querySelector('.p[data-pid="' + opid + '"]');
-  if (b) { b.classList.add('hit'); b.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
-}
-
 function onSearch(e) {
   const side = e.target.dataset.side;
   const q = e.target.value.trim().toLowerCase();
@@ -332,10 +423,12 @@ function onSearch(e) {
   const model = side === 'src' ? state.session.src : state.session.tgt;
   const p = model.paras.find(x => x.text.toLowerCase().includes(q));
   if (!p) return;
-  highlightCounterpart(side, p.id);
-  const n = panes[side].querySelector('.p[data-pid="' + p.id + '"]');
-  if (n) n.scrollIntoView({ block: 'center' });
+  const at = p.text.toLowerCase().indexOf(q);
+  nav.focusSpan(side, p.id, at, at + q.length);
 }
+
+/** Goes to a paragraph pair and marks the sentences where the entity occurs (or should). */
+function focusUnit(unitIdx, opt) { nav.focusUnit(unitIdx, opt); }
 
 // ------------------------------------------------------------------ manual masking
 

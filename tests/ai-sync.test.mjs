@@ -469,8 +469,13 @@ async function main() {
       const txt = await page.textContent('#mount');
       if (name === 'providers') {
         check('providers screen: cards, key status and module table', /Google Gemini/.test(txt) && /Clave guardada/.test(txt) && /Sin clave/.test(txt) &&
-          /Modelo por m/.test(txt) && /Fidelidad/.test(txt) && /Proveedor general/.test(txt), txt.slice(0, 200));
-        const opts = await page.evaluate(() => Array.from(document.querySelector('select[data-module="style"]').options).map(o => o.textContent));
+          /se elige en M/.test(txt) && /Proveedor general/.test(txt), txt.slice(0, 200));
+        // The model of each module is chosen in Settings > Modulos with this select.
+        const opts = await page.evaluate(async () => {
+          const sel = await H.ui.providers.moduleModelSelect('style', 'triage');
+          document.getElementById('mount').appendChild(sel);
+          return Array.from(document.querySelector('select[data-module="style"]').options).map(o => o.textContent);
+        });
         check('module select: General first, flagged choice, add options last', opts[0] === 'General' && opts.some(o => /sin clave: se usa el general/.test(o)) &&
           /A\u00f1adir modelo/.test(opts[opts.length - 2]) && /A\u00f1adir proveedor/.test(opts[opts.length - 1]), opts);
         // The dropdown of the module cards.
@@ -496,7 +501,7 @@ async function main() {
         await page.click('.modal-foot >> text=Cancelar');
       }
       if (name === 'usage') {
-        check('usage screen shows totals, bars and the price table', /Uso de IA y coste/.test(txt) && /Ortograf/.test(txt) && /A\/78\/100/.test(txt) &&
+        check('usage screen shows totals, bars and the price table', /Uso de IA y coste/.test(txt) && /Gram\u00e1tica/.test(txt) && /A\/78\/100/.test(txt) &&
           /Mock model/.test(txt) && /Precios/.test(txt), txt.slice(0, 300));
         const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }), page.click('text=Exportar a Excel')]);
         const p = path.join(OUT, 'usage-export.xlsx');
