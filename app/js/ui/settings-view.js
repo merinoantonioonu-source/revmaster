@@ -189,6 +189,7 @@ function mountPrivacy(host) {
     el('ul', { style: { marginLeft: '18px', lineHeight: '1.6' } },
       el('li', 'Los documentos se leen y se procesan en este navegador. GitHub Pages solo sirve el programa: no recibe nada.'),
       el('li', 'A una IA solo se env\u00eda texto ENMASCARADO. La puerta de salida (gateway) rechaza cualquier texto sin enmascarar, salvo hacia un proveedor marcado como local.'),
+      el('li', '\u00danica excepci\u00f3n, elegida por usted: el m\u00f3dulo Nombres oficiales env\u00eda la lista de nombres de organismos, \u00f3rganos, cargos, pa\u00edses y lugares (nunca personas, cifras, fechas, s\u00edmbolos ni el texto del documento). Se puede desactivar en Ajustes \u203a M\u00f3dulos.'),
       el('li', 'Enmascarar reduce el riesgo, pero no lo elimina: el contexto puede delatar de qu\u00e9 se habla.'),
       el('li', 'Las claves de API se guardan en este navegador y no viajan en el archivo de sincronizaci\u00f3n, salvo cifradas si usted lo activa.'),
       el('li', 'Todas las webs de GitHub Pages de una misma cuenta comparten el almacenamiento del navegador: UMBRA usa claves con el prefijo umbra.')))));

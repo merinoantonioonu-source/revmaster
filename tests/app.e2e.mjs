@@ -150,7 +150,11 @@ async function main() {
     const log = mock.state.log;
     ok(log.some(r => r.model === 'mock-big'), 'Cascade: the deep model was called for flagged units');
     ok(log.some(r => /HALLAZGOS A VERIFICAR/.test(r.prompt)), 'Verifier was called');
-    const leaks = log.filter(r => /Asamblea General|Secretario General|Secretary-General|General Assembly|1\.250|1,250|Naciones Unidas/.test(r.prompt));
+    // The names table (Nombres oficiales) is the one call with real names, by the owner's choice: only rows of names.
+    const namesCall = log.find(r => /^NOMBRES \(fila/.test(r.prompt));
+    ok(!!namesCall && namesCall.prompt.split('\n').slice(1, -1).every(l => /^\d+ \| (ORG|ORGANO|CARGO|PAIS|LUGAR) \| [^|]+ \| [^|]+$/.test(l)) && !/1\.250|1,250/.test(namesCall.prompt),
+      'The names call carries only the table of institutional names');
+    const leaks = log.filter(r => r !== namesCall && /Asamblea General|Secretario General|Secretary-General|General Assembly|1\.250|1,250|Naciones Unidas/.test(r.prompt));
     if (leaks.length) console.log('LEAK SAMPLE:', leaks[0].prompt.slice(0, 600));
     ok(!leaks.length, 'No real entity reached the AI (only masked text in the prompts)');
     const fused = log.filter(r => /P\u00c1RRAFOS DE LA TRADUCCI\u00d3N/.test(r.prompt));

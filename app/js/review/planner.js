@@ -18,6 +18,7 @@ import { idbGet } from '../store/idb.js';
 import { resolveClient } from '../ai/registry.js';
 import { estimateCost } from '../ai/usage.js';
 import { buildSkeleton } from './skeleton.js';
+import { namesRows, namesTableText } from './names.js';
 
 const TOK = (s) => Math.ceil(String(s || '').length / 3.8);
 const WORDS = (s) => (String(s || '').match(/\S+/g) || []).length;
@@ -47,7 +48,7 @@ function _reviewText(session, u, input) {
  */
 export async function makePlan(session, ctx, opts) {
   const wanted = (opts.modules || []).filter(id => moduleById(id) && moduleById(id).ai && id !== 'verifier');
-  const plan = { groups: [], skeleton: [], verify: null, totals: { calls: 0, inTok: 0, outTok: 0, cost: 0, cached: 0, dups: 0, units: 0 },
+  const plan = { groups: [], skeleton: [], names: null, verify: null, totals: { calls: 0, inTok: 0, outTok: 0, cost: 0, cached: 0, dups: 0, units: 0 },
     errors: [], session };
   const units = reviewableUnits(session).filter(u => !opts.unitFilter || opts.unitFilter.has(u.idx));
 
@@ -75,6 +76,7 @@ export async function makePlan(session, ctx, opts) {
     if (done.has(id) || !models[id]) continue;
     const input = moduleById(id).input;
     if (input === 'skeleton') { done.add(id); plan.skeleton.push(id); continue; }
+    if (input === 'names') { done.add(id); continue; }
     let mates = [id];
     const fuse = FUSABLE.find(f => f.includes(id));
     if (fuse && ctx.cfg[id] && ctx.cfg[id].merge !== false) {
@@ -185,6 +187,19 @@ export async function makePlan(session, ctx, opts) {
   }
   plan.skeleton = skel;
 
+  // Official names: one call with the table of names only (no text of the document).
+  if (wanted.includes('names') && models.names) {
+    const rows = namesRows(session);
+    if (rows.length) {
+      const system = systemPrompt(ctx.prompts, ['names'], session.srcLang, ctx.cfg);
+      const inTok = TOK(system) + TOK(namesTableText(rows)), outTok = 30 + Math.ceil(rows.length * 0.3) * 40;
+      const tri = models.names.tri;
+      const cost = await _cost(tri, inTok, outTok, 0);
+      plan.names = { module: 'names', tri, system, rows, est: { inTok, outTok, cost, calls: 1 } };
+      plan.totals.calls++; plan.totals.inTok += inTok; plan.totals.outTok += outTok; plan.totals.cost += cost;
+    }
+  }
+
   // Verifier: estimated on the expected number of findings (one every four units).
   const verifyMods = wanted.filter(id => ctx.cfg[id] && ctx.cfg[id].verify);
   if (verifyMods.length && ctx.cfg.verifier && ctx.cfg.verifier.enabled !== false) {
@@ -239,6 +254,7 @@ export function serializePlan(plan) {
       dupOf: Array.from(g.dupOf.entries()), est: g.est
     })),
     skeleton: plan.skeleton.map(s => ({ module: s.module, tri: ref(s.tri), system: s.system, user: s.user, units: Array.from(s.units), est: s.est })),
+    names: plan.names ? { module: 'names', tri: ref(plan.names.tri), system: plan.names.system, rows: plan.names.rows, est: plan.names.est } : null,
     verify: plan.verify ? { modules: plan.verify.modules, client: ref(plan.verify.client), est: plan.verify.est } : null,
     totals: plan.totals
   };
@@ -255,6 +271,7 @@ export function restorePlan(data, session) {
       dupOf: new Map(g.dupOf || []), cachedHits: [], est: g.est || {}
     })),
     skeleton: (data.skeleton || []).map(s => Object.assign({}, s, { units: new Set(s.units) })),
+    names: data.names || null,
     verify: data.verify || null,
     totals: data.totals || { calls: 0 },
     errors: []
