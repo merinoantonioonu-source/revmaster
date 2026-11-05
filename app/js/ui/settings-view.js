@@ -6,7 +6,7 @@
 import { helpBtn, helpItem } from './help.js';
 import { el, $, clear, toast, modal, pickFiles, promptDialog, confirmDialog } from '../util/dom.js';
 import { state, on, emit } from '../state.js';
-import { MODULES, moduleById, INPUT_LABELS } from '../review/module-list.js';
+import { MODULES, moduleById, INPUT_LABELS, ROLE_LABELS } from '../review/module-list.js';
 import { loadModuleConfig, saveModuleConfig, THINKING_LABELS } from '../review/module-config.js';
 import { loadPrompts, savePrompt, defaultPrompt, promptOf } from '../review/prompts.js';
 import { idbClear } from '../store/idb.js';
@@ -109,36 +109,63 @@ function mountExport(host) {
 async function mountModules(host) {
   const cfg = await loadModuleConfig();
   const prompts = await loadPrompts();
-  host.appendChild(el('div.note', 'El proveedor y el modelo de cada m\u00f3dulo se eligen en ', el('a', { href: '#', onclick: (e) => { e.preventDefault(); showSettingsSection('providers'); } }, 'Proveedores y modelos'),
-    ' (o pulsando la pastilla del modelo en la tarjeta del m\u00f3dulo, en Revisar).'));
-  const t = el('table.grid', el('tr', el('th', 'M\u00f3dulo'), el('th', 'Entrada'), el('th', 'Activo'), el('th', 'Razonamiento'), el('th', 'Palabras por lote'),
-    el('th', 'Fusionar'), el('th', 'Verificar'), el('th', 'Presupuesto (US$)')));
+  const { moduleModelSelect } = await import('./settings-providers.js');
+  const saved = () => toast('Guardado.', 'ok', 1500);
+
+  // 1) What runs and with which model: the only table most people need.
+  const t = el('table.grid.modtable', el('tr', el('th', 'M\u00f3dulo'), el('th', 'Activo'), el('th', 'Modelo'), el('th', { title: 'Sus hallazgos pasan por el Verificador, que descarta los falsos positivos' }, 'Verificar')));
+  for (const m of MODULES) {
+    const c = cfg[m.id] || {};
+    const save = (patch) => saveModuleConfig(m.id, patch).then(saved);
+    let modelCell;
+    if (!m.ai) modelCell = el('span.muted', 'No usa IA');
+    else {
+      modelCell = el('div.modsel');
+      for (const role of m.roles) {
+        const sel = await moduleModelSelect(m.id, role, saved);
+        modelCell.appendChild(m.roles.length > 1 || role === 'deep'
+          ? el('label.row', el('span.muted', { style: { minWidth: '60px', fontSize: '11px' } }, ROLE_LABELS[role]), sel)
+          : sel);
+      }
+    }
+    t.appendChild(el('tr',
+      el('td', el('b', m.label), el('div.muted', { style: { fontSize: '11px' } }, m.desc)),
+      el('td', m.id === 'local' ? el('span.muted', 'Siempre') : el('input', { type: 'checkbox', checked: c.enabled !== false, onchange: (e) => save({ enabled: e.target.checked }) })),
+      el('td', modelCell),
+      el('td', !m.ai || m.id === 'verifier' ? '\u2014' : el('input', { type: 'checkbox', checked: !!c.verify, onchange: (e) => save({ verify: e.target.checked }) }))));
+  }
+  host.appendChild(el('div.card', el('h3', 'M\u00f3dulos de revisi\u00f3n', helpBtn('module-settings')), el('div.body',
+    el('p.info', { style: { marginBottom: '8px' } }, el('b', 'Cribado'), ': repasa todo el texto con un modelo econ\u00f3mico. ', el('b', 'A fondo'),
+      ' (Fidelidad e Integridad): un modelo m\u00e1s fuerte revisa solo lo que se\u00f1al\u00f3 el cribado. ', el('b', 'General'), ': el proveedor general de ',
+      el('a', { href: '#', onclick: (e) => { e.preventDefault(); showSettingsSection('providers'); } }, 'Proveedores y modelos'), '.'),
+    t)));
+
+  // 2) The checks without AI and their optional extra.
+  host.appendChild(el('div.card', el('h3', 'Comprobaciones sin IA', helpBtn('layer0')), el('div.body',
+    el('p.info', 'Se hacen en este navegador, al momento y gratis, sin enviar nada a ninguna IA ni descargar nada: cifras y etiquetas que no coinciden, p\u00e1rrafos que faltan o sin traducir, longitud y n\u00famero de oraciones (posibles omisiones), paralelismo de listas, palabras repetidas, convenciones y las reglas que no necesitan IA.'),
+    await _semanticSettings(cfg.local || {}))));
+
+  // 3) Advanced: thinking, batch size, fusion, budget.
+  const adv = el('table.grid', el('tr', el('th', 'M\u00f3dulo'), el('th', 'Razonamiento'), el('th', 'Palabras por lote'), el('th', 'Fusionar'), el('th', 'Presupuesto (US$)')));
   for (const m of MODULES.filter(x => x.ai)) {
     const c = cfg[m.id];
-    const save = (patch) => saveModuleConfig(m.id, patch).then(() => toast('Guardado.', 'ok', 1500));
+    const save = (patch) => saveModuleConfig(m.id, patch).then(saved);
     const thinking = el('select', { onchange: (e) => save({ thinking: e.target.value }) },
       Object.keys(THINKING_LABELS).map(k => el('option', { value: k }, THINKING_LABELS[k])));
     thinking.value = c.thinking || '';
-    t.appendChild(el('tr',
-      el('td', el('b', m.label), el('div.muted', m.desc)),
-      el('td', INPUT_LABELS[m.input]),
-      el('td', el('input', { type: 'checkbox', checked: c.enabled !== false, onchange: (e) => save({ enabled: e.target.checked }) })),
+    adv.appendChild(el('tr',
+      el('td', el('b', m.label)),
       el('td', thinking),
       el('td', m.id === 'verifier' || m.input === 'skeleton' ? '\u2014' : el('input.inp', { type: 'number', min: 0, step: 100, value: c.batchWords || '', placeholder: 'Auto', style: { width: '80px' },
         onchange: (e) => save({ batchWords: parseInt(e.target.value, 10) || 0 }) })),
       el('td', ['fidelity', 'integrity', 'grammar', 'style'].includes(m.id) ? el('input', { type: 'checkbox', checked: c.merge !== false, onchange: (e) => save({ merge: e.target.checked }) }) : '\u2014'),
-      el('td', m.id === 'verifier' ? '\u2014' : el('input', { type: 'checkbox', checked: !!c.verify, onchange: (e) => save({ verify: e.target.checked }) })),
       el('td', el('input.inp', { type: 'number', min: 0, step: 0.05, value: c.budget || '', placeholder: 'Sin l\u00edmite', style: { width: '90px' },
         onchange: (e) => save({ budget: parseFloat(e.target.value) || 0 }) }))));
   }
-  host.appendChild(el('div.card', el('h3', 'Capa 0 (sin IA)', helpBtn('layer0')), el('div.body',
-    el('label', el('input', { type: 'checkbox', checked: cfg.local.spell !== false, onchange: (e) => saveModuleConfig('local', { spell: e.target.checked }).then(() => toast('Guardado.', 'ok', 1500)) }),
-      ' Corrector ortogr\u00e1fico local (diccionario espa\u00f1ol de Hunspell; se descarga una vez, unos 900 KB)'),
-    el('p.info', { style: { marginTop: '6px' } }, 'Si se\u00f1ala una palabra correcta, rech\u00e1cela y elija \u00abNo volver a se\u00f1alarlo\u00bb: se crea una regla para ignorarla.'),
-    await _semanticSettings(cfg.local))));
-  host.appendChild(el('div.card', el('h3', 'Ajustes de los m\u00f3dulos', helpBtn('module-settings')), el('div.body',
-    el('p.info', 'Fusionar: Fidelidad con Integridad, y Gram\u00e1tica con Estilo, comparten una sola llamada por lote cuando usan el mismo modelo (la entrada se paga una vez). Verificar: sus hallazgos pasan por el Verificador. Razonamiento: cu\u00e1nto piensa el modelo antes de responder (se cobra como salida).'),
-    t)));
+  host.appendChild(el('div.card', el('h3', 'Opciones avanzadas', helpBtn('module-advanced')), el('div.body',
+    el('details', el('summary', { style: { cursor: 'pointer', color: 'var(--primary)', fontWeight: 600 } }, 'Mostrar (no hace falta tocarlas)'),
+      el('p.info', { style: { margin: '8px 0' } }, 'Razonamiento: cu\u00e1nto piensa el modelo antes de responder (se cobra como salida). Palabras por lote: tama\u00f1o de cada env\u00edo. Fusionar: Fidelidad con Integridad, y Gram\u00e1tica con Estilo, comparten llamada si usan el mismo modelo. Presupuesto: tope de gasto por ejecuci\u00f3n.'),
+      adv))));
   // Prompts (built-in, editable)
   const box = el('div.body');
   for (const m of MODULES.filter(x => x.ai)) {
@@ -161,9 +188,9 @@ async function _semanticSettings(c) {
   const { listProviders, hasApiKey } = await import('../ai/registry.js');
   const { embeddingsSupported, DEFAULT_LOCAL_MODEL, DEFAULT_API_MODELS } = await import('../ai/embeddings.js');
   const save = (patch) => saveModuleConfig('local', patch).then(() => toast('Guardado.', 'ok', 1500));
-  const mode = el('select.inp', el('option', { value: 'ask' }, 'Preguntar la primera vez'), el('option', { value: 'off' }, 'Desactivada'),
-    el('option', { value: 'local' }, 'En este navegador (modelo local)'), el('option', { value: 'api' }, 'Con un proveedor (embeddings)'));
-  mode.value = c.semantic || 'ask';
+  const mode = el('select.inp', el('option', { value: 'off' }, 'Desactivada'),
+    el('option', { value: 'local' }, 'En este navegador (descarga unos 140 MB la primera vez)'), el('option', { value: 'api' }, 'Con un proveedor (embeddings, muy barato)'));
+  mode.value = c.semantic === 'local' || c.semantic === 'api' ? c.semantic : 'off';
   const localModel = el('input.inp', { value: c.semModel || DEFAULT_LOCAL_MODEL, onchange: (e) => save({ semModel: e.target.value.trim() || DEFAULT_LOCAL_MODEL }) });
   const provs = [];
   for (const p of await listProviders()) if (embeddingsSupported(p) && (await hasApiKey(p.id) || p.trust === 'local')) provs.push(p);
@@ -188,8 +215,8 @@ async function _semanticSettings(c) {
   mode.addEventListener('change', () => { save({ semantic: mode.value }); sync(); });
   sync();
   return el('div', { style: { marginTop: '12px', borderTop: '1px solid var(--border-soft)', paddingTop: '10px' } },
-    el('b', 'Similitud sem\u00e1ntica (omisiones y adiciones)'),
-    el('p.info', { style: { margin: '4px 0 8px' } }, 'Compara el sentido de cada oraci\u00f3n del original con las de la traducci\u00f3n: una oraci\u00f3n sin equivalente es una posible omisi\u00f3n (o adici\u00f3n). Los p\u00e1rrafos sospechosos pasan adem\u00e1s al modelo \u00aba fondo\u00bb de Integridad y Fidelidad.'),
+    el('b', 'Extra opcional: similitud sem\u00e1ntica'),
+    el('p.info', { style: { margin: '4px 0 8px' } }, 'Desactivada salvo que usted la active. Compara el sentido de cada oraci\u00f3n del original con las de la traducci\u00f3n: una oraci\u00f3n sin equivalente es una posible omisi\u00f3n (o adici\u00f3n). Los p\u00e1rrafos sospechosos pasan adem\u00e1s al modelo \u00aba fondo\u00bb de Integridad y Fidelidad.'),
     el('div.form-grid', el('div.field', el('label.lbl', 'Funcionamiento'), mode), el('div.field', el('label.lbl', 'Sensibilidad'), sens)),
     localBox, apiBox);
 }

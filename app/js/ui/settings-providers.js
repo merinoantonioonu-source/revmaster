@@ -17,6 +17,7 @@ import { el, clear, modal, toast, confirmDialog, debounce } from '../util/dom.js
 import { AI_MODULES, ROLE_LABELS, moduleById } from '../review/module-list.js';
 import { ADAPTERS, adapterLabel, testConnection } from '../ai/providers.js';
 import * as reg from '../ai/registry.js';
+import { emit } from '../state.js';
 import { recordUsage, OTHER_MODULE } from '../ai/usage.js';
 
 const TRUST_LABEL = { external: 'Externo', local: 'Local' };
@@ -93,6 +94,16 @@ function _modelSelect(status, current, onChoose, opts) {
     prev = v;
     await onChoose(_decode(v));
   });
+  return sel;
+}
+
+/** The model <select> of one module slot (Settings > Modulos), saved when changed. */
+export async function moduleModelSelect(moduleId, role, onSaved) {
+  const [status, mm] = await Promise.all([reg.providersWithStatus(), reg.getModuleModels()]);
+  const slot = mm.map[moduleId] || {};
+  const sel = _modelSelect(status, slot[role] || null, async (c) => { await reg.setModuleModel(moduleId, role, c); if (onSaved) onSaved(c); });
+  sel.dataset.module = moduleId;
+  sel.dataset.role = role;
   return sel;
 }
 
@@ -381,7 +392,11 @@ export async function openProviderModal(profile) {
   const body = el('div',
     el('div.form-grid',
       el('div.field', el('label.lbl', 'Nombre'), nameInp),
-      el('div.field', el('label.lbl', 'Tipo'), adapterSel)),
+      // Built-in profiles keep their type (a Gemini profile is always Gemini): say so instead of a dead list.
+      p.builtIn
+        ? el('div.field', el('label.lbl', 'Tipo'), el('div.inp', { style: { background: 'var(--bg-app)' } }, adapterLabel(p.adapter)),
+          el('p.info', 'Fijo en los proveedores de serie. Para otro servicio (OpenAI, OpenRouter, DeepSeek, Ollama...), use \u00ab+ A\u00f1adir proveedor\u00bb.'))
+        : el('div.field', el('label.lbl', 'Tipo'), adapterSel)),
     fPreset, fBase, fBatch, fAzure,
     el('div.field', el('label.lbl', 'Clave de API'), el('div.row', el('div.grow', keyInp), keyState, removeKeyBtn),
       el('p.info', 'La clave se guarda solo en este navegador. No viaja en el archivo de sincronizaci\u00f3n, salvo cifrada si lo activas en Ajustes > Sincronizaci\u00f3n.')),
@@ -504,26 +519,7 @@ export async function mount(container) {
       el('p.info', 'Lo usa todo m\u00f3dulo que no tenga un modelo propio, y el que tenga uno sin clave. Si no eliges ninguno, se usa el primer proveedor con clave.'),
       genSel));
 
-    // Model per module
-    const tbl = el('table.grid', el('tr', el('th', 'M\u00f3dulo'), el('th', ROLE_LABELS.triage), el('th', ROLE_LABELS.deep)));
-    for (const m of AI_MODULES) {
-      const slot = mm.map[m.id] || {};
-      const cell = (role) => {
-        if (!m.roles.includes(role)) return el('td.muted', '\u2014');
-        const sel = _modelSelect(status, slot[role] || null, async (c) => { await reg.setModuleModel(m.id, role, c); render(); });
-        sel.dataset.module = m.id;
-        sel.dataset.role = role;
-        return el('td', sel);
-      };
-      tbl.appendChild(el('tr',
-        el('td', el('b', m.label), el('div.muted', { style: { fontSize: '11px' } }, m.desc)),
-        cell('triage'), cell('deep')));
-    }
-    frag.appendChild(_card(['Modelo por m\u00f3dulo', helpBtn('module-models')],
-      el('p.info', ROLE_LABELS.triage + ': pasada econ\u00f3mica por todo el texto. ' + ROLE_LABELS.deep +
-        ': modelo fuerte sobre lo que se\u00f1alan el cribado o la capa local. "General" = el proveedor general. ' +
-        'Si el proveedor elegido no tiene clave, el m\u00f3dulo usa el general y lo dice.'),
-      tbl));
+    frag.appendChild(el('p.info', 'El modelo de cada m\u00f3dulo se elige en ', el('a', { href: '#', onclick: (e) => { e.preventDefault(); emit('goto-settings', 'modules'); } }, 'M\u00f3dulos'), '.'));
 
     clear(root).appendChild(frag);
   }

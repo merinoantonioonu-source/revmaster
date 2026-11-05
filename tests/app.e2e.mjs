@@ -39,7 +39,7 @@ async function newApp(browser, base) {
   await page.goto(base + '/app/index.html');
   await page.waitForSelector('.modal', { timeout: 15000 });   // the guide on first run
   await page.click('.modal-foot .btn');
-  // The semantic check asks before its first use (large download): not part of this test (phase6.e2e.mjs).
+  // The semantic check is an optional extra, off by default (tested in phase6.e2e.mjs).
   await page.evaluate(async () => { const mc = await import('/app/js/review/module-config.js'); await mc.saveModuleConfig('local', { semantic: 'off' }); });
   return { ctx, page, errors };
 }
@@ -132,7 +132,7 @@ async function main() {
 
     // Review: layer 0 + AI modules through the UI
     await page.click('.step[data-view="review"]');
-    await page.waitForSelector('#rv-modules .mcard');
+    await page.waitForSelector('#rv-modules .mchip');
     await page.waitForTimeout(800);
     await page.click('#tools button:has-text("Ejecutar seleccionados")');
     await page.waitForSelector('.modal:has-text("Plan de ejecuci")', { timeout: 15000 });
@@ -154,14 +154,14 @@ async function main() {
     if (leaks.length) console.log('LEAK SAMPLE:', leaks[0].prompt.slice(0, 600));
     ok(!leaks.length, 'No real entity reached the AI (only masked text in the prompts)');
     const fused = log.filter(r => /P\u00c1RRAFOS DE LA TRADUCCI\u00d3N/.test(r.prompt));
-    ok(fused.length >= 1 && /ORTOGRAF/.test(fused[0].system) && /ESTILO/.test(fused[0].system), 'Grammar and style fused in one call');
+    ok(fused.length >= 1 && /GRAM\u00c1TICA/.test(fused[0].system) && /ESTILO/.test(fused[0].system) && !/ORTOGRAF\u00cdA Y/.test(fused[0].system), 'Grammar (without spelling) and style fused in one call');
     const gram = res.find(f => f.module === 'grammar' && /desplegado/.test(f.quote || ''));
     ok(!!gram && gram.start !== null, 'Grammar finding anchored in the real text');
     ok(res.some(f => f.state === 'discarded' || f.verified), 'Verifier verdicts applied');
     await page.screenshot({ path: path.join(OUT, '3-review.png') });
 
     // Accept the grammar finding through the UI, then export with tracked changes and comments
-    await page.click('.bub:has-text("Pendientes")');
+    await page.selectOption('select[data-filter="state"]', 'open');
     await page.waitForTimeout(300);
     const card = page.locator('#rv-findings .iss', { hasText: 'fueron desplegado' }).first();
     await card.locator('button:has-text("Aceptar")').click();
@@ -230,11 +230,11 @@ async function main() {
 
     // External AI answer imported through the dialog
     await menuItem(page, 'Exportar enmascarado', 'Importar respuesta de IA externa');
-    await page.fill('.modal textarea', info.uReq + ' | EST | SUG | presente | presente | Prueba de IA externa.\nFIN 1');
+    await page.fill('.modal textarea', info.uReq + ' | EST | SUG | presente | actual | Prueba de IA externa.\n' + info.uReq + ' | EST | SUG | presente | presente | Igual que la cita: se descarta.\nFIN 1');
     await page.click('.modal-foot .btn.primary');
     await page.waitForTimeout(500);
     const extF = await page.evaluate(async () => { const { state } = await import('/app/js/state.js'); return state.findings.filter(f => f.source === 'external').length; });
-    ok(extF === 1, 'External AI answer imported as a finding');
+    ok(extF === 1, 'External AI answer imported as a finding (a proposal identical to its quote is dropped)');
 
     // A user rule created in the editor is applied by layer 0
     await page.click('.step[data-view="settings"]');
@@ -247,7 +247,7 @@ async function main() {
     await page.click('.modal-foot .btn.primary');
     await page.waitForTimeout(400);
     await page.click('.step[data-view="review"]');
-    await page.click('#rv-modules .mcard:has-text("Capa 0") button:has-text("Ejecutar")');
+    await page.click('#rv-modules .mchip[data-mod="local"] .run');
     await page.waitForTimeout(1500);
     const ruleHit = await page.evaluate(async () => { const { state } = await import('/app/js/state.js'); return state.findings.some(f => f.sub === 'rules' && /septuag/.test(f.quote)); });
     ok(ruleHit, 'New user rule detected by layer 0');
@@ -305,9 +305,9 @@ async function main() {
       const nopair = await p1.$$eval('.ent .st.bad', ns => ns.length);
       ok(nopair >= 2, 'Masking shows the figures without a pair (1,250 vs 1.520): ' + nopair);
       await p1.click('.step[data-view="review"]');
-      await p1.waitForSelector('#rv-modules .mcard');
-      await p1.click('#rv-modules .mcard:has-text("Capa 0") button:has-text("Ejecutar")');
-      await p1.waitForSelector('#rv-modules .mcard:has-text("Capa 0"):has-text("hallazgos")', { timeout: 30000 });
+      await p1.waitForSelector('#rv-modules .mchip');
+      await p1.click('#rv-modules .mchip[data-mod="local"] .run');
+      await p1.waitForSelector('#rv-modules .mchip[data-mod="local"].done', { timeout: 30000 });
       const loc = await p1.evaluate(async () => {
         const { state } = await import('/app/js/state.js');
         return state.findings.filter(f => f.module === 'local').map(f => ({ sub: f.sub, cat: f.cat, sev: f.sev, quote: f.quote, sug: f.suggestion }));

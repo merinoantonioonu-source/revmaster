@@ -29,8 +29,8 @@ navegador: no se suben a GitHub ni a ningún servidor. A una IA solo llega texto
    - el documento censurado, en el mismo formato;
    - una tabla bilingüe;
    - el texto listo para pegar en una IA externa.
-2. **Revisar.** Hay una Capa 0 que funciona sin IA y es gratis. Además, hay ocho módulos con IA:
-   - ortografía y gramática;
+2. **Revisar.** Hay unas comprobaciones sin IA, gratis e instantáneas. Además, hay ocho módulos con IA:
+   - gramática (la ortografía la corrige Word);
    - fidelidad;
    - integridad (omisiones y adiciones);
    - estilo;
@@ -43,8 +43,11 @@ navegador: no se suben a GitHub ni a ningún servidor. A una IA solo llega texto
    muestra el plan con su coste estimado.
 
    Además:
-   - **Similitud semántica:** compara el sentido de cada oración del original con las de la
-     traducción para encontrar omisiones y adiciones. Funciona en tu navegador, sin coste, o con un
+   - **Navegación por oraciones, como en Final Check:** al pulsar una oración se resalta con su
+     pareja en la otra hoja; al pulsar un hallazgo, las dos hojas van a su oración.
+   - **Tabla de hallazgos** en una ventana aparte, y un **Excel para valorar** los hallazgos.
+   - **Similitud semántica (opcional):** compara el sentido de cada oración del original con las de
+     la traducción para encontrar omisiones y adiciones. Funciona en tu navegador, sin coste, o con un
      proveedor, con texto enmascarado.
    - **Modo diferido:** la primera pasada va a la API de lotes del proveedor (Gemini, Anthropic,
      Mistral u OpenAI). Cuesta la mitad y responde en minutos u horas.
@@ -96,8 +99,6 @@ fusiona un cambio en `main`.
 ## Créditos de terceros
 
 - [JSZip](https://stuk.github.io/jszip/) (MIT o GPLv3) y [SheetJS](https://sheetjs.com/) (Apache 2.0), copiados de COMeT.
-- [nspell](https://github.com/wooorm/nspell) (MIT).
 - [transformers.js](https://github.com/huggingface/transformers.js) 3.7.6 (Apache 2.0), que descarga al usarse
   el modelo [paraphrase-multilingual-MiniLM-L12-v2](https://huggingface.co/Xenova/paraphrase-multilingual-MiniLM-L12-v2) (Apache 2.0).
-- Diccionario español de Hunspell de [dictionary-es](https://github.com/wooorm/dictionaries) (GPL-3.0, LGPL-3.0 o MPL-1.1, a elegir; véase `app/data/hunspell/LICENSE.txt`).
 - Partes del código proceden de COMeT (del mismo autor) y se indican en la cabecera de cada archivo.

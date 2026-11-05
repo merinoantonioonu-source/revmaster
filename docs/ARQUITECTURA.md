@@ -222,9 +222,8 @@ FIN <n>
   - formato de millares;
   - reglas sin IA.
 
-  A esto se suma `review/spell.js`: un corrector ortográfico local con Hunspell (`app/data/hunspell/es.*`,
-  diccionario `dictionary-es` 4.0.0 con su licencia) y `app/libs/nspell.esm.js` (nspell 2.1.5, MIT,
-  empaquetado una vez con esbuild).
+  El corrector ortográfico local (Hunspell) se retiró el 2026-11-05 a petición del usuario: la
+  ortografía la corrige Word, y el módulo de Gramática ya no la revisa.
 - **Fase 6, completa.** Incluye el «puente» para proveedores sin CORS (campo `relayUrl` del perfil), la
   similitud semántica y el modo diferido; los dos últimos se describen en el §10.
 - **Pruebas.** `node tests/run-all.mjs` ejecuta estas cuatro:
@@ -292,3 +291,44 @@ FIN <n>
 - **Pruebas:** `tests/phase6.e2e.mjs`. El simulador `tests/mock-ai.mjs` imita las cuatro APIs de lotes y
   las de *embeddings*. El modelo local real no se puede descargar en las pruebas, así que se sustituye con
   `setLocalEmbedderFactory`.
+
+## 11. Navegación por oraciones y tabla de hallazgos (2026-11-05)
+
+Emula la navegación de Final Check de COMeT (comportamiento copiado; código nuevo, no importado).
+
+- **`ui/nav.js`.**
+  - Un segmento es una ORACIÓN: `sentenceSpans(text, lang)`, con el segmentador SRX (EN o FR para el
+    original, ES para la traducción) y los desplazamientos medidos en `para.text`.
+  - Los párrafos se emparejan por las unidades de la sesión. Las oraciones se emparejan por posición,
+    y solo si los dos párrafos tienen el mismo número de oraciones (`peerSentence`). Si no, el otro
+    lado se marca a nivel de párrafo (clase `.flash`, fija).
+  - El resaltado usa la API de resaltado de CSS: `::highlight(um-seg)` para la oración y su pareja, y
+    `::highlight(um-focus)` para el texto exacto de un hallazgo.
+  - Al pulsar una oración, la hoja pulsada no se mueve: la otra se desplaza hasta poner la pareja a la
+    misma altura (`alignOther`). Ir a un hallazgo o a un lugar centra las dos (`centerIn`).
+  - ← y → recorren las oraciones; al pasar el ratón por un párrafo, su pareja se recuadra.
+  - `preview.js` guarda en cada nodo de texto su desplazamiento (`__o`), y en cada etiqueta, `__o` y
+    `__e`. `domPos`, `rangeOf` y `offsetAt` convierten entre desplazamientos y posiciones del DOM.
+    Seleccionar un hallazgo ya no redibuja las hojas; después de redibujarlas, `nav.refresh()`
+    vuelve a pintar las marcas.
+  - `findingPlace(session, f)` da la oración de un hallazgo en las dos lenguas y su etiqueta
+    «§párrafo.oración». La usan la lista, la tabla y el Excel para valorar.
+- **`ui/findings-window.js`.** La tabla de hallazgos en una ventana aparte, como la de
+  Transformations:
+  - Se abre con `window.open('', 'umbra-findings', ...)` en el mismo origen. Su DOM se construye desde
+    la ventana principal, y sus filas llaman directamente a la principal.
+  - La ventana no guarda datos: se redibuja con cada evento `findings` o `finding`.
+- **Entidades.**
+  - La lista muestra por defecto solo las que tienen un problema.
+  - «Ver dónde no cuadra» recorre las parejas de párrafos con un recuento distinto (`problemPlaces`)
+    y marca las oraciones con `nav.focusUnit`.
+  - «Emparejar…» (antes «Fusionar») propone primero las entidades que solo están en la otra lengua.
+- **Excel para valorar** (`exportFeedbackXlsx`). Tiene una fila por hallazgo y las columnas «Su
+  valoración» (con lista desplegable: `dataValidations` añadido con JSZip, porque SheetJS Community no
+  la escribe), «Gravedad correcta» y «Comentario». Puede llevar el texto real o el enmascarado.
+- **Fidelidad.**
+  - Es de sentido: las instrucciones excluyen los cambios de estructura, de orden y de voz, las formas
+    oficiales completas, los artículos y las preposiciones.
+  - Los hallazgos cuya propuesta es idéntica a la cita se descartan al leer la respuesta
+    (`parseFindings`).
+

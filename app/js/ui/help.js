@@ -7,13 +7,7 @@
  */
 
 import { el } from '../util/dom.js';
-import { MODULES } from '../review/module-list.js';
 import { showGuide } from './guide.js';
-
-const CARD_TIP = ['**Casilla**: el m\u00f3dulo entra en **\u25b6 Ejecutar seleccionados**.',
-  '**Pastilla del modelo**: p\u00falsela para cambiar el proveedor o el modelo, o para a\u00f1adir uno.',
-  'Debajo, los tokens y el coste estimados.',
-  '**Ejecutar**: solo este m\u00f3dulo. **\u2691 n**: sus hallazgos pendientes.'];
 
 const T = {
   // ------------------------------------------------------------------ files and start
@@ -28,7 +22,7 @@ const T = {
   // ------------------------------------------------------------------ step 1: mask
   'mask-tools': { t: 'Barra de enmascarado', b: [
     ['**Categor\u00edas** (Cifras, Fechas, Organismos\u2026): pulse una para dejar de enmascararla o para volver a hacerlo. Las apagadas salen en gris.',
-      'El resumen dice cu\u00e1ntas entidades hay, cu\u00e1ntas est\u00e1n **por revisar** y cu\u00e1ntas **cifras sin pareja** (una cifra que no est\u00e1 igual en las dos lenguas: posible error).',
+      'El resumen dice cu\u00e1ntas entidades hay, cu\u00e1ntas tienen **problemas** y cu\u00e1ntas **cifras sin pareja** (una cifra que no est\u00e1 igual en las dos lenguas: posible error).',
       '**Original: ingl\u00e9s / franc\u00e9s**: la lengua del original.',
       '**Opciones**: n\u00fameros en letra, siglas desconocidas y deshacer lo hecho a mano.',
       '**\ud83d\udc41 Ver original / Ver etiquetas**: alterna entre las etiquetas y el texto real.',
@@ -38,7 +32,7 @@ const T = {
     ['**N\u00fameros escritos en letra** (\u00abdoscientos\u00bb, \u00abthree\u00bb\u2026): se enmascaran como cifras.',
       '**Siglas desconocidas presentes en ambos textos**: una sigla que no est\u00e1 en las listas pero aparece igual en el original y en la traducci\u00f3n se enmascara.',
       '**Volver a enmascarar todo lo que se quit\u00f3 a mano**: anula los \u00abNo enmascarar\u00bb.',
-      '**Deshacer todas las fusiones**: separa las entidades que se fusionaron.',
+      '**Deshacer todos los emparejamientos**: separa las entidades que se emparejaron a mano.',
       '**Quitar los t\u00e9rminos a\u00f1adidos a mano en este proyecto**: borra lo enmascarado con [[Alt+E]] (su diccionario personal no cambia).'] ] },
   'mask-export': { t: 'Exportar enmascarado', b: [
     ['**Original / Traducci\u00f3n enmascarada**: el mismo documento, en su formato, con etiquetas en lugar de los datos. Sirve para enviarlo a una IA o a otra persona sin datos sensibles.',
@@ -47,23 +41,21 @@ const T = {
       '**Importar respuesta de IA externa**: convierte la respuesta de esa IA en hallazgos de Revisar.',
       '**Mapa de claves**: la lista etiqueta \u2192 texto real. Contiene los datos reales: p\u00f3ngale contrase\u00f1a y gu\u00e1rdelo aparte.'] ] },
   entities: { t: 'Entidades del documento', b: [
-    'Cada tarjeta es una entidad con su etiqueta (`{el CARGO1}`), su estado y sus formas: **O:** en el original y **T:** en la traducci\u00f3n (\u00d7n = veces).',
-    ['**OK**: todo cuadra.',
-      '**Sin pareja**: est\u00e1 en una lengua y no en la otra. Compruebe si falta, si sobra o si hay que fusionarla con otra.',
+    'Una entidad es un dato que UMBRA tapa con una etiqueta (`{el CARGO1}`): cifras, fechas, s\u00edmbolos y direcciones (por su forma) y organismos, \u00f3rganos, pa\u00edses, lugares y cargos (por sus listas triling\u00fces), personas (tras \u00abMr.\u00bb, \u00abSra.\u00bb, \u00abM.\u00bb\u2026), siglas presentes en las dos lenguas y lo que usted a\u00f1ada.',
+    ['**Con problemas / Todas**: por defecto se ven solo las que tienen alg\u00fan problema. Debajo, la categor\u00eda.',
+      '**Sin pareja**: est\u00e1 en una lengua y no en la otra.',
       '**Recuento distinto**: aparece un n\u00famero de veces distinto en cada lengua.',
-      '**Formas distintas**: la traducci\u00f3n la nombra de varias maneras; revise la coherencia.'],
-    'Las burbujas de arriba filtran (Todas, Por revisar o una categor\u00eda). Pulse una tarjeta para resaltar la entidad en las hojas. Botones:',
-    ['**Categor\u00eda** y **Art\u00edculo** (el, la, los, las: el que lleva la etiqueta de la traducci\u00f3n).',
-      '**Fusionar\u2026**: dos etiquetas que son la misma entidad.',
-      '**A mi diccionario**: se enmascarar\u00e1 en todos los documentos.',
-      '**No enmascarar**: la deja como texto normal.'] ] },
+      '**Formas distintas**: la traducci\u00f3n la nombra de varias maneras.',
+      '**Ver d\u00f3nde no cuadra \u203a**: lleva a cada p\u00e1rrafo en el que no coincide y resalta la oraci\u00f3n en las dos hojas. Pulse **Siguiente \u203a** para ir al siguiente.'],
+    'Botones: **Categor\u00eda**, **Art\u00edculo** (el, la, los, las: el que lleva la etiqueta en la traducci\u00f3n), **Emparejar\u2026** (es la misma entidad que otra etiqueta), **A mi diccionario** (se enmascarar\u00e1 en todos los documentos) y **No enmascarar**.'] },
   sheets: { t: 'Las dos hojas', b: [
     'A la izquierda, el original; a la derecha, la traducci\u00f3n, con las etiquetas en color (las de la traducci\u00f3n llevan el art\u00edculo).',
-    ['Pulse un p\u00e1rrafo para ver su pareja en la otra hoja; pulse una etiqueta para ver su entidad.',
+    ['**Clic en una oraci\u00f3n**: se resalta en amarillo, y tambi\u00e9n su pareja en la otra hoja, que se desplaza hasta ponerla a la misma altura. Si las dos no tienen el mismo n\u00famero de oraciones, se resalta el p\u00e1rrafo entero.',
+      '[[\u2190]] / [[\u2192]]: oraci\u00f3n anterior y siguiente.',
+      'Al pasar el rat\u00f3n por un p\u00e1rrafo, su pareja se recuadra.',
       '**Para enmascarar algo que UMBRA no ha detectado**: selecci\u00f3nelo y pulse [[Alt+E]], o clic derecho \u203a **Enmascarar la selecci\u00f3n\u2026**',
       '**Clic derecho en una etiqueta**: no enmascarar esa aparici\u00f3n o la entidad en todo el documento.',
-      '**Buscar\u2026**: salta al primer p\u00e1rrafo que contiene el texto.',
-      'Las etiquetas en rojo no tienen pareja en la otra lengua.',
+      '**Buscar\u2026**: lleva al primer texto que coincide y lo resalta.',
       '[[Ctrl]]+rueda del rat\u00f3n sobre las hojas ampl\u00eda el texto.'] ] },
   'mask-selection': { t: 'Enmascarar una selecci\u00f3n', b: [
     'Se enmascaran todas las apariciones del texto en esa hoja.',
@@ -82,18 +74,30 @@ const T = {
   'external-import': { t: 'Importar respuesta de IA externa', b: [
     'Pegue la respuesta completa de la IA. UMBRA reconoce las l\u00edneas con el formato que se le pidi\u00f3 (`12 | OMI | MAY | cita | sugerencia | motivo`) y descarta el resto.',
     'Las etiquetas se convierten en el texto real y los hallazgos aparecen en Revisar con el origen \u00abIA externa\u00bb.'] },
-  merge: { t: 'Fusionar entidades', b: [
-    'Para cuando UMBRA ha dado dos etiquetas a una sola entidad: por ejemplo, la sigla del original (UNDP) y el nombre completo de la traducci\u00f3n (Programa de las Naciones Unidas para el Desarrollo).',
-    'La etiqueta elegida absorbe a la otra y las dos lenguas quedan emparejadas. Para deshacerlo: Opciones \u203a Deshacer todas las fusiones.'] },
+  merge: { t: 'Emparejar entidades', b: [
+    '**Para qu\u00e9 sirve**: a veces UMBRA da dos etiquetas distintas a lo que es una sola entidad, porque en cada lengua se escribe de otra forma. Por ejemplo, \u00abUNDP\u00bb en el original queda como `{ORG4}` y \u00abPNUD\u00bb en la traducci\u00f3n como `{el ORG7}`: las dos salen como \u00abSin pareja\u00bb.',
+    '**C\u00f3mo se usa**: en la tarjeta de una de ellas pulse **Emparejar\u2026** y elija la otra. Arriba de la lista aparecen las que **encajan** (las que est\u00e1n solo en la otra lengua). Desde ese momento llevan la misma etiqueta, cuentan como una sola entidad y dejan de salir como problema.',
+    'Para deshacerlo: Opciones \u203a Deshacer todos los emparejamientos.'] },
 
   // ------------------------------------------------------------------ step 2: review
   'review-tools': { t: 'Barra de revisi\u00f3n', b: [
     ['El resumen cuenta los hallazgos pendientes por gravedad: cr\u00edticos, mayores, menores y sugerencias.',
       '**Perfil de reglas**: aplica solo las reglas de un tipo de documento (los perfiles se crean en Ajustes \u203a Reglas).',
-      '**\u25b6 Ejecutar seleccionados**: ejecuta los m\u00f3dulos marcados en sus tarjetas. Antes de gastar, ense\u00f1a el plan con el coste estimado. **\u25a0 Detener** para a mitad.',
+      '**\u25b6 Ejecutar seleccionados**: ejecuta los m\u00f3dulos marcados en la barra de m\u00f3dulos. Antes de gastar, ense\u00f1a el plan con el coste estimado. **\u25a0 Detener** para a mitad.',
       '**M\u00e1s**: IA externa, verificar hallazgos y atajos a los ajustes.',
-      '**Exportar**: la traducci\u00f3n corregida (DOCX con control de cambios y comentarios) y los informes.'],
-    'Consejo: empiece por la **Capa 0** (gratis); lo que se\u00f1ale ayuda a los m\u00f3dulos con IA.'] },
+      '**Exportar**: la traducci\u00f3n corregida (DOCX con control de cambios y comentarios), los informes y el Excel para valorar los hallazgos.'],
+    'Consejo: empiece por las **Comprobaciones sin IA** (gratis); lo que se\u00f1alen ayuda a los m\u00f3dulos con IA.'] },
+  modules: { t: 'M\u00f3dulos de revisi\u00f3n', b: [
+    'Cada pastilla es un m\u00f3dulo. **Casilla**: entra en \u00ab\u25b6 Ejecutar seleccionados\u00bb. **\u25b6** peque\u00f1o: ejecuta solo ese m\u00f3dulo. Al lado, su coste estimado y, despu\u00e9s de ejecutarlo, \u2691 n hallazgos pendientes (o \u2713 si no encontr\u00f3 nada). Deje el rat\u00f3n encima para ver qu\u00e9 hace y con qu\u00e9 modelo.',
+    ['**Comprobaciones sin IA**: gratis, sin enviar nada: cifras, etiquetas, p\u00e1rrafos que faltan, paralelismo, convenciones y reglas fijas.',
+      '**Gram\u00e1tica**: concordancia, r\u00e9gimen, tiempos y puntuaci\u00f3n (la ortograf\u00eda la corrige Word).',
+      '**Fidelidad**: errores de SENTIDO (no de estructura): falsos amigos, modalidad, negaciones, qui\u00e9n hace qu\u00e9.',
+      '**Integridad**: lo que falta o sobra respecto del original.',
+      '**Estilo**: calcos, pasivas, gerundios, registro institucional.',
+      '**Coherencia** y **Convenciones ONU**: miran el documento entero de una vez (listas, t\u00edtulos, f\u00f3rmulas de resoluci\u00f3n); son baratos.',
+      '**Lectura en fr\u00edo**: lee la traducci\u00f3n sin el original, como un lector nuevo.',
+      '**\u2713 Verificar hallazgos**: un modelo revisa los hallazgos pendientes de la IA y descarta los falsos positivos.'],
+    'Qu\u00e9 m\u00f3dulos est\u00e1n activos y con qu\u00e9 modelo se elige en Ajustes \u203a M\u00f3dulos.'] },
   'review-more': { t: 'Men\u00fa M\u00e1s', b: [
     ['**Copiar para IA externa / Importar respuesta**: revisar con una IA de chat sin clave.',
       '**Verificar los hallazgos pendientes de la IA**: los manda al Verificador, que descarta los falsos positivos. Cuesta poco: solo env\u00eda los hallazgos con su contexto.',
@@ -102,20 +106,32 @@ const T = {
     ['**DOCX con control de cambios y comentarios**: los hallazgos ACEPTADOS entran como cambios controlados (que acepta o rechaza en Word) y los dem\u00e1s, como comentarios de Word.',
       '**Sin comentarios**: solo los cambios.',
       '**Con los cambios aplicados**: documento limpio. Es la opci\u00f3n de PPTX y XLSX, que no tienen control de cambios.',
-      '**Informe HTML o Excel**: todos los hallazgos, salvo los descartados por el Verificador. **JSON**: los datos en bruto.'] ] },
+      '**Informe HTML o Excel**: todos los hallazgos, salvo los descartados por el Verificador.',
+      '**Hallazgos para valorar (Excel)**: una fila por hallazgo con columnas para su opini\u00f3n; v\u00e9ase su propia ayuda.',
+      '**JSON**: los datos en bruto.'] ] },
   findings: { t: 'Hallazgos', b: [
-    'Cada tarjeta muestra la gravedad (**CRI** cr\u00edtico, **MAY** mayor, **MEN** menor, **SUG** sugerencia), el m\u00f3dulo, el p\u00e1rrafo (\u00a7), la cita tachada \u2192 la propuesta, el motivo y el origen (Sin IA, Regla, el modelo, a fondo, cach\u00e9 o IA externa).',
-    ['**Aceptar** [[A]]: se aplicar\u00e1 al exportar. Si est\u00e1 desactivado, no hay propuesta o no se encontr\u00f3 la cita: use Editar.',
+    'Tres listas filtran lo que se ve: **Estado** (lo que usted ya decidi\u00f3: pendientes, aceptados, rechazados o ignorados, descartados por el Verificador), **M\u00f3dulo** (qui\u00e9n lo encontr\u00f3) y **Gravedad**. Cada opci\u00f3n dice cu\u00e1ntos hay.',
+    'Cada tarjeta muestra la gravedad (**CRI** cr\u00edtica, **MAY** mayor, **MEN** menor, **SUG** sugerencia), el m\u00f3dulo, el lugar (\u00a7 p\u00e1rrafo.oraci\u00f3n), la cita tachada \u2192 la propuesta, el motivo y el origen.',
+    ['**Pulse una tarjeta**: las dos hojas van a esa oraci\u00f3n; el texto exacto sale en amarillo intenso.',
+      '**Aceptar** [[A]]: se aplicar\u00e1 al exportar. Si est\u00e1 desactivado, no hay propuesta: use Editar.',
       '**Editar** [[E]]: corrija la propuesta (queda aceptada); UMBRA ofrece convertirla en regla.',
       '**Rechazar** [[R]]: ofrece \u00abNo volver a se\u00f1alarlo\u00bb (crea una regla de ignorar). **Ignorar**: lo aparta sin m\u00e1s.',
       '[[J]] / [[K]]: siguiente y anterior. **Deshacer** devuelve un hallazgo decidido a pendientes.',
-      'Burbujas: filtran por estado, m\u00f3dulo y gravedad. **Descartados** = los que el Verificador consider\u00f3 falsos.',
+      '**\u29c9 Tabla**: abre los hallazgos en una ventana aparte, en forma de tabla (como la de Transformations de Final Check).',
       '**\u22ef**: aceptar o rechazar en bloque los visibles, o borrar los pendientes de la IA.'],
     'Solo lo ACEPTADO se aplica al exportar.'] },
+  feedback: { t: 'Hallazgos para valorar', b: [
+    'Un Excel para decir qu\u00e9 hallazgos son buenos y cu\u00e1les no, y as\u00ed ajustar las reglas y las instrucciones de los m\u00f3dulos.',
+    ['Una fila por hallazgo: lugar, m\u00f3dulo, gravedad, cita, propuesta, motivo, origen y la oraci\u00f3n del original y de la traducci\u00f3n.',
+      '**Su valoraci\u00f3n** (lista desplegable): Correcto, Falso positivo, Gravedad excesiva, Gravedad insuficiente, Propuesta mejorable o Dudoso.',
+      '**Gravedad correcta** y **Comentario**: lo que habr\u00eda que cambiar.',
+      '**Enmascarado**: sin datos reales, para compartirlo sin riesgo.'],
+    'No cambie las columnas ID ni \u00a7: sirven para encontrar cada hallazgo.'] },
   'review-sheets': { t: 'Hojas de revisi\u00f3n', b: [
-    ['La traducci\u00f3n lleva subrayados los hallazgos visibles, con el color de su gravedad: pulse uno para verlo en la lista.',
+    ['La traducci\u00f3n lleva subrayados los hallazgos visibles, con el color de su gravedad.',
+      '**Clic en una oraci\u00f3n**: se resalta con su pareja en el original y, si tiene hallazgos, se muestra el primero en la lista (pulse otra vez para ver el siguiente).',
       'Una marca \u00ab+ omisi\u00f3n\u00bb al final de un p\u00e1rrafo indica algo que falta.',
-      'A la izquierda, el original del mismo documento.',
+      '[[\u2190]] / [[\u2192]]: oraci\u00f3n anterior y siguiente. Al pasar el rat\u00f3n por un p\u00e1rrafo, su pareja se recuadra.',
       'Solo se marcan los hallazgos que pasan los filtros de la lista.'] ] },
   plan: { t: 'Plan de ejecuci\u00f3n', b: [
     'Lo que se va a enviar, antes de gastar nada:',
@@ -125,12 +141,6 @@ const T = {
       '**Presupuesto m\u00e1ximo**: UMBRA deja de enviar al llegar a esa cifra (vac\u00edo = sin l\u00edmite).',
       '**Modo diferido (lotes)**: la primera pasada cuesta la mitad, pero tarda de minutos a horas.'],
     'Solo sale texto enmascarado.'] },
-  semantic: { t: 'Similitud sem\u00e1ntica', b: [
-    'Compara el sentido de cada oraci\u00f3n del original con las de la traducci\u00f3n, sin gastar en modelos de texto. Una oraci\u00f3n sin equivalente es una posible **omisi\u00f3n** (o **adici\u00f3n**).',
-    ['**En este navegador**: gratis y privado. La primera vez descarga unos 140 MB (el motor y el modelo) y luego los guarda.',
-      '**Con un proveedor**: muy barato y r\u00e1pido; solo env\u00eda texto enmascarado.',
-      '**No usarla**: la Capa 0 sigue con sus comprobaciones de longitud y oraciones.'],
-    'Se cambia cuando quiera en Ajustes \u203a M\u00f3dulos \u203a Capa 0. Los p\u00e1rrafos sospechosos pasan adem\u00e1s al modelo \u00aba fondo\u00bb de Integridad y Fidelidad.'] },
   deferred: { t: 'Lotes diferidos', b: [
     'Revisiones enviadas en **modo diferido**: el proveedor las procesa a mitad de precio cuando tiene capacidad (de minutos a 24 horas).',
     ['UMBRA pregunta por ellas cada minuto mientras la p\u00e1gina est\u00e1 abierta, y al volver a abrir el proyecto.',
@@ -148,7 +158,7 @@ const T = {
     ['**Informe HTML**: para leer o imprimir, con cada hallazgo, su estado y su contexto.',
       '**Informe Excel**: una fila por hallazgo, para filtrar u ordenar.',
       '**Hallazgos en JSON**: los datos en bruto, para guardarlos o procesarlos.'],
-    'No incluyen los hallazgos descartados por el Verificador.'] },
+    'No incluyen los hallazgos descartados por el Verificador. Para valorar los hallazgos, use Revisar \u203a Exportar \u203a Hallazgos para valorar (Excel).'] },
   'export-masked': { t: 'Exportar enmascarado', b: [
     'El documento con etiquetas en lugar de los datos (mismo formato) o la tabla biling\u00fce enmascarada. Las mismas opciones est\u00e1n en el paso 1, en **Exportar enmascarado**.'] },
   'project-file': { t: 'Proyecto (.umbra)', b: [
@@ -158,18 +168,21 @@ const T = {
     'Los proyectos tambi\u00e9n se guardan solos en este navegador (\ud83d\uddc2 en la cabecera).'] },
 
   // ------------------------------------------------------------------ settings: modules
-  layer0: { t: 'Capa 0 (sin IA)', b: [
-    ['**Corrector ortogr\u00e1fico**: diccionario espa\u00f1ol de Hunspell en el navegador. Si marca una palabra correcta, rech\u00e1cela con \u00abNo volver a se\u00f1alarlo\u00bb.',
-      '**Similitud sem\u00e1ntica**: busca oraciones sin equivalente (omisiones y adiciones). \u00abPreguntar la primera vez\u00bb, desactivada, en este navegador o con un proveedor.',
-      '**Sensibilidad**: \u00abAlta\u00bb da m\u00e1s avisos (y m\u00e1s falsos positivos).',
-      '**Modelo local**: el de serie es multiling\u00fce; solo c\u00e1mbielo si sabe lo que hace.',
-      '**Proveedor y modelo de embeddings**: solo para el modo con proveedor (Gemini, Mistral u OpenAI).'] ] },
-  'module-settings': { t: 'Ajustes de los m\u00f3dulos', b: [
-    ['**Activo**: si se desactiva, el m\u00f3dulo no se ejecuta aunque est\u00e9 marcado.',
-      '**Razonamiento**: cu\u00e1nto \u00abpiensa\u00bb el modelo antes de responder. M\u00e1s razonamiento = mejor juicio, pero se cobra como salida.',
-      '**Palabras por lote**: tama\u00f1o de cada env\u00edo. \u00abAuto\u00bb va bien; lotes m\u00e1s grandes ahorran instrucciones repetidas, pero el modelo puede pasar cosas por alto.',
+  'module-settings': { t: 'M\u00f3dulos de revisi\u00f3n', b: [
+    ['**Activo**: si se desactiva, el m\u00f3dulo no se ejecuta aunque est\u00e9 marcado en Revisar.',
+      '**Modelo**: el proveedor y el modelo que usa. **Cribado** repasa todo el texto (basta un modelo econ\u00f3mico); **A fondo** (Fidelidad e Integridad) usa un modelo m\u00e1s fuerte solo en lo que se\u00f1al\u00f3 el cribado. **General** = el proveedor general.',
+      '**Verificar**: los hallazgos del m\u00f3dulo pasan por el Verificador, que descarta falsos positivos. Recomendado con modelos econ\u00f3micos.'],
+    'Lo dem\u00e1s est\u00e1 en **Opciones avanzadas**: no hace falta tocarlo.'] },
+  layer0: { t: 'Comprobaciones sin IA', b: [
+    'Se hacen en este navegador, al momento y gratis, y no env\u00edan ni descargan nada: cifras y etiquetas que no coinciden, p\u00e1rrafos que faltan o sin traducir, longitud y n\u00famero de oraciones (posibles omisiones), paralelismo de listas, palabras repetidas, convenciones de resoluciones y las reglas que no necesitan IA.',
+    '**Extra opcional: similitud sem\u00e1ntica** (desactivada salvo que usted la active). Compara el sentido de cada oraci\u00f3n del original con las de la traducci\u00f3n para encontrar omisiones y adiciones:',
+    ['**En este navegador**: gratis y privado, pero la primera vez descarga unos 140 MB (el motor y un modelo de idiomas); luego quedan guardados.',
+      '**Con un proveedor**: muy barato y r\u00e1pido; solo env\u00eda texto enmascarado.',
+      '**Sensibilidad**: \u00abAlta\u00bb da m\u00e1s avisos (y m\u00e1s falsos positivos).'] ] },
+  'module-advanced': { t: 'Opciones avanzadas', b: [
+    ['**Razonamiento**: cu\u00e1nto \u00abpiensa\u00bb el modelo antes de responder. M\u00e1s razonamiento = mejor juicio, pero se cobra como salida.',
+      '**Palabras por lote**: tama\u00f1o de cada env\u00edo. \u00abAuto\u00bb va bien.',
       '**Fusionar**: Fidelidad con Integridad, y Gram\u00e1tica con Estilo, comparten una llamada por lote si usan el mismo modelo (la entrada se paga una vez).',
-      '**Verificar**: los hallazgos del m\u00f3dulo pasan por el Verificador, que descarta falsos positivos.',
       '**Presupuesto**: tope de gasto por ejecuci\u00f3n del m\u00f3dulo.'] ] },
   'module-prompts': { t: 'Instrucciones de cada m\u00f3dulo', b: [
     'Lo que se le pide a la IA en cada m\u00f3dulo. Puede ampliarlas o cambiarlas (por ejemplo, para insistir en algo) y volver a las de serie con **Restaurar las de serie**.',
@@ -180,18 +193,13 @@ const T = {
     'Cada proveedor es un perfil con su clave y sus modelos.',
     ['**Editar**: escriba o cambie la clave de API y la lista de modelos.',
       '**Probar conexi\u00f3n**: comprueba la clave y si el proveedor admite llamadas desde una p\u00e1gina web (CORS).',
-      '**+ A\u00f1adir proveedor**: cualquier servicio compatible con OpenAI (OpenRouter, Groq, DeepSeek, Ollama\u2026), Azure o Anthropic.',
+      '**+ A\u00f1adir proveedor**: cualquier servicio compatible con OpenAI (OpenAI, OpenRouter, Groq, DeepSeek, Ollama\u2026), Azure o Anthropic.',
       '**Ocultar / Restaurar**: los de serie no se borran; se ocultan o vuelven a su estado inicial.'],
-    'Las claves se guardan solo en este navegador. D\u00f3nde conseguirlas: en la web de cada proveedor (Google AI Studio para Gemini, console.mistral.ai para Mistral\u2026).'] },
+    'Las claves se guardan solo en este navegador. D\u00f3nde conseguirlas: en la web de cada proveedor (Google AI Studio para Gemini, console.mistral.ai para Mistral\u2026). El modelo de cada m\u00f3dulo se elige en Ajustes \u203a M\u00f3dulos.'] },
   'general-provider': { t: 'Proveedor general', b: [
     'El modelo que usa todo m\u00f3dulo que no tenga uno propio (o cuyo proveedor no tenga clave). Si no elige ninguno, se usa el primer proveedor con clave.'] },
-  'module-models': { t: 'Modelo por m\u00f3dulo', b: [
-    ['**Cribado**: pasada econ\u00f3mica por todo el texto. Un modelo r\u00e1pido y barato basta.',
-      '**A fondo**: modelo fuerte solo sobre lo que se\u00f1alaron el cribado o la Capa 0 (Fidelidad e Integridad; el Verificador usa este).',
-      '**General**: usa el proveedor general.'],
-    'Tambi\u00e9n se cambia desde la tarjeta de cada m\u00f3dulo, en Revisar (la pastilla del modelo).'] },
   'provider-edit': { t: 'Perfil de proveedor', b: [
-    ['**Tipo**: Gemini, Mistral, Anthropic, Azure o compatible con OpenAI (la mayor\u00eda de servicios).',
+    ['**Tipo**: Gemini, Mistral, Anthropic, Azure o compatible con OpenAI (la mayor\u00eda de servicios). En los proveedores de serie est\u00e1 fijo (un perfil de Gemini es siempre Gemini): para otro servicio, use **+ A\u00f1adir proveedor**.',
       '**Clave de API**: se guarda solo en este navegador.',
       '**URL base**: la direcci\u00f3n de la API (por ejemplo, `https://api.openai.com/v1`); las plantillas la rellenan.',
       '**Confianza**: \u00abExterno\u00bb = servicio en Internet (solo recibe texto enmascarado); \u00abLocal\u00bb = un modelo en su propio equipo (Ollama, LM Studio\u2026).',
@@ -224,7 +232,7 @@ const T = {
       '**Probar en el documento**: muestra qu\u00e9 se\u00f1alar\u00eda en el documento abierto.'] ] },
   lists: { t: 'Listas de entidades', b: [
     'Deciden qu\u00e9 se enmascara y con qu\u00e9 art\u00edculo.',
-    ['**Listas de serie**: organismos, \u00f3rganos, pa\u00edses, cargos\u2026 en ingl\u00e9s, franc\u00e9s y espa\u00f1ol. Se pueden editar y restaurar.',
+    ['**Listas de serie**: unas 670 entidades (organismos, \u00f3rganos, pa\u00edses, lugares y cargos) en ingl\u00e9s, franc\u00e9s y espa\u00f1ol. Se pueden editar y restaurar.',
       '**Mi diccionario**: lo que usted a\u00f1ade (desde aqu\u00ed, con \u00abA mi diccionario\u00bb en una entidad o al enmascarar con [[Alt+E]]). Viaja en el archivo de sincronizaci\u00f3n.',
       'Cada entrada: categor\u00eda, art\u00edculo y sus formas (una por l\u00ednea: nombre completo, forma corta y siglas).',
       '**Exportar / Importar**: copia de seguridad o compartir el diccionario.'] ] },
@@ -263,31 +271,6 @@ const T = {
       '**Borrar todos los proyectos**: los guardados en este navegador (no los archivos .umbra).',
       '**Borrar todos los datos de UMBRA**: proyectos, ajustes, reglas, claves y gasto. Si tiene archivo de sincronizaci\u00f3n, podr\u00e1 traerlos de nuevo.'] ] }
 };
-
-// One topic per review module, built from the module list plus what it means in practice.
-const MOD_EXTRA = {
-  local: ['Gratis e instant\u00e1nea: no env\u00eda nada a ninguna IA. Comprueba cifras y etiquetas que no coinciden, p\u00e1rrafos que faltan o est\u00e1n sin traducir, diferencias de longitud y de n\u00famero de oraciones (posibles omisiones), paralelismo de listas, palabras repetidas, limpieza (espacios, signos), convenciones de cifras y resoluciones, ortograf\u00eda y las reglas que no necesitan IA.',
-    'Ejec\u00fatela siempre primero: lo que se\u00f1ala sobre omisiones lo miran despu\u00e9s a fondo Integridad y Fidelidad.'],
-  grammar: ['Lee solo la traducci\u00f3n. Ortograf\u00eda, concordancia, r\u00e9gimen preposicional, tiempos verbales y puntuaci\u00f3n.',
-    'Un modelo econ\u00f3mico basta. Se fusiona con Estilo si usan el mismo modelo.'],
-  fidelity: ['Lee el original y la traducci\u00f3n (enmascarados). Errores de sentido, falsos amigos, modalidad (shall, should, may\u2026), negaciones, qui\u00e9n hace qu\u00e9 e intensidad.',
-    'Dos modelos: **Cribado** (econ\u00f3mico, todo el texto) y **A fondo** (fuerte, solo lo se\u00f1alado). Se fusiona con Integridad.'],
-  integrity: ['Lee el original y la traducci\u00f3n (enmascarados). Busca lo que falta y lo que sobra.',
-    'Cribado + a fondo, como Fidelidad. Recibe adem\u00e1s los p\u00e1rrafos que la Capa 0 marc\u00f3 como sospechosos.'],
-  style: ['Lee solo la traducci\u00f3n. Calcos, pasivas, gerundios, nominalizaciones, registro institucional y claridad.',
-    'Se fusiona con Gram\u00e1tica si usan el mismo modelo.'],
-  coherence: ['Trabaja con el **esqueleto**: un resumen del documento (t\u00edtulos, listas, comienzos de p\u00e1rrafo y expresiones repetidas) en una sola llamada, as\u00ed que es barato.',
-    'Se\u00f1ala etiquetas tratadas de forma distinta, listas sin paralelismo (verbos y sustantivos) y expresiones repetidas traducidas de varias maneras.'],
-  conventions: ['Trabaja con el esqueleto. Convenciones de la ONU: pre\u00e1mbulo y parte dispositiva de las resoluciones, cursivas, f\u00f3rmulas fijas, cifras, fechas y s\u00edmbolos.'],
-  coldread: ['Lee la traducci\u00f3n **sin el original**, como un lector nuevo, y se\u00f1ala lo que no se entiende o suena a traducci\u00f3n.',
-    '\u00daselo al final, con un buen modelo.'],
-  verifier: ['No revisa el texto: revisa los **hallazgos** de los dem\u00e1s m\u00f3dulos y descarta los falsos positivos (o mejora la propuesta: \u00ab\u270e verificado\u00bb).',
-    'Se activa por m\u00f3dulo en Ajustes \u203a M\u00f3dulos (columna Verificar) o a mano con su bot\u00f3n **Verificar**. Lo descartado va a la burbuja \u00abDescartados\u00bb.']
-};
-for (const m of MODULES) {
-  const tips = m.ai ? CARD_TIP : [CARD_TIP[0], '**Ejecutar**: solo la Capa 0. **\u2691 n**: sus hallazgos pendientes.'];
-  T['mod-' + m.id] = { t: m.label, b: [].concat(MOD_EXTRA[m.id] || [m.desc], m.id === 'verifier' ? [] : ['En la tarjeta:', tips]) };
-}
 
 export const HELP_TOPICS = T;
 

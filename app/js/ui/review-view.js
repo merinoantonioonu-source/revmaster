@@ -17,7 +17,9 @@ import { loadPrompts, CAT_LABELS } from '../review/prompts.js';
 import { getEffectiveRules, loadRulesStore, upsertRule, SEV_LABELS } from '../rules/rules.js';
 import { STATE_LABELS } from '../review/findings.js';
 import { externalDialog, importDialog } from './mask-view.js';
-import { exportCorrected, exportReportHtml, exportReportXlsx, exportFindingsJson } from '../export/exports.js';
+import { exportCorrected, exportReportHtml, exportReportXlsx, exportFindingsJson, exportFeedbackXlsx } from '../export/exports.js';
+import { createNav, findingPlace, peerSentence, sentencesOf } from './nav.js';
+import { openFindingsWindow, syncFindingsWindow, findingsWindowSelect } from './findings-window.js';
 import { openMenu } from './menu.js';
 
 let root, toolsHost, panes = {};
@@ -28,13 +30,16 @@ let progress = {};            // moduleId -> { done, total, label, state:'run'|'
 let estimates = {};           // moduleId -> { tok, cost } | { error }
 let selectedModules = new Set(['local', 'grammar', 'fidelity', 'integrity', 'style', 'coherence', 'conventions']);
 let estTimer = null;
+let nav = null;
 
 export function mountReviewView(host, tools) {
   root = host;
   toolsHost = tools;
   root.appendChild(el('div.list',
-    el('h4', 'Hallazgos', helpBtn('findings'), el('span.grow'), el('button.btn.sm', { title: 'Opciones de la lista', onclick: (e) => listMenu(e.currentTarget) }, '\u22ef')),
-    el('div.bubbles#rv-bubbles'),
+    el('h4', 'Hallazgos', helpBtn('findings'), el('span.grow'),
+      el('button.btn.sm', { title: 'Abrir los hallazgos en una ventana aparte, en forma de tabla', onclick: openTable }, '\u29c9 Tabla'),
+      el('button.btn.sm', { title: 'Opciones de la lista', onclick: (e) => listMenu(e.currentTarget) }, '\u22ef')),
+    el('div.filters#rv-bubbles'),
     el('div.scroll#rv-findings')));
   root.appendChild(el('div.work',
     el('div.modstrip#rv-modules'),
@@ -42,9 +47,11 @@ export function mountReviewView(host, tools) {
       el('div.pane', el('div.pane-head', el('span#rv-src-title', 'ORIGINAL')), el('div.pane-body#rv-src')),
       el('div.pane', el('div.pane-head', el('span', 'TRADUCCI\u00d3N \u00b7 ES'), helpBtn('review-sheets'), el('span.grow'), el('span.muted#rv-unit-info')), el('div.pane-body#rv-tgt')))));
   panes = { src: $('#rv-src'), tgt: $('#rv-tgt') };
+  nav = createNav({ panes, session: () => state.session });
+  nav.attachHover();
   on('view', (v) => { if (v === 'review') { renderAll(); scheduleEstimates(); } });
-  on('findings', () => { if (state.view === 'review') { renderTools(); renderFindings(); renderPanes(); } });
-  on('finding', () => { if (state.view === 'review') { renderTools(); renderFindings(); renderPanes(); } });
+  on('findings', () => { syncFindingsWindow(); if (state.view === 'review') { renderTools(); renderModules(); renderFindings(); renderPanes(); } });
+  on('finding', () => { syncFindingsWindow(); if (state.view === 'review') { renderTools(); renderFindings(); renderPanes(); } });
   on('masked', () => { estimates = {}; if (state.view === 'review') { renderPanes(); scheduleEstimates(); } });
   on('project', () => {
     progress = {}; estimates = {}; selected = null;
@@ -74,10 +81,10 @@ async function renderTools() {
   const open = state.findings.filter(f => f.state === 'open');
   const n = (s) => open.filter(f => f.sev === s).length;
   toolsHost.appendChild(el('div.summary',
-    n('CRI') ? el('span.pill.err', n('CRI') + ' cr\u00edticos') : null,
-    n('MAY') ? el('span.pill.warn', n('MAY') + ' mayores') : null,
-    n('MEN') ? el('span.pill.info', n('MEN') + ' menores') : null,
-    n('SUG') ? el('span.pill.gray', n('SUG') + ' sugerencias') : null,
+    n('CRI') ? el('span.pill.err', n('CRI') + (n('CRI') === 1 ? ' cr\u00edtico' : ' cr\u00edticos')) : null,
+    n('MAY') ? el('span.pill.warn', n('MAY') + (n('MAY') === 1 ? ' mayor' : ' mayores')) : null,
+    n('MEN') ? el('span.pill.info', n('MEN') + (n('MEN') === 1 ? ' menor' : ' menores')) : null,
+    n('SUG') ? el('span.pill.gray', n('SUG') + (n('SUG') === 1 ? ' sugerencia' : ' sugerencias')) : null,
     !open.length ? el('span.pill.ok', 'Sin hallazgos pendientes') : null));
   toolsHost.appendChild(el('div.grow'));
   const prof = el('select', { title: 'Perfil de reglas', onchange: (e) => { setProfile(e.target.value); estimates = {}; scheduleEstimates(); } },
@@ -115,6 +122,7 @@ function exportMenu(anchor) {
     { header: 'Informes' },
     { label: 'Informe HTML', onClick: () => exportReportHtml(f => f.state !== 'discarded') },
     { label: 'Informe Excel', onClick: () => exportReportXlsx(f => f.state !== 'discarded') },
+    { label: 'Hallazgos para valorar (Excel)\u2026', onClick: feedbackDialog },
     { label: 'Hallazgos en JSON', onClick: exportFindingsJson },
     { sep: true },
     helpItem('review-export', anchor)
@@ -167,45 +175,71 @@ async function modelLabel(moduleId, role) {
 }
 
 let _modsGen = 0;
+let _modCfg = {};
+/** Estimated cost of the ticked modules (without redrawing the bar). */
+function _updateTotal() {
+  let total = 0, any = false;
+  for (const id of selectedModules) {
+    const est = estimates[id];
+    if (_modCfg[id] && _modCfg[id].enabled === false) continue;
+    if (est && !est.error) { total += est.cost || 0; any = true; }
+  }
+  const t = document.querySelector('#rv-modules .mtotal');
+  if (t) t.textContent = any ? 'Marcados: ~' + fmtMoney(total) : '';
+}
+/** The module bar: one chip per module (tick = it runs with "Ejecutar seleccionados"; the small
+ *  play button runs that module alone), the estimated cost of what is ticked and the Verifier. */
 async function renderModules() {
   const host = $('#rv-modules');
   if (!host) return;
   const gen = ++_modsGen;
   const cfg = await loadModuleConfig();
-  if (gen !== _modsGen) return;   // a newer call is drawing the cards
+  if (gen !== _modsGen) return;   // a newer call is drawing the bar
   clear(host);
   const defCard = _deferredCard();
   if (defCard) host.appendChild(defCard);
+  let total = 0, anyEst = false;
   for (const m of MODULES) {
+    if (m.id === 'verifier') continue;
+    const off = m.ai && cfg[m.id] && cfg[m.id].enabled === false;
+    const on = selectedModules.has(m.id) && !off;
     const p = progress[m.id];
-    const cls = p ? (p.state === 'run' ? '.run' : (p.state === 'err' ? '.err' : '.done')) : '';
+    const st = p ? (p.state === 'run' ? 'run' : (p.state === 'err' ? 'err' : 'done')) : '';
     const count = state.findings.filter(f => f.module === m.id && f.state === 'open').length;
-    const chk = el('input', { type: 'checkbox', checked: selectedModules.has(m.id), onchange: (e) => {
+    const est = estimates[m.id];
+    if (on && est && !est.error) { total += est.cost || 0; anyEst = true; }
+    let stat = '';
+    if (p && p.state === 'run') stat = p.total ? Math.round(100 * (p.done || 0) / Math.max(1, p.total)) + ' %' : '\u2026';
+    else if (p && p.state === 'err') stat = '\u26a0';
+    else if (count) stat = '\u2691 ' + count;
+    else if (p && p.state === 'done') stat = '\u2713';
+    const tip = [m.desc,
+      m.ai ? (est ? (est.error || ('Coste estimado: ~' + fmtMoney(est.cost) + ' (' + fmtInt(est.tok) + ' tokens' + (est.cached ? ', ' + est.cached + ' p\u00e1rrafos en cach\u00e9' : '') + ')')) : 'Calculando el coste\u2026') : 'Sin IA: gratis.',
+      off ? 'Desactivado en Ajustes \u203a M\u00f3dulos.' : '',
+      p && p.msg ? (p.state === 'err' ? 'Error: ' : '') + p.msg : '',
+      count ? count + ' hallazgos pendientes.' : ''].filter(Boolean).join('\n');
+    const chk = el('input', { type: 'checkbox', checked: on ? true : null, disabled: off ? true : null, onchange: (e) => {
       if (e.target.checked) selectedModules.add(m.id); else selectedModules.delete(m.id);
+      e.target.closest('.mchip').classList.toggle('on', e.target.checked);
+      _updateTotal();
     } });
-    const card = el('div.mcard' + cls, { title: m.desc },
-      el('div.nm', chk, m.label, helpBtn('mod-' + m.id)),
-      el('span.in', INPUT_ICONS[m.input] + ' ' + INPUT_LABELS[m.input]));
-    if (m.ai) {
-      for (const role of m.roles) {
-        const pill = el('button.mpill', { title: ROLE_LABELS[role] + ': pulse para cambiar el modelo', onclick: (e) => pickModel(e.currentTarget, m.id, role) }, '\u2026');
-        modelLabel(m.id, role).then(t => { pill.textContent = (m.roles.length > 1 ? ROLE_LABELS[role] + ': ' : '') + t + ' \u25be'; });
-        card.appendChild(pill);
-      }
-      const est = estimates[m.id];
-      card.appendChild(el('div.est', est ? (est.error ? est.error : '~' + fmtInt(est.tok) + ' tokens \u00b7 ' + fmtMoney(est.cost) + (est.cached ? ' \u00b7 ' + est.cached + ' en cach\u00e9' : '')) : (m.id === 'verifier' ? 'Tras los dem\u00e1s m\u00f3dulos' : 'Estimando\u2026')));
-      if (cfg[m.id] && cfg[m.id].enabled === false) card.appendChild(el('div.est.warn-t', 'Desactivado en Ajustes'));
-    } else {
-      card.appendChild(el('div.est', 'Sin IA \u00b7 gratis'));
-    }
-    if (p && p.state === 'run') card.appendChild(el('div.bar', el('i', { style: { width: Math.round(100 * (p.done || 0) / Math.max(1, p.total || 1)) + '%' } })));
-    if (p && p.msg) card.appendChild(el('div.est' + (p.state === 'err' ? '.err-t' : ''), p.msg));
-    const runBtn = m.id === 'verifier'
-      ? el('button.btn.sm', { disabled: !!running, onclick: reverify }, 'Verificar')
-      : el('button.btn.sm', { disabled: !!running, onclick: () => runModules([m.id]) }, 'Ejecutar');
-    card.appendChild(el('div.ft', el('span', count ? '\u2691 ' + count : (p && p.state === 'done' ? '\u2713 0' : '')), runBtn));
-    host.appendChild(card);
+    const chip = el('label.mchip' + (on ? '.on' : '') + (off ? '.off' : '') + (st ? '.' + st : ''), { title: tip, 'data-mod': m.id },
+      chk, el('span.nm', m.label),
+      el('span.cost' + (est && est.error ? '.warn-t' : ''), m.ai ? (est && !est.error ? fmtMoney(est.cost) : (est && est.error ? (/clave/.test(est.error) ? 'sin clave' : 'sin estimar') : '')) : 'gratis'),
+      stat ? el('span.stat', stat) : null,
+      el('button.run', { type: 'button', title: 'Ejecutar solo ' + m.label, disabled: running ? true : null,
+        onclick: (e) => { e.preventDefault(); e.stopPropagation(); runModules([m.id]); } }, '\u25b6'));
+    if (p && p.state === 'run') chip.appendChild(el('i.bar', { style: { width: (p.total ? Math.round(100 * (p.done || 0) / Math.max(1, p.total)) : 30) + '%' } }));
+    if (m.ai) modelLabel(m.id, m.roles[0]).then(t => { chip.title = tip + '\nModelo: ' + t + (m.roles.length > 1 ? ' (cribado)' : ''); });
+    host.appendChild(chip);
   }
+  host.appendChild(el('span.grow'));
+  host.appendChild(el('span.mtotal', anyEst ? 'Marcados: ~' + fmtMoney(total) : ''));
+  _modCfg = cfg;
+  const vp = progress.verifier;
+  host.appendChild(el('button.btn.sm' + (vp && vp.state === 'run' ? '.amber' : ''), { title: 'Pasa los hallazgos pendientes de la IA por el Verificador, que descarta los falsos positivos' + (vp && vp.msg ? '\n' + vp.msg : ''),
+    disabled: running ? true : null, onclick: reverify }, '\u2713 Verificar hallazgos' + (vp && vp.state === 'run' ? '\u2026' : '')));
+  host.appendChild(helpBtn('modules'));
 }
 
 async function pickModel(anchor, moduleId, role) {
@@ -241,22 +275,11 @@ async function computeEstimates() {
 // ------------------------------------------------------------------ running
 
 // The semantic check needs a choice the first time (the local model is a large download).
-async function _semanticMode(ctx) {
+function _semanticMode(ctx) {
+  // An optional extra, off unless switched on in Ajustes > Modulos (no question, no download by surprise).
   const c = ctx.cfg.local || {};
-  if (c.semantic === 'local' || c.semantic === 'api') return c.semantic;
-  if (c.semantic === 'off') return null;
-  const r = await modal({ title: 'Similitud sem\u00e1ntica (omisiones y adiciones)', help: helpBtn('semantic'), width: '620px', body: el('div',
-    el('p', 'La Capa 0 puede comparar el sentido de cada oraci\u00f3n del original con las de la traducci\u00f3n para encontrar omisiones y adiciones sin gastar en IA.'),
-    el('ul',
-      el('li', el('b', 'En este navegador:'), ' gratis y privado (lee el texto real). La primera vez descarga unos 140 MB (el motor y el modelo) y despu\u00e9s los guarda.'),
-      el('li', el('b', 'Con un proveedor:'), ' muy barato y r\u00e1pido; solo env\u00eda texto enmascarado. Se elige en Ajustes \u203a M\u00f3dulos.')),
-    el('p.info', 'Puede cambiarlo cuando quiera en Ajustes \u203a M\u00f3dulos \u203a Capa 0.')),
-    buttons: [{ label: 'No usarla', value: 'off' }, { label: 'Con un proveedor', value: 'api' }, { label: 'En este navegador', kind: 'primary', value: 'local' }] });
-  if (!r) return null;
-  await saveModuleConfig('local', { semantic: r });
-  ctx.cfg.local = Object.assign({}, c, { semantic: r });
-  if (r === 'api' && !c.semProvider) { toast('Elija el proveedor de la similitud sem\u00e1ntica en Ajustes \u203a M\u00f3dulos.', 'warn', 7000); emit('goto-settings', 'modules'); return null; }
-  return r === 'off' ? null : r;
+  if (c.semantic === 'api' && !c.semProvider) { toast('Similitud sem\u00e1ntica: falta elegir el proveedor en Ajustes \u203a M\u00f3dulos.', 'warn', 7000); return null; }
+  return c.semantic === 'local' || c.semantic === 'api' ? c.semantic : null;
 }
 
 /** Units the local layer suspects of an omission, an addition or a change of meaning. */
@@ -279,15 +302,7 @@ async function runModules(ids) {
   const ai = ids.filter(id => id !== 'local' && id !== 'verifier' && moduleById(id) && moduleById(id).ai && ctx.cfg[id].enabled !== false);
   if (wantLocal) {
     let list = runLocalChecks(state.session, { rules: ctx.rules, conventions: state.data.conventions, profile: ctx.profile });
-    if (!ctx.cfg.local || ctx.cfg.local.spell !== false) {
-      progress.local = { state: 'run', msg: 'Corrector ortogr\u00e1fico\u2026' };
-      renderModules();
-      try {
-        const { spellFindings } = await import('../review/spell.js');
-        list = list.concat(await spellFindings(state.session, { rules: ctx.rules }));
-      } catch (e) { console.warn('spell', e); toast('No se pudo cargar el corrector ortogr\u00e1fico local: ' + e.message, 'warn'); }
-    }
-    const sem = await _semanticMode(ctx);
+    const sem = _semanticMode(ctx);
     if (sem) {
       progress.local = { state: 'run', msg: 'Similitud sem\u00e1ntica\u2026' };
       renderModules();
@@ -303,7 +318,7 @@ async function runModules(ids) {
     }
     addFindings(list, ['local']);
     progress.local = { state: 'done', msg: list.length + ' hallazgos' };
-    if (!ai.length) { toast('Capa 0: ' + list.length + ' hallazgos.', 'ok'); renderModules(); return; }
+    if (!ai.length) { toast('Comprobaciones sin IA: ' + list.length + ' hallazgos.', 'ok'); renderModules(); return; }
   }
   if (!ai.length) { renderModules(); return; }
   const plan = await makePlan(state.session, ctx, { modules: ai });
@@ -436,43 +451,50 @@ function visibleFindings() {
   return state.findings.filter(f =>
     (filt.module === 'all' || f.module === filt.module) &&
     (filt.sev === 'all' || f.sev === filt.sev) &&
-    (filt.state === 'all' ? true : (filt.state === 'open' ? f.state === 'open' : f.state === filt.state))
+    (filt.state === 'all' ? true : (filt.state === 'rejected' ? (f.state === 'rejected' || f.state === 'ignored') : f.state === filt.state))
   ).sort((a, b) => (a.unit - b.unit) || ((a.start == null ? 1e9 : a.start) - (b.start == null ? 1e9 : b.start)));
 }
 
+/** Three labelled lists instead of a cloud of bubbles: state, module and severity. */
 function renderFindings() {
-  const bub = $('#rv-bubbles');
-  if (!bub) return;
-  clear(bub);
-  const base = state.findings.filter(f => filt.state === 'all' ? true : f.state === filt.state);
-  const mk = (key, val, label, n) => el('span.bub' + (filt[key] === val ? '.on' : ''), { onclick: () => { filt[key] = val; renderFindings(); renderPanes(); } }, label + (n !== undefined ? ' ' + n : ''));
-  bub.appendChild(mk('state', 'open', 'Pendientes', state.findings.filter(f => f.state === 'open').length));
-  bub.appendChild(mk('state', 'accepted', 'Aceptados', state.findings.filter(f => f.state === 'accepted').length));
-  bub.appendChild(mk('state', 'rejected', 'Rechazados', state.findings.filter(f => f.state === 'rejected' || f.state === 'ignored').length));
-  bub.appendChild(mk('state', 'discarded', 'Descartados', state.findings.filter(f => f.state === 'discarded').length));
-  bub.appendChild(mk('state', 'all', 'Todos'));
-  bub.appendChild(el('span', { style: { flexBasis: '100%', height: '0' } }));
-  bub.appendChild(mk('module', 'all', 'Todos los m\u00f3dulos'));
-  for (const m of MODULES) {
-    const n = base.filter(f => f.module === m.id).length;
-    if (n) bub.appendChild(mk('module', m.id, m.short, n));
-  }
-  bub.appendChild(el('span', { style: { flexBasis: '100%', height: '0' } }));
-  bub.appendChild(mk('sev', 'all', 'Toda gravedad'));
-  for (const s of ['CRI', 'MAY', 'MEN', 'SUG']) {
-    const n = base.filter(f => f.sev === s && (filt.module === 'all' || f.module === filt.module)).length;
-    if (n) bub.appendChild(mk('sev', s, SEV_LABELS[s], n));
-  }
+  const box = $('#rv-bubbles');
+  if (!box) return;
+  clear(box);
+  const all = state.findings;
+  const n = (pred) => all.filter(pred).length;
+  const inState = (f) => filt.state === 'all' ? true : (filt.state === 'rejected' ? (f.state === 'rejected' || f.state === 'ignored') : f.state === filt.state);
+  const base = all.filter(inState);
+  if (filt.module !== 'all' && !base.some(f => f.module === filt.module)) filt.module = 'all';
+  const baseMod = base.filter(f => filt.module === 'all' || f.module === filt.module);
+  if (filt.sev !== 'all' && !baseMod.some(f => f.sev === filt.sev)) filt.sev = 'all';
+  const sel = (key, label, options, title) => {
+    const s = el('select.fsel', { 'data-filter': key, title, onchange: (e) => { filt[key] = e.target.value; renderFindings(); renderPanes(); } },
+      options.map(([v, t]) => el('option', { value: v }, t)));
+    s.value = filt[key];
+    return el('label.ffield', el('span', label), s);
+  };
+  box.appendChild(sel('state', 'Estado', [
+    ['open', 'Pendientes (' + n(f => f.state === 'open') + ')'],
+    ['accepted', 'Aceptados (' + n(f => f.state === 'accepted') + ')'],
+    ['rejected', 'Rechazados o ignorados (' + n(f => f.state === 'rejected' || f.state === 'ignored') + ')'],
+    ['discarded', 'Descartados por el Verificador (' + n(f => f.state === 'discarded') + ')'],
+    ['all', 'Todos (' + all.length + ')']], 'Qu\u00e9 hallazgos ver seg\u00fan lo que usted ya decidi\u00f3'));
+  box.appendChild(sel('module', 'M\u00f3dulo', [['all', 'Todos (' + base.length + ')']].concat(
+    MODULES.filter(m => base.some(f => f.module === m.id)).map(m => [m.id, m.label + ' (' + base.filter(f => f.module === m.id).length + ')'])),
+    'Qu\u00e9 m\u00f3dulo encontr\u00f3 el hallazgo'));
+  box.appendChild(sel('sev', 'Gravedad', [['all', 'Todas (' + baseMod.length + ')']].concat(
+    ['CRI', 'MAY', 'MEN', 'SUG'].filter(s => baseMod.some(f => f.sev === s)).map(s => [s, SEV_LABELS[s] + ' (' + baseMod.filter(f => f.sev === s).length + ')'])),
+    'Cr\u00edtica: cambia el sentido. Mayor: error claro. Menor: detalle. Sugerencia: mejora opcional.'));
   const host = $('#rv-findings');
   clear(host);
   const list = visibleFindings();
   if (!list.length) {
-    host.appendChild(el('div.empty', state.findings.length ? 'No hay hallazgos con estos filtros.' :
-      'Todav\u00eda no hay hallazgos. Elija los m\u00f3dulos arriba y pulse \u00abEjecutar seleccionados\u00bb, o empiece por la Capa 0 (gratis).'));
+    host.appendChild(el('div.empty', all.length ? 'No hay hallazgos con estos filtros.' :
+      'Todav\u00eda no hay hallazgos. Marque los m\u00f3dulos arriba y pulse \u00abEjecutar seleccionados\u00bb, o empiece por las comprobaciones sin IA (gratis).'));
     return;
   }
   for (const f of list.slice(0, 600)) host.appendChild(findingCard(f));
-  if (list.length > 600) host.appendChild(el('div.empty', 'Se muestran 600 de ' + list.length + ': use los filtros.'));
+  if (list.length > 600) host.appendChild(el('div.empty', 'Se muestran 600 de ' + list.length + ': use los filtros o la tabla (\u29c9).'));
 }
 
 function findingCard(f) {
@@ -491,7 +513,7 @@ function findingCard(f) {
       f.verified === 'ok' ? el('span.state.accepted', '\u2713 verificado') : null,
       f.verified === 'edit' ? el('span.state.accepted', '\u270e verificado') : null,
       f.state !== 'open' ? el('span.state.' + f.state, STATE_LABELS[f.state]) : null,
-      el('span.seg', u ? '\u00a7' + u.n : '')),
+      el('span.seg', { title: 'P\u00e1rrafo y oraci\u00f3n' }, '\u00a7' + _placeLabel(f))),
     body,
     el('div.why', f.reason || ''),
     f.verifierReason ? el('div.why', 'Verificador: ' + f.verifierReason) : null,
@@ -550,12 +572,61 @@ function moveNext(id) {
   if (next) select(next.id); else { selected = null; renderPanes(); }
 }
 
-function select(id) {
+function _placeLabel(f) {
+  const pl = state.session ? findingPlace(state.session, f) : null;
+  return pl ? pl.label : '';
+}
+
+/** Selects a finding: card, mark and, unless the click came from a sheet, both sheets centred on its
+ *  sentence (the exact text in stronger yellow). */
+function select(id, opts) {
+  const o = opts || {};
   selected = id;
   for (const c of document.querySelectorAll('#rv-findings .iss')) c.classList.toggle('sel', c.dataset.id === id);
   const card = document.querySelector('#rv-findings .iss[data-id="' + id + '"]');
-  if (card) card.scrollIntoView({ block: 'nearest' });
-  renderPanes(true);
+  if (card) card.scrollIntoView({ block: o.fromPane ? 'center' : 'nearest' });
+  for (const m of panes.tgt.querySelectorAll('mark.cur')) m.classList.remove('cur');
+  for (const m of panes.tgt.querySelectorAll('mark[data-fids]')) if (m.dataset.fids.split(',').includes(id)) m.classList.add('cur');
+  const f = state.findings.find(x => x.id === id);
+  if (f) focusFinding(f, !!o.fromPane);
+  findingsWindowSelect(id);
+}
+
+function focusFinding(f, quiet) {
+  const s = state.session;
+  const u = s && s.units[f.unit];
+  if (!u) return;
+  if (u.tgtPara !== null && f.start !== null && f.start !== undefined && f.end > f.start) nav.focusSpan('tgt', u.tgtPara, f.start, f.end, { quiet });
+  else if (u.srcPara !== null && f.srcStart !== null && f.srcStart !== undefined) nav.focusSpan('src', u.srcPara, f.srcStart, f.srcEnd, { quiet });
+  else if (!quiet) nav.focusParas(u.idx);
+  const pl = findingPlace(s, f);
+  $('#rv-unit-info').textContent = pl ? '\u00a7' + pl.label : '';
+}
+
+/** Findings of one sentence of the translation (to reveal them when it is clicked). */
+function _findingsInSentence(pid, index) {
+  const s = state.session;
+  const sp = sentencesOf(s, 'tgt', pid)[index];
+  const list = visibleFindings().filter(f => { const u = s.units[f.unit]; return u && u.tgtPara === pid; });
+  if (!sp) return list;
+  return list.filter(f => f.start === null || f.start === undefined ? false : (f.start < sp.end && (f.end || f.start) >= sp.start));
+}
+
+/** A click in a sheet: the sentence and its pair are marked (the other sheet follows) and, as in
+ *  Final Check, a finding of that sentence is shown in the list (repeated clicks go through them). */
+function onSheetClick(side, p, ev) {
+  const m = side === 'tgt' && ev.target.closest('mark[data-fids]');
+  const r = nav.clickAt(side, ev);
+  let ids = [];
+  if (m) ids = m.dataset.fids.split(',');
+  else if (r && r.index !== null) {
+    let pid = r.pid, index = r.index;
+    if (side === 'src') { const peer = peerSentence(state.session, 'src', r.pid, r.index); pid = peer ? peer.pid : null; index = peer ? peer.index : null; }
+    if (pid !== null) ids = (index === null ? visibleFindings().filter(f => { const u = state.session.units[f.unit]; return u && u.tgtPara === pid; }) : _findingsInSentence(pid, index)).map(f => f.id);
+  }
+  if (!ids.length) return;
+  const i = ids.indexOf(selected);
+  select(ids[(i + 1) % ids.length], { fromPane: true });
 }
 
 function onKey(e) {
@@ -565,6 +636,7 @@ function onKey(e) {
   if (!list.length) return;
   const i = list.findIndex(f => f.id === selected);
   const f = list[i];
+  if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.shiftKey) { e.preventDefault(); nav.step(e.key === 'ArrowRight' ? 1 : -1); return; }
   const k = e.key.toLowerCase();
   if (k === 'j') { e.preventDefault(); select((list[i + 1] || list[0]).id); }
   else if (k === 'k') { e.preventDefault(); select((list[i - 1] || list[list.length - 1]).id); }
@@ -575,7 +647,7 @@ function onKey(e) {
 
 // ------------------------------------------------------------------ sheets
 
-function renderPanes(scroll) {
+function renderPanes() {
   if (!state.session || state.view !== 'review') return;
   const s = state.session;
   $('#rv-src-title').textContent = 'ORIGINAL \u00b7 ' + (s.srcLang === 'fr' ? 'FR' : 'EN');
@@ -593,35 +665,18 @@ function renderPanes(scroll) {
       gaps.get(u.tgtPara).push(f);
     }
   }
-  const sel = state.findings.find(f => f.id === selected);
-  const selUnit = sel ? s.units[sel.unit] : null;
   const keep = { src: panes.src.scrollTop, tgt: panes.tgt.scrollTop };
   renderDoc(panes.tgt, s.tgt, {
     decorate: (p) => _flatten(byPara.get(p.id) || [], selected),
     gaps: (p) => (gaps.get(p.id) || []).map(f => ({ at: p.text.length, label: '+ ' + (CAT_LABELS[f.cat] || f.cat).toLowerCase(), title: f.reason })),
-    onParaClick: (p, ev) => {
-      const m = ev.target.closest('mark[data-fids]');
-      if (m) select(m.dataset.fids.split(',')[0]);
-    }
+    onParaClick: (p, ev) => onSheetClick('tgt', p, ev)
   });
-  renderDoc(panes.src, s.src, {});
+  renderDoc(panes.src, s.src, { onParaClick: (p, ev) => onSheetClick('src', p, ev) });
   panes.src.scrollTop = keep.src;
   panes.tgt.scrollTop = keep.tgt;
-  if (selUnit) {
-    const a = selUnit.tgtPara !== null ? panes.tgt.querySelector('.p[data-pid="' + selUnit.tgtPara + '"]') : null;
-    const b = selUnit.srcPara !== null ? panes.src.querySelector('.p[data-pid="' + selUnit.srcPara + '"]') : null;
-    if (a) a.classList.add('hit');
-    if (b) b.classList.add('hit');
-    if (scroll) {
-      const cur = panes.tgt.querySelector('mark.cur');
-      (cur || a || b) && (cur || a || b).scrollIntoView({ block: 'center' });
-      if (b) b.scrollIntoView({ block: 'center' });
-    }
-    $('#rv-unit-info').textContent = 'P\u00e1rrafo ' + selUnit.n;
-  }
+  nav.refresh();
 }
 
-/** Overlapping findings -> non-overlapping marks (classes of the most severe finding). */
 function _flatten(list, selectedId) {
   if (!list.length) return [];
   const cuts = new Set();
@@ -722,3 +777,50 @@ async function pollDeferredNow(manual) {
     if (state.view === 'review') renderAll();
   }
 }
+
+// ------------------------------------------------------------------ table window and feedback
+
+/** The findings as a table in a window of their own (as the Transformations window of Final Check). */
+function openTable() {
+  if (!state.session) return;
+  const ok = openFindingsWindow({
+    filt: Object.assign({}, filt),
+    select: (id) => select(id),
+    setState: (f, st) => updateFinding(f.id, { state: st }),
+    edit: (f, text) => updateFinding(f.id, { edited: text, state: 'accepted' }),
+    exportFeedback: () => feedbackDialog(),
+    selected: () => selected
+  });
+  if (!ok) toast('El navegador ha bloqueado la ventana: permita las ventanas emergentes de esta p\u00e1gina.', 'warn', 8000);
+}
+
+/** "Hallazgos para valorar (Excel)": real or masked text, all findings or the ones shown. */
+async function feedbackDialog() {
+  if (!state.session) return;
+  const masked = el('input', { type: 'radio', name: 'fbtext', value: 'masked', checked: true });
+  const real = el('input', { type: 'radio', name: 'fbtext', value: 'real' });
+  const allF = el('input', { type: 'radio', name: 'fbwhich', value: 'all', checked: true });
+  const vis = el('input', { type: 'radio', name: 'fbwhich', value: 'visible' });
+  const r = await modal({ title: 'Hallazgos para valorar (Excel)', help: helpBtn('feedback'), width: '600px', body: el('div',
+    el('p', 'Un Excel con una fila por hallazgo, su contexto y tres columnas vac\u00edas para usted: ', el('b', 'Su valoraci\u00f3n'), ' (lista desplegable), ',
+      el('b', 'Gravedad correcta'), ' y ', el('b', 'Comentario'), '. Rell\u00e9nelo y env\u00edelo para ajustar las reglas y las comprobaciones.'),
+    el('label.lbl', 'Texto'),
+    el('div', el('label.row', masked, ' Enmascarado (recomendado si va a compartir el archivo: sin datos reales)')),
+    el('div', el('label.row', real, ' Real')),
+    el('label.lbl', 'Hallazgos'),
+    el('div', el('label.row', allF, ' Todos (' + state.findings.length + ')')),
+    el('div', el('label.row', vis, ' Solo los que se ven con los filtros actuales (' + visibleFindings().length + ')'))),
+    buttons: [{ label: 'Cancelar', value: null }, { label: 'Descargar Excel', kind: 'primary', value: 'ok' }] });
+  if (r !== 'ok') return;
+  const ids = vis.checked ? new Set(visibleFindings().map(f => f.id)) : null;
+  try {
+    const n = await exportFeedbackXlsx({ masked: masked.checked, filter: ids ? (f) => ids.has(f.id) : null, subLabels: LOCAL_SUBS,
+      segText: (f, isMasked) => {
+        if (isMasked) return null;   // the masked texts are whole paragraphs (tags keep their positions there)
+        const pl = findingPlace(state.session, f);
+        return pl ? { label: pl.label, src: pl.src, tgt: pl.tgt } : null;
+      } });
+    toast(n + ' hallazgos exportados para valorar.', 'ok');
+  } catch (e) { console.error(e); toast('No se pudo exportar: ' + e.message, 'err', 8000); }
+}
+

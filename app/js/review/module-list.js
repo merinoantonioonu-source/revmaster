@@ -8,10 +8,10 @@
  *        'deep' = strong model on what triage or the local layer flagged).
  */
 export const MODULES = [
-  { id: 'local', label: 'Capa 0 \u00b7 local', short: 'Local', input: 'local', roles: [], ai: false,
-    desc: 'Comprobaciones sin IA: cifras, etiquetas, estructura, paralelismo, convenciones y reglas fijas.' },
-  { id: 'grammar', label: 'Ortograf\u00eda y gram\u00e1tica', short: 'Gram\u00e1tica', input: 'target', roles: ['triage'], ai: true,
-    desc: 'Ortograf\u00eda, concordancia, r\u00e9gimen, tiempos verbales y puntuaci\u00f3n del espa\u00f1ol.' },
+  { id: 'local', label: 'Comprobaciones sin IA', short: 'Sin IA', input: 'local', roles: [], ai: false,
+    desc: 'Gratis e instant\u00e1neas, sin enviar nada: cifras, etiquetas, p\u00e1rrafos que faltan, paralelismo, convenciones y reglas fijas.' },
+  { id: 'grammar', label: 'Gram\u00e1tica', short: 'Gram\u00e1tica', input: 'target', roles: ['triage'], ai: true,
+    desc: 'Concordancia, r\u00e9gimen, tiempos verbales y puntuaci\u00f3n del espa\u00f1ol (la ortograf\u00eda la corrige Word).' },
   { id: 'fidelity', label: 'Fidelidad', short: 'Fidelidad', input: 'bilingual', roles: ['triage', 'deep'], ai: true,
     desc: 'Errores de traducci\u00f3n: sentido, falsos amigos, modalidad, negaciones, agente, intensidad.' },
   { id: 'integrity', label: 'Integridad', short: 'Integridad', input: 'bilingual', roles: ['triage', 'deep'], ai: true,

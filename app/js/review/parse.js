@@ -70,6 +70,9 @@ export function parseFindings(text, validUnits) {
     const quote = _clean(parts[3]);
     const suggestion = _clean(parts.length > 4 ? parts[4] : '');
     const reason = _clean(parts.length > 5 ? parts.slice(5).join(' / ') : '');
+    // A "correction" identical to the quote proposes nothing: it is noise.
+    const same = (a, b) => a.replace(/\s+/g, ' ').trim() === b.replace(/\s+/g, ' ').trim();
+    if (quote && suggestion && same(quote, suggestion)) { ignored++; continue; }
     items.push({ unit, cat, sev, quote, suggestion, reason });
   }
   return { items, fin, ignored };

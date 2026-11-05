@@ -115,7 +115,17 @@ export async function semanticFindings(session, cfg, hooks) {
     }
     if (x.side === 'src') {
       const shown = x.sent.text.length > 160 ? x.sent.text.slice(0, 157) + '\u2026' : x.sent.text;
-      findings.push(Object.assign(base, { cat: 'OMI', sev: 'MAY', reason: 'Posible omisi\u00f3n: la traducci\u00f3n no parece recoger \u00ab' + shown + '\u00bb' + how }));
+      // Where the sentence is in the original, so the sheets can mark it (ui/nav.js).
+      let srcStart = null, srcEnd = null;
+      if (engine === 'api') {
+        const m = session.masked.src.get(u.srcPara);
+        const hit = m ? locate(m.masked, x.sent.text) : -1;
+        if (hit !== -1) { srcStart = maskedToOriginal(m.map, hit.start, 'start'); srcEnd = maskedToOriginal(m.map, hit.end, 'end'); }
+      } else {
+        const hit = locate(session.src.paras[u.srcPara].text, x.sent.text);
+        if (hit !== -1) { srcStart = hit.start; srcEnd = hit.end; }
+      }
+      findings.push(Object.assign(base, { cat: 'OMI', sev: 'MAY', srcStart, srcEnd, reason: 'Posible omisi\u00f3n: la traducci\u00f3n no parece recoger \u00ab' + shown + '\u00bb' + how }));
     } else {
       // Anchor the sentence in the real text of the paragraph.
       const para = session.tgt.paras[u.tgtPara];
