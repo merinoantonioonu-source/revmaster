@@ -20,6 +20,7 @@ export const DEFAULTS = {
   coherence: { enabled: true, thinking: 'low', batchWords: 0, merge: false, verify: false, budget: 0, scope: 'all', strictness: 'normal' },
   conventions: { enabled: true, thinking: 'minimal', batchWords: 0, merge: false, verify: false, budget: 0, scope: 'all', strictness: 'normal' },
   coldread: { enabled: false, thinking: 'minimal', batchWords: 0, merge: false, verify: true, budget: 0, scope: 'all', strictness: 'grave' },
+  names: { enabled: true, thinking: 'low', batchWords: 0, merge: false, verify: false, budget: 0, scope: 'all', strictness: 'normal' },
   verifier: { enabled: true, thinking: 'high', batchWords: 0, merge: false, verify: false, budget: 0, scope: 'all' }
 };
 

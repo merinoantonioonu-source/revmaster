@@ -7,7 +7,8 @@
  * hooks = { onProgress({ done, total, label, module }), onFindings(list), signal, budget (US$, 0 = none) }
  */
 
-import { callAI } from '../ai/gateway.js';
+import { callAI, callAINames } from '../ai/gateway.js';
+import { namesFindings } from './names.js';
 import { idbPut } from '../store/idb.js';
 import { parseFindings, parseVerdicts } from './parse.js';
 import { anchorItem, sameFinding } from './findings.js';
@@ -35,8 +36,9 @@ export async function runPlan(plan, ctx, hooks) {
       out.stopped = true;
       throw Object.assign(new Error('Se ha alcanzado el presupuesto m\u00e1ximo de esta ejecuci\u00f3n.'), { code: 'BUDGET' });
     }
-    const r = await callAI(Object.assign({ masked: true, project: ctx.project && ctx.project.name, file: ctx.project && ctx.project.file,
-      signal: h.signal }, args));
+    const base = { project: ctx.project && ctx.project.name, file: ctx.project && ctx.project.file, signal: h.signal };
+    // The names table is the only call that is not masked text; the gateway checks it row by row.
+    const r = args.rows ? await callAINames(Object.assign(base, args)) : await callAI(Object.assign({ masked: true }, base, args));
     out.spent += r.cost || 0;
     out.calls++;
     done++;
@@ -155,6 +157,19 @@ export async function runPlan(plan, ctx, hooks) {
     } catch (e) {
       if (e.code === 'BUDGET' || e.code === 'ABORT') break;
       out.errors.push({ module: s.module, message: e.message, code: e.code });
+    }
+  }
+
+  // ---- Official names (the table of names only)
+  if (plan.names && !out.stopped) {
+    progress('Nombres oficiales', 'names');
+    try {
+      const r = await call({ module: 'names', role: 'triage', rows: plan.names.rows, system: plan.names.system, words: 0,
+        thinking: _thinking(ctx.cfg, 'names'), maxTokens: 8192 }, plan.names.est.cost);
+      const parsed = parseFindings(r.text, new Set(plan.names.rows.map(x => x.n)));
+      push(namesFindings(session, plan.names.rows, parsed.items, { model: r.modelId }));
+    } catch (e) {
+      if (e.code !== 'BUDGET' && e.code !== 'ABORT') out.errors.push({ module: 'names', message: e.message, code: e.code });
     }
   }
 

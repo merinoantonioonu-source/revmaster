@@ -89,6 +89,35 @@ export async function callAI(opts) {
   };
 }
 
+// ------------------------------------------------------------------ the table of institutional names
+
+const NAME_CATS = new Set(['ORG', 'ORGANO', 'CARGO', 'PAIS', 'LUGAR']);
+const NOT_A_NAME = 'La lista de nombres contiene algo que no es un nombre de organismo, \u00f3rgano, cargo, pa\u00eds o lugar: no se env\u00eda.';
+
+/**
+ * callAINames({ rows:[{ n, cat, src, tgt }], module, role, system, ... }) -> as callAI.
+ * The one exception to "only masked text": the user chose to have the official names checked, so the
+ * table of public institutional names (never persons, figures, dates, symbols, URLs or the text) may
+ * go out. The prompt is built HERE from rows that are checked one by one; nothing else can travel.
+ */
+export async function callAINames(o) {
+  const rows = (o && o.rows) || [];
+  if (!rows.length) throw _err('EMPTY', 'No hay nombres que revisar.');
+  for (const r of rows) {
+    if (!NAME_CATS.has(r.cat) || !Number.isInteger(r.n)) throw _err('UNMASKED', NOT_A_NAME);
+    for (const form of String(r.src || '').split(' / ').concat([String(r.tgt || '')])) {
+      const f = form.trim();
+      // A name, not a sentence: short, no line breaks or separators, few lowercase content words
+      // (verbs, nouns of a sentence), no final full stop.
+      const lower = f.split(/\s+/).filter(w => /^[a-z\u00df-\u00ff]{4,}/.test(w)).length;
+      if (!f || f.length > 160 || /[\n\r|{}]/.test(f) || f.split(/\s+/).length > 22 || lower > 6 || /[.!?;:]$/.test(f)) throw _err('UNMASKED', NOT_A_NAME);
+    }
+  }
+  const prompt = 'NOMBRES (fila | categor\u00eda | original | traducci\u00f3n):\n' +
+    rows.map(r => r.n + ' | ' + r.cat + ' | ' + r.src + ' | ' + r.tgt).join('\n') + '\n(FIN ' + rows.length + ')';
+  return callAI(Object.assign({}, o, { prompt, masked: true, rows: undefined }));
+}
+
 // ------------------------------------------------------------------ deferred batches (-50 %)
 
 /** Can this module role run as a deferred batch? -> { ok, kind, providerId, modelId, profileName } */

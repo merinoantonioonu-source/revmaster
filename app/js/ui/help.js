@@ -17,7 +17,7 @@ const T = {
       'UMBRA empareja los p\u00e1rrafos de los dos documentos y enmascara al momento.',
       'Para cambiar un archivo, vuelva a pulsar su casilla.',
       'El proyecto se guarda solo en este navegador; para volver a \u00e9l, pulse \ud83d\uddc2 (Proyectos guardados) en la cabecera.',
-      'Los archivos no salen de su ordenador: a una IA solo llega texto enmascarado.'] ] },
+      'Los archivos no salen de su ordenador: a una IA solo llega texto enmascarado (y, con Nombres oficiales, la lista de nombres de organismos, \u00f3rganos, cargos, pa\u00edses y lugares).'] ] },
 
   // ------------------------------------------------------------------ step 1: mask
   'mask-tools': { t: 'Barra de enmascarado', b: [
@@ -91,6 +91,7 @@ const T = {
       '**Estilo**: calcos, pasivas, gerundios, registro institucional.',
       '**Coherencia** y **Convenciones ONU**: miran el documento entero de una vez (listas, t\u00edtulos, f\u00f3rmulas de resoluci\u00f3n); son baratos.',
       '**Lectura en fr\u00edo**: lee la traducci\u00f3n sin el original, como un lector nuevo.',
+      '**Nombres oficiales**: comprueba la denominaci\u00f3n oficial y la coherencia de organismos, \u00f3rganos, cargos, pa\u00edses y lugares; solo env\u00eda la lista de esos nombres, sin el texto.',
       '**\u2713 Verificar hallazgos**: otro modelo revisa los hallazgos pendientes y descarta los falsos positivos.'],
     'Qu\u00e9 m\u00f3dulos est\u00e1n activos, con qu\u00e9 modelo y con qu\u00e9 **exigencia** se elige en Ajustes \u203a M\u00f3dulos.'] },
   'review-more': { t: 'Men\u00fa M\u00e1s', b: [
@@ -125,6 +126,14 @@ const T = {
       '**Gravedad correcta** y **Comentario**: lo que habr\u00eda que cambiar.',
       '**Enmascarado**: sin datos reales, para compartirlo sin riesgo.'],
     'No cambie las columnas ID ni \u00a7: sirven para encontrar cada hallazgo.'] },
+  bench: { t: 'Banco de pruebas', b: [
+    'Un documento de prueba hecho con su informe de revisi\u00f3n: p\u00e1rrafos con errores conocidos (de sentido, omisiones, adiciones, nombres oficiales y gram\u00e1tica) y p\u00e1rrafos correctos.',
+    ['**Cargar**: se abre como un proyecto aparte; el que ten\u00eda abierto queda guardado (\u1f5c2).',
+      'Ejecute los m\u00f3dulos con los modelos y la exigencia que quiera probar.',
+      '**Resultado**: cu\u00e1ntos errores detecta cada m\u00f3dulo, cu\u00e1les se le escapan, cu\u00e1les descart\u00f3 el Verificador y cu\u00e1nto **ruido** mete (hallazgos que no corresponden a ning\u00fan error).',
+      '**Copiar el resumen**: p\u00e9guelo en el chat para ajustar las instrucciones de los m\u00f3dulos.',
+      'Antes de repetir una prueba, use \u1f5d1 Vaciar con \u00abOlvidar las respuestas guardadas\u00bb.'],
+    'Sirve para comparar modelos, exigencias e instrucciones con datos, y no a ojo.'] },
   'review-sheets': { t: 'Hojas de revisi\u00f3n', b: [
     ['La traducci\u00f3n lleva subrayados los hallazgos visibles, con el color de su gravedad.',
       '**Clic en una oraci\u00f3n**: se resalta con su pareja en el original y, si tiene hallazgos, se muestra el primero en la lista (pulse otra vez para ver el siguiente).',
@@ -238,6 +247,7 @@ const T = {
   privacy: { t: 'Privacidad', b: [
     ['Los documentos se procesan en este navegador; la web solo sirve el programa.',
       'A una IA solo llega texto ENMASCARADO: la salida rechaza el texto sin enmascarar, salvo hacia un proveedor marcado como local.',
+      '\u00danica excepci\u00f3n: **Nombres oficiales** env\u00eda solo la lista de nombres de organismos, \u00f3rganos, cargos, pa\u00edses y lugares (nunca personas, cifras, fechas ni el texto). Se puede desactivar.',
       'Enmascarar reduce el riesgo, pero no lo elimina: el contexto puede delatar de qu\u00e9 se habla.'] ] },
   'browser-data': { t: 'Datos de este navegador', b: [
     ['**Vaciar la cach\u00e9 de resultados**: la pr\u00f3xima revisi\u00f3n de los mismos p\u00e1rrafos se volver\u00e1 a pagar.',

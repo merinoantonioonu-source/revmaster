@@ -27,7 +27,10 @@ The owner is both developer and end user and **does not code**. Explain things i
   `python3 -I tools/asciify.py` then `python3 -I tools/asciify.py --check` before committing.
 - **UI text in Spanish, starting with a capital letter.** Code comments in English.
 - **No `chrome.*` APIs**: storage goes through `app/js/store/`. Every AI call goes through
-  `app/js/ai/gateway.js`, which refuses unmasked text for external providers.
+  `app/js/ai/gateway.js`, which refuses unmasked text for external providers. The ONE exception,
+  chosen by the owner: `callAINames` (module "Nombres oficiales") sends the table of institutional
+  names (ORG, ORGANO, CARGO, PAIS, LUGAR; never persons, figures, dates, symbols or the text), built
+  and checked row by row inside the gateway. Do not widen it.
 - **Tests**: `node tests/run-all.mjs` (Playwright + Chromium are preinstalled; it starts a static
   server and a mock OpenAI-compatible provider). Run them before opening a PR.
 - **VERSION.md** is append-only: one line per change.
@@ -64,4 +67,9 @@ See `docs/ARQUITECTURA.md` (contracts between modules) and `docs/PROPUESTA.md` (
 - Removed on purpose (do not bring back): the spell checker (Word does spelling), the AI-free
   "Capa 0" checks, the rules system (editor, built-in rules, profiles) and the semantic similarity.
 - "Exigencia" (module config `strictness`: grave | normal | estricta) is in the prompt AND enforced by
-  the runner (`STRICT_ALLOWED`): findings of a severity not asked for are dropped.
+  the runner (`STRICT_ALLOWED`): findings of a severity not asked for are dropped. Severity is about
+  the effect on what is understood, not the size of the change (one word can be MAY).
+- The prompts are calibrated on the owner's review report (2026-11-05): its cases are the test bench
+  (`tools/make_bench.py` -> `app/data/calibration/`; Revisar > Mas > Banco de pruebas). When tuning a
+  module, ask the owner for the bench result ("Copiar el resumen") before and after; add new report
+  cases to `make_bench.py` and rebuild. `tests/bench.e2e.mjs` checks the scoring and the names call.

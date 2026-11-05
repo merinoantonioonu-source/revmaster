@@ -1,0 +1,448 @@
+{
+ "kind": "umbra-bench",
+ "version": 1,
+ "source": "Informe de revisi\u00f3n del usuario (2026-11-05)",
+ "paragraphs": [
+  {
+   "n": 1,
+   "es": "Banco de pruebas de UMBRA",
+   "expect": []
+  },
+  {
+   "n": 2,
+   "es": "El Consejo alent\u00f3 a otros Estados Miembros a que apoyaran los esfuerzos para aplicar los embargos de armas y petr\u00f3leo e informaran sobre ellos.",
+   "expect": [
+    {
+     "module": "fidelity",
+     "keys": [
+      "informaran",
+      "informar sobre",
+      "informacion"
+     ],
+     "what": "support and inform efforts: \u00abefforts\u00bb es complemento de los dos verbos (aportar informaci\u00f3n para orientarlos), no \u00abinformaran sobre ellos\u00bb."
+    }
+   ]
+  },
+  {
+   "n": 3,
+   "es": "El Consejo recibi\u00f3 exposiciones informativas sobre las medidas coercitivas mar\u00edtimas adoptadas despu\u00e9s de las resoluciones pertinentes del Consejo.",
+   "expect": [
+    {
+     "module": "fidelity",
+     "keys": [
+      "despues de",
+      "en virtud de",
+      "further to"
+     ],
+     "what": "further to = \u00aben virtud de\u00bb, no \u00abdespu\u00e9s de\u00bb (valor normativo, no temporal)."
+    }
+   ]
+  },
+  {
+   "n": 4,
+   "es": "Desde 2012, a\u00f1o en que se emiti\u00f3 una nota de la Presidencia del Consejo de Seguridad sobre el particular, el proceso de nombramiento de las Presidencias y las Vicepresidencias se llevaba a cabo con la participaci\u00f3n de todos los miembros del Consejo.",
+   "expect": [
+    {
+     "module": "fidelity",
+     "keys": [
+      "llevaba",
+      "se lleva"
+     ],
+     "what": "is conducted (sigue vigente) \u2260 \u00abse llevaba a cabo\u00bb (sugiere que dej\u00f3 de aplicarse)."
+    }
+   ]
+  },
+  {
+   "n": 5,
+   "es": "El 16 de abril, el Comit\u00e9 aprob\u00f3 el informe presentado al Consejo, en el que se\u00f1al\u00f3 que era incapaz de hacer una recomendaci\u00f3n un\u00e1nime.",
+   "expect": [
+    {
+     "module": "fidelity",
+     "keys": [
+      "presentado",
+      "su informe"
+     ],
+     "what": "\u00abel informe presentado al Consejo\u00bb presupone que ya se hab\u00eda presentado: \u00absu informe al Consejo\u00bb."
+    },
+    {
+     "module": "fidelity",
+     "keys": [
+      "incapaz",
+      "no habia podido"
+     ],
+     "what": "unable \u2260 \u00abera incapaz\u00bb (connota incompetencia): \u00abno hab\u00eda podido\u00bb."
+    }
+   ]
+  },
+  {
+   "n": 6,
+   "es": "Se explic\u00f3 con mayor detalle la funci\u00f3n del Comit\u00e9 en lo concerniente a la liquidaci\u00f3n de los art\u00edculos confiscados durante las inspecciones de buques prevista en la resoluci\u00f3n 2292 (2016).",
+   "expect": [
+    {
+     "module": "fidelity",
+     "keys": [
+      "prevista",
+      "realizadas"
+     ],
+     "what": "\u00abprevista\u00bb concuerda con \u00abla liquidaci\u00f3n\u00bb; pursuant to modifica a las inspecciones: \u00abrealizadas en virtud de\u00bb."
+    }
+   ]
+  },
+  {
+   "n": 7,
+   "es": "Se pod\u00eda encontrar m\u00e1s informaci\u00f3n sobre la labor del Equipo de Vigilancia en su 15.\u00ba informe.",
+   "expect": [
+    {
+     "module": "fidelity",
+     "keys": [
+      "podia",
+      "puede encontrarse",
+      "puede"
+     ],
+     "what": "can be found (presente) \u2260 \u00abse pod\u00eda encontrar\u00bb."
+    }
+   ]
+  },
+  {
+   "n": 8,
+   "es": "Como en el caso de los comit\u00e9s, salvo decisi\u00f3n en contrario, los grupos de trabajo se formaron con representantes de los 15 miembros del Consejo y celebraron sus reuniones a puerta cerrada.",
+   "expect": [
+    {
+     "module": "fidelity",
+     "keys": [
+      "salvo decision",
+      "contrario"
+     ],
+     "what": "\u00absalvo decisi\u00f3n en contrario\u00bb desplazado: modifica la composici\u00f3n en lugar del car\u00e1cter privado de las reuniones."
+    },
+    {
+     "module": "fidelity",
+     "keys": [
+      "se formaron",
+      "integrados",
+      "compuestos"
+     ],
+     "what": "were composed of (composici\u00f3n) \u2260 \u00abse formaron\u00bb (creaci\u00f3n)."
+    }
+   ]
+  },
+  {
+   "n": 9,
+   "es": "El Grupo de Trabajo deb\u00eda examinar las medidas pr\u00e1cticas que se han de imponer contra las personas, los grupos y las entidades involucrados en actividades terroristas o asociados con ellas, adem\u00e1s de las ya enunciadas por el Comit\u00e9 establecido en virtud de la resoluci\u00f3n 1267 (1999), entre ellas establecer los procedimientos m\u00e1s eficaces que se consideren adecuados.",
+   "expect": [
+    {
+     "module": "fidelity",
+     "keys": [
+      "ademas de",
+      "salvo",
+      "enunciadas"
+     ],
+     "what": "other than those designated = \u00absalvo los designados\u00bb (personas, excluyente), no \u00abadem\u00e1s de las ya enunciadas\u00bb (medidas, aditivo)."
+    },
+    {
+     "module": "fidelity",
+     "keys": [
+      "los procedimientos mas eficaces",
+      "mas eficaces",
+      "comparativo",
+      "superlativo"
+     ],
+     "what": "more effective procedures (comparativo) \u2260 \u00ablos procedimientos m\u00e1s eficaces\u00bb (superlativo)."
+    }
+   ]
+  },
+  {
+   "n": 10,
+   "es": "El Consejo tambi\u00e9n se refiri\u00f3 a otros aspectos relacionados con la gesti\u00f3n, la presentaci\u00f3n de informes y el desempe\u00f1o de las funciones del Tribunal.",
+   "expect": [
+    {
+     "module": "fidelity",
+     "keys": [
+      "desempeno",
+      "conclusion",
+      "terminacion"
+     ],
+     "what": "completion of functions = \u00abconclusi\u00f3n de las funciones\u00bb, no \u00abdesempe\u00f1o\u00bb."
+    }
+   ]
+  },
+  {
+   "n": 11,
+   "es": "El Consejo solicit\u00f3 al Secretario General que expusiera claramente una serie de opciones para la financiaci\u00f3n de la Misi\u00f3n, por ejemplo, el apoyo de los asociados internacionales.",
+   "expect": [
+    {
+     "module": "integrity",
+     "keys": [
+      "por ejemplo",
+      "sin caracter restrictivo",
+      "entre otros",
+      "not limited"
+     ],
+     "what": "including, but not limited to \u2260 \u00abpor ejemplo\u00bb (rebaja una inclusi\u00f3n obligatoria)."
+    }
+   ]
+  },
+  {
+   "n": 12,
+   "es": "El Consejo expres\u00f3 su intenci\u00f3n de convocar una reuni\u00f3n privada en octubre.",
+   "expect": [
+    {
+     "module": "integrity",
+     "keys": [
+      "cerrada",
+      "closed"
+     ],
+     "what": "Falta la aclaraci\u00f3n entre par\u00e9ntesis (closed): \u00ab(a puerta cerrada)\u00bb."
+    }
+   ]
+  },
+  {
+   "n": 13,
+   "es": "El Consejo solicit\u00f3 al Secretario General que hiciera posible implementar en la AUSSOM el marco establecido por la resoluci\u00f3n 2719 (2023) a partir del 1 de julio de 2025 con los recursos que quedaran disponibles tras ajustar el tama\u00f1o de la UNSOS.",
+   "expect": [
+    {
+     "module": "integrity",
+     "keys": [
+      "eventual",
+      "potential",
+      "posible implementacion"
+     ],
+     "what": "Falta potential (\u00abeventual\u00bb)."
+    },
+    {
+     "module": "integrity",
+     "keys": [
+      "existentes",
+      "existing"
+     ],
+     "what": "Falta existing (\u00abexistentes\u00bb)."
+    }
+   ]
+  },
+  {
+   "n": 14,
+   "es": "El Consejo les solicit\u00f3 que lo informaran a m\u00e1s tardar el 30 de septiembre de 2025, presentando una estrategia de salida actualizada para la AUSSOM.",
+   "expect": [
+    {
+     "module": "integrity",
+     "keys": [
+      "presentando",
+      "en particular",
+      "incluida",
+      "including on"
+     ],
+     "what": "including on restringido a \u00abpresentando\u00bb: el informe incluye la estrategia, no se limita a ella."
+    },
+    {
+     "module": "grammar",
+     "keys": [
+      "lo informaran",
+      "le informaran",
+      "informaran al"
+     ],
+     "what": "\u00ablo informaran\u00bb referido al Consejo: \u00abinformaran al Consejo de Seguridad\u00bb."
+    }
+   ]
+  },
+  {
+   "n": 15,
+   "es": "El Consejo modific\u00f3 el nombre del Comit\u00e9 del Consejo de Seguridad establecido en virtud de la resoluci\u00f3n 2127 (2013) relativa a la Rep\u00fablica Centroafricana por \"Comit\u00e9 dimanante de la resoluci\u00f3n 2745 (2024)\".",
+   "expect": [
+    {
+     "module": "integrity",
+     "keys": [
+      "consejo de seguridad",
+      "security council"
+     ],
+     "what": "En el nuevo nombre falta \u00abdel Consejo de Seguridad\u00bb."
+    },
+    {
+     "module": "grammar",
+     "keys": [
+      "modifico",
+      "cambio",
+      "por el de"
+     ],
+     "what": "R\u00e9gimen: no \u00abmodificar algo por\u00bb, sino \u00abcambiar algo por (el de)\u00bb."
+    }
+   ]
+  },
+  {
+   "n": 16,
+   "es": "Con sujeci\u00f3n a cualquier pr\u00f3rroga de ese per\u00edodo que acordara el Comit\u00e9, el Estado pertinente podr\u00eda presentar una solicitud actualizada.",
+   "expect": [
+    {
+     "module": "integrity",
+     "keys": [
+      "falta de aprobacion",
+      "lack of approval"
+     ],
+     "what": "Falta el inciso and following any such lack of approval."
+    }
+   ]
+  },
+  {
+   "n": 17,
+   "es": "El Consejo alent\u00f3 al Comit\u00e9 a que, cuando procediera, considerara la posibilidad de realizar visitas a determinados pa\u00edses.",
+   "expect": [
+    {
+     "module": "integrity",
+     "keys": [
+      "donde",
+      "where"
+     ],
+     "what": "Falta where: \u00abdonde y cuando procediera\u00bb."
+    }
+   ]
+  },
+  {
+   "n": 18,
+   "es": "El Consejo autoriz\u00f3 inspecciones a fin de asegurar la estricta aplicaci\u00f3n del embargo de armas en alta mar frente a las costas de Libia.",
+   "expect": [
+    {
+     "module": "integrity",
+     "keys": [
+      "estricta"
+     ],
+     "what": "Adici\u00f3n: \u00abestricta\u00bb no est\u00e1 en el original."
+    }
+   ]
+  },
+  {
+   "n": 19,
+   "es": "Asimismo, se examinan otros \u00f3rganos subsidiarios, como la Oficina del \u00d3mbudsman, la Direcci\u00f3n Ejecutiva del Comit\u00e9 contra el Terrorismo y algunos grupos de expertos, junto con los comit\u00e9s correspondientes.",
+   "expect": [
+    {
+     "module": "integrity",
+     "keys": [
+      "algunos"
+     ],
+     "what": "Adici\u00f3n: \u00abalgunos\u00bb restringe a una parte de los grupos de expertos."
+    }
+   ]
+  },
+  {
+   "n": 20,
+   "es": "En 2024, el mandato del Comit\u00e9 establecido en virtud de la resoluci\u00f3n 1591 (2005) se mantuvo en su mayor parte sin cambios.",
+   "expect": [
+    {
+     "module": "integrity",
+     "keys": [
+      "en su mayor parte",
+      "mayor parte"
+     ],
+     "what": "Adici\u00f3n: \u00aben su mayor parte\u00bb sugiere cambios que no hubo."
+    }
+   ]
+  },
+  {
+   "n": 21,
+   "es": "El informe se bas\u00f3 en una serie de consultas con los Estados Miembros, las partes pertinentes del sistema de las Naciones Unidas y representantes de la sociedad civil.",
+   "expect": [
+    {
+     "module": "integrity",
+     "keys": [
+      "pertinentes"
+     ],
+     "what": "Adici\u00f3n: \u00abpertinentes\u00bb no est\u00e1 en el original."
+    }
+   ]
+  },
+  {
+   "n": 22,
+   "es": "El Consejo escuch\u00f3 una exposici\u00f3n informativa de la Subsecretaria General de Apoyo a la Consolidaci\u00f3n de la Paz del Departamento de Asuntos Pol\u00edticos y de Consolidaci\u00f3n de la Paz y Operaciones de Paz.",
+   "expect": [
+    {
+     "module": "names",
+     "keys": [
+      "departamentos",
+      "departamento",
+      "departments"
+     ],
+     "what": "Departments (dos departamentos) fundidos en un \u00abDepartamento\u00bb inexistente."
+    }
+   ]
+  },
+  {
+   "n": 23,
+   "es": "El Consejo estableci\u00f3 la Misi\u00f3n de Asistencia Transicional de las Naciones Unidas en Somalia.",
+   "expect": [
+    {
+     "module": "names",
+     "keys": [
+      "transicional",
+      "de transicion"
+     ],
+     "what": "Nombre oficial: \u00abMisi\u00f3n de Asistencia de las Naciones Unidas de Transici\u00f3n en Somalia\u00bb, sin \u00abTransicional\u00bb."
+    }
+   ]
+  },
+  {
+   "n": 24,
+   "es": "El Consejo solicit\u00f3 al Secretario General que le proporcionara an\u00e1lisis integrados para describir el impacto de la misi\u00f3n, facilitar la reevaluaci\u00f3n del mandato y seguir comunic\u00e1ndole los progresos, e incluyera informaci\u00f3n en los informes combinados.",
+   "expect": [
+    {
+     "module": "grammar",
+     "keys": [
+      "incluyera",
+      "y que"
+     ],
+     "what": "Paralelismo roto: \u00abe incluyera\u00bb tras tres infinitivos, sin repetir \u00abque\u00bb."
+    }
+   ]
+  },
+  {
+   "n": 25,
+   "es": "Hacer recomendaciones al Consejo sobre posibles medidas para promover la protecci\u00f3n de los ni\u00f1os afectados por conflictos armados, que se refirieran tambi\u00e9n a los mandatos apropiados.",
+   "expect": [
+    {
+     "module": "grammar",
+     "keys": [
+      "refirieran",
+      "refieran"
+     ],
+     "what": "Correlaci\u00f3n de tiempos: \u00abrefirieran\u00bb rompe el presente de la serie (\u00abque se refieran\u00bb)."
+    }
+   ]
+  },
+  {
+   "n": 26,
+   "es": "Record\u00f3 a ese respecto que en el Art\u00edculo 52, p\u00e1rrafo 1 se presum\u00eda la existencia de acuerdos regionales.",
+   "expect": [
+    {
+     "module": "grammar",
+     "keys": [
+      "parrafo 1,",
+      "coma"
+     ],
+     "what": "Falta la coma que cierra el inciso: \u00aben el Art\u00edculo 52, p\u00e1rrafo 1, se presum\u00eda\u00bb."
+    }
+   ]
+  },
+  {
+   "n": 27,
+   "es": "El Comit\u00e9 celebr\u00f3 tres consultas oficiosas durante el per\u00edodo que se examina.",
+   "expect": []
+  },
+  {
+   "n": 28,
+   "es": "El Consejo prorrog\u00f3 el mandato del Grupo de Expertos hasta el 15 de diciembre de 2025.",
+   "expect": []
+  },
+  {
+   "n": 29,
+   "es": "En una carta de fecha 10 de mayo de 2024, el Secretario General inform\u00f3 al Consejo de su intenci\u00f3n de nombrar a los miembros del Grupo.",
+   "expect": []
+  },
+  {
+   "n": 30,
+   "es": "El Consejo decidi\u00f3 seguir ocup\u00e1ndose activamente de la cuesti\u00f3n.",
+   "expect": []
+  },
+  {
+   "n": 31,
+   "es": "Los grupos de trabajo se reunieron peri\u00f3dicamente e informaron al Consejo sobre sus actividades.",
+   "expect": []
+  }
+ ]
+}

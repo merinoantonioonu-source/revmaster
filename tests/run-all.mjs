@@ -17,7 +17,8 @@ const steps = [
   ['Aplicacion completa', 'node', [path.join(HERE, 'app.e2e.mjs')]],
   ['Fase 6 (lotes diferidos)', 'node', [path.join(HERE, 'phase6.e2e.mjs')]],
   ['Ayuda contextual', 'node', [path.join(HERE, 'help.e2e.mjs')]],
-  ['Navegacion por segmentos', 'node', [path.join(HERE, 'nav.e2e.mjs')]]
+  ['Navegacion por segmentos', 'node', [path.join(HERE, 'nav.e2e.mjs')]],
+  ['Banco de pruebas y nombres', 'node', [path.join(HERE, 'bench.e2e.mjs')]]
 ];
 
 let failed = 0;

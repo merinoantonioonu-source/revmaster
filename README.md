@@ -34,6 +34,8 @@ navegador: no se suben a GitHub ni a ningún servidor. A una IA solo llega texto
    Cada módulo es un revisor especializado que solo busca lo que le compete:
    - gramática (la ortografía la corrige Word);
    - fidelidad de sentido;
+   - nombres oficiales (solo envía la lista de nombres de organismos, órganos, cargos, países y
+     lugares, nunca el texto);
    - integridad (omisiones y adiciones);
    - estilo;
    - coherencia;
@@ -48,6 +50,8 @@ navegador: no se suben a GitHub ni a ningún servidor. A una IA solo llega texto
    - **Navegación por oraciones, como en Final Check:** al pulsar una oración se resalta con su
      pareja en la otra hoja; al pulsar un hallazgo, las dos hojas van a su oración.
    - **Tabla de hallazgos** en una ventana aparte, y un **Excel para valorar** los hallazgos.
+   - **Banco de pruebas:** un documento hecho con un informe de revisión real para medir cuántos
+     errores detecta cada módulo y cuánto ruido mete (Revisar › Más).
    - **Modo diferido:** la primera pasada va a la API de lotes del proveedor (Gemini, Anthropic,
      Mistral u OpenAI). Cuesta la mitad y responde en minutos u horas.
 3. **Exportar.** La traducción revisada sale así:

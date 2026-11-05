@@ -5,7 +5,7 @@
 
 import { helpBtn, helpItem } from './help.js';
 import { el, $, clear, toast, modal, fmtInt, fmtMoney, promptDialog, confirmDialog } from '../util/dom.js';
-import { state, on, emit, addFindings, updateFinding, saveProjectSoon } from '../state.js';
+import { state, on, emit, addFindings, updateFinding, saveProjectSoon, openFiles } from '../state.js';
 import { renderDoc } from './preview.js';
 import { MODULES, moduleById, INPUT_ICONS, INPUT_LABELS, ROLE_LABELS } from '../review/module-list.js';
 import { makePlan } from '../review/planner.js';
@@ -19,6 +19,7 @@ import { exportCorrected, exportReportHtml, exportReportXlsx, exportFindingsJson
 import { createNav, findingPlace, peerSentence, sentencesOf } from './nav.js';
 import { openFindingsWindow, syncFindingsWindow, findingsWindowSelect } from './findings-window.js';
 import { openMenu } from './menu.js';
+import { loadBenchSpec, benchFiles, evaluateBench } from '../review/bench.js';
 
 let root, toolsHost, panes = {};
 let filt = { module: 'all', sev: 'all', state: 'open' };
@@ -26,7 +27,7 @@ let selected = null;
 let running = null;           // { abort: AbortController, modules:[] }
 let progress = {};            // moduleId -> { done, total, label, state:'run'|'done'|'err', msg }
 let estimates = {};           // moduleId -> { tok, cost } | { error }
-let selectedModules = new Set(['grammar', 'fidelity', 'integrity', 'style', 'coherence', 'conventions']);
+let selectedModules = new Set(['grammar', 'fidelity', 'integrity', 'style', 'coherence', 'conventions', 'names']);
 let estTimer = null;
 let nav = null;
 
@@ -100,6 +101,8 @@ function moreMenu(anchor) {
     { sep: true },
     { label: 'Verificar los hallazgos pendientes de la IA', onClick: reverify },
     { label: 'Configurar m\u00f3dulos y modelos', onClick: () => emit('goto-settings', 'modules') },
+    { sep: true },
+    { label: state.project && state.project.bench ? 'Resultado del banco de pruebas\u2026' : 'Banco de pruebas\u2026', onClick: benchDialog },
     { sep: true },
     helpItem('review-more', anchor)
   ]);
@@ -275,7 +278,7 @@ async function runModules(ids) {
   const ai = ids.filter(id => id !== 'verifier' && moduleById(id) && moduleById(id).ai && ctx.cfg[id].enabled !== false);
   if (!ai.length) { renderModules(); return; }
   const plan = await makePlan(state.session, ctx, { modules: ai });
-  if (plan.errors.length && !plan.groups.length && !plan.skeleton.length) {
+  if (plan.errors.length && !plan.groups.length && !plan.skeleton.length && !plan.names) {
     toast('No hay ning\u00fan proveedor de IA con clave. Config\u00farelo en Ajustes \u203a Proveedores.', 'err', 8000);
     emit('goto-settings', 'providers');
     return;
@@ -335,6 +338,12 @@ async function runModules(ids) {
     (discarded ? ' (' + discarded + ' descartados por el verificador)' : '') + ' \u00b7 ' + fmtMoney(res.spent || 0) +
     (res.stopped ? ' \u00b7 detenida' : '') + '.', (res.errors || []).length ? 'warn' : 'ok', 7000);
   for (const e of res.errors || []) toast((moduleById(String(e.module).split('+')[0]) || { label: e.module }).label + ': ' + e.message, 'err', 9000);
+  if (state.project && state.project.bench) {
+    try {
+      const r = evaluateBench(state.session, state.findings, await loadBenchSpec());
+      toast('Banco de pruebas: ' + r.found + ' de ' + r.expected + ' errores detectados, ' + r.noise.length + ' hallazgos de ruido. Detalle en M\u00e1s \u203a Resultado del banco de pruebas.', 'ok', 10000);
+    } catch (e) { console.warn('bench', e); }
+  }
 }
 
 function planDialog(plan, budget, cap) {
@@ -347,10 +356,11 @@ function planDialog(plan, budget, cap) {
       (g.dupOf.size ? '; ' + g.dupOf.size + ' repetidos se revisan una vez' : '')));
   }
   for (const s of plan.skeleton) rows.push(el('li', moduleById(s.module).label + ': 1 llamada con el esqueleto (' + s.units.size + ' elementos)'));
+  if (plan.names) rows.push(el('li', 'Nombres oficiales: 1 llamada con ' + plan.names.rows.length + ' nombres (solo la lista de nombres, sin el texto)'));
   if (plan.verify) rows.push(el('li', 'Verificador: ' + plan.verify.est.calls + ' llamada(s) con ' + plan.verify.client.modelId));
   for (const e of plan.errors) rows.push(el('li.err-t', moduleById(e.module).label + ': ' + e.message));
   const budgetIn = el('input.inp', { type: 'number', min: 0, step: 0.05, value: budget || '', placeholder: 'Sin l\u00edmite', style: { width: '110px' } });
-  const nothing = !plan.groups.some(g => g.batches.length) && !plan.skeleton.length;
+  const nothing = !plan.groups.some(g => g.batches.length) && !plan.skeleton.length && !plan.names;
   // Deferred mode: the first pass (and the skeleton calls) at about half the price; the deep pass and
   // the Verifier, which are small, run when the answers arrive, at the normal price.
   const firstPass = plan.groups.reduce((n, g) => n + (g.est.cost || 0) - ((g.est.deep && g.est.deep.cost) || 0), 0) +
@@ -366,7 +376,7 @@ function planDialog(plan, budget, cap) {
   const body = el('div',
     el('ul', rows),
     el('p', el('b', fmtInt(plan.totals.calls) + ' llamadas \u00b7 ~' + fmtInt(plan.totals.inTok + plan.totals.outTok) + ' tokens \u00b7 ~' + fmtMoney(plan.totals.cost))),
-    el('p.info', 'Estimaci\u00f3n orientativa: el gasto real se registra en Uso de IA. Solo se env\u00eda texto enmascarado.' +
+    el('p.info', 'Estimaci\u00f3n orientativa: el gasto real se registra en Uso de IA. Solo se env\u00eda texto enmascarado (y, si est\u00e1 marcado Nombres oficiales, la lista de nombres de organismos, \u00f3rganos, cargos, pa\u00edses y lugares).' +
       (nothing ? ' No hay nada nuevo que enviar: todo est\u00e1 en la cach\u00e9.' : '')),
     el('label.lbl', 'Presupuesto m\u00e1ximo de esta ejecuci\u00f3n (US$)'), budgetIn,
     defBox);
@@ -785,4 +795,68 @@ async function resetFindings() {
   nav.clear();
   scheduleEstimates();
   toast('Hallazgos borrados' + (cache.checked ? ' y respuestas guardadas olvidadas' : '') + '.', 'ok');
+}
+
+// ------------------------------------------------------------------ test bench
+
+const _MOD = (id) => (moduleById(id) || { label: id }).label;
+
+/** Loads the test bench (a project of its own) or, when it is open, shows how the modules did. */
+async function benchDialog() {
+  if (state.project && state.project.bench) return benchResults();
+  let spec;
+  try { spec = await loadBenchSpec(); } catch (e) { toast(e.message, 'err', 8000); return; }
+  const expected = spec.paragraphs.reduce((n, p) => n + p.expect.length, 0);
+  const clean = spec.paragraphs.filter(p => !p.expect.length).length;
+  const r = await modal({ title: 'Banco de pruebas', help: helpBtn('bench'), width: '640px', body: el('div',
+    el('p', 'Un documento de prueba hecho con su informe de revisi\u00f3n: ', el('b', spec.paragraphs.length + ' p\u00e1rrafos con ' + expected + ' errores conocidos'),
+      ' (de sentido, omisiones, adiciones, nombres oficiales y gram\u00e1tica) y ', el('b', clean + ' p\u00e1rrafos correctos'), '.'),
+    el('ol',
+      el('li', 'Pulse \u00abCargar\u00bb: se abre como un proyecto aparte (el que tiene abierto queda guardado).'),
+      el('li', 'Ejecute los m\u00f3dulos que quiera, con los modelos y la exigencia que quiera probar.'),
+      el('li', 'Al terminar, M\u00e1s \u203a Resultado del banco de pruebas: cu\u00e1ntos errores detecta cada m\u00f3dulo y cu\u00e1nto ruido mete.')),
+    el('p.info', 'Sirve para comparar modelos, exigencias e instrucciones con datos y no a ojo. Antes de repetir una prueba, use \ud83d\uddd1 Vaciar con \u00abOlvidar las respuestas guardadas\u00bb.')),
+    buttons: [{ label: 'Cancelar', value: null }, { label: 'Cargar el banco de pruebas', kind: 'primary', value: 'ok' }] });
+  if (r !== 'ok') return;
+  try {
+    const f = await benchFiles();
+    await openFiles(f.src, f.tgt);
+    state.project.bench = true;
+    state.project.name = 'Banco de pruebas';
+    saveProjectSoon();
+    emit('project');
+    emit('goto', 'review');
+    toast('Banco de pruebas cargado: ejecute los m\u00f3dulos.', 'ok', 6000);
+  } catch (e) { console.error(e); toast('No se pudo cargar el banco de pruebas: ' + e.message, 'err', 8000); }
+}
+
+async function benchResults() {
+  let res;
+  try { res = evaluateBench(state.session, state.findings, await loadBenchSpec()); } catch (e) { toast(e.message, 'err', 8000); return; }
+  const pct = (a, b) => b ? Math.round(100 * a / b) + ' %' : '\u2014';
+  const mods = Object.keys(res.byModule);
+  const table = el('table.grid', el('tr', el('th', 'M\u00f3dulo'), el('th', 'Errores esperados'), el('th', 'Detectados'), el('th', 'Ruido')),
+    mods.map(m => { const b = res.byModule[m]; return el('tr', el('td', _MOD(m)), el('td', String(b.expected || '\u2014')),
+      el('td', b.expected ? b.found + ' (' + pct(b.found, b.expected) + ')' + (b.found !== b.foundOwn ? ' \u00b7 ' + (b.found - b.foundOwn) + ' por otro m\u00f3dulo' : '') : '\u2014'),
+      el('td', String(b.noise))); }));
+  const items = el('ul.benchlist', res.items.map(it => el('li.' + (it.hit ? 'hit' : 'miss'),
+    el('b', (it.hit ? '\u2713 ' : '\u2717 ') + '\u00a7' + it.n + ' \u00b7 ' + _MOD(it.module) + ': '), it.what,
+    it.hit ? el('div.muted', 'Encontrado' + (it.other ? ' por ' + _MOD(it.hit.module) : '') + ': \u00ab' + (it.hit.quote || '') + '\u00bb \u2192 \u00ab' + (it.hit.edited || it.hit.suggestion || '') + '\u00bb') : null,
+    it.discarded ? el('div.warn-t', 'Lo encontr\u00f3 ' + _MOD(it.discarded.module) + ', pero el Verificador lo descart\u00f3.') : null)));
+  const noise = el('ul.benchlist', res.noise.slice(0, 80).map(f => el('li.miss',
+    el('b', '\u00a7' + ((state.session.units[f.unit] || {}).n || '') + ' \u00b7 ' + _MOD(f.module) + ' \u00b7 ' + f.sev + ': '),
+    '\u00ab' + (f.quote || '') + '\u00bb \u2192 \u00ab' + (f.edited || f.suggestion || '') + '\u00bb', el('div.muted', f.reason || ''))));
+  const summary = 'Banco de pruebas: ' + res.found + ' de ' + res.expected + ' errores detectados (' + pct(res.found, res.expected) + '); ruido: ' + res.noise.length +
+    ' hallazgos que no corresponden a ning\u00fan error (' + res.noiseClean + ' en p\u00e1rrafos correctos).\n' +
+    mods.map(m => { const b = res.byModule[m]; return '- ' + _MOD(m) + ': ' + (b.expected ? b.found + '/' + b.expected : '0 esperados') + ', ruido ' + b.noise; }).join('\n') + '\n' +
+    'No detectados:\n' + res.items.filter(i => !i.hit).map(i => '  \u00a7' + i.n + ' ' + _MOD(i.module) + ': ' + i.what).join('\n') + '\n' +
+    'Ruido:\n' + res.noise.map(f => '  \u00a7' + ((state.session.units[f.unit] || {}).n || '') + ' ' + _MOD(f.module) + ' ' + f.sev + ': ' + (f.quote || '') + ' -> ' + (f.suggestion || '') + ' (' + (f.reason || '') + ')').join('\n');
+  await modal({ title: 'Resultado del banco de pruebas', help: helpBtn('bench'), width: '820px', body: el('div',
+    el('p', el('b', res.found + ' de ' + res.expected + ' errores detectados (' + pct(res.found, res.expected) + ')'), ' \u00b7 ruido: ', el('b', String(res.noise.length)),
+      ' hallazgos que no corresponden a ning\u00fan error (', String(res.noiseClean), ' en p\u00e1rrafos correctos).'),
+    table,
+    el('h4', { style: { margin: '12px 0 4px' } }, 'Errores esperados'), items,
+    el('h4', { style: { margin: '12px 0 4px' } }, 'Ruido (' + res.noise.length + ')'), res.noise.length ? noise : el('p.muted', 'Ninguno.')),
+    buttons: [{ label: 'Copiar el resumen', onClick: async () => { const { copyText } = await import('../util/dom.js'); await copyText(summary); toast('Resumen copiado: p\u00e9guelo en el chat para ajustar los m\u00f3dulos.', 'ok', 6000); return false; } },
+      { label: 'Cerrar', kind: 'primary', value: null }] });
 }

@@ -388,3 +388,51 @@ y aquí solo añadían ruido.
   - El editor de reglas, retirado, era el que duplicaba contenido: guardaba su contenedor en una variable
     del módulo y lo compartían dos montajes asíncronos.
 
+## 13. Calibración con el informe del usuario, Nombres oficiales y banco de pruebas (2026-11-05)
+
+- **Instrucciones** (`review/prompts.js`): están calibradas con los casos del informe de revisión del usuario.
+  - **Fidelidad**:
+    - complemento compartido;
+    - conector jurídico leído como temporal;
+    - tiempo o aspecto que cambia los hechos;
+    - modificador o salvedad desplazados;
+    - exclusión leída como adición;
+    - comparativo leído como superlativo;
+    - presuposición;
+    - connotación;
+    - acepción.
+  - **Integridad**:
+    - palabras sueltas con alcance (potential, existing, where, strict, some, largely, relevant);
+    - fórmulas jurídicas rebajadas;
+    - paréntesis;
+    - incisos;
+    - partes de nombres.
+  - **Gramática**:
+    - régimen;
+    - «lo informara»;
+    - paralelismo;
+    - correlación de tiempos;
+    - coma de cierre de inciso.
+  - La ortotipografía (ordinales, espacios, mayúsculas) queda fuera.
+  - **Gravedad**: se mide por el efecto en lo que se entiende, no por el tamaño del cambio.
+- **Nombres oficiales** (`review/names.js` y `gateway.callAINames`):
+  - Es una llamada con la tabla de nombres reconocidos:
+    - una fila por forma de la traducción;
+    - con las formas del original;
+    - de las categorías ORG, ORGANO, CARGO, PAIS y LUGAR.
+  - La tabla se construye y se valida dentro de la puerta de salida: nada de personas, cifras, fechas,
+    símbolos, URL ni términos propios, y nada que parezca una frase.
+  - Hay un hallazgo por cada aparición de la forma señalada.
+  - Los nombres compuestos que UMBRA no reconoce siguen en el texto visible. Los ven Fidelidad e
+    Integridad, y entran en la tabla si se añaden con Alt+E o al diccionario.
+- **Banco de pruebas** (`tools/make_bench.py` genera `app/data/calibration/banco_en.docx`, `banco_es.docx` y
+  `banco.json`; la evaluación está en `review/bench.js`):
+  - Contiene 31 párrafos: los casos del informe y 5 párrafos correctos.
+  - Un hallazgo acierta si está en el párrafo y su cita, su propuesta o su motivo contienen una de las
+    claves del error.
+  - Todo lo demás es ruido.
+  - Desde Revisar › Más:
+    - se carga como un proyecto aparte;
+    - muestra el resultado por módulo;
+    - copia un resumen para el chat.
+

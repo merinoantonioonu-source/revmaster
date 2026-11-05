@@ -3,7 +3,7 @@
  * settings screens, the module cards, the planner and the rules editor all read this list.
  *
  * input: 'bilingual' (source + target), 'target' (Spanish only), 'skeleton' (structure digest),
- *        'findings' (other modules' findings).
+ *        'findings' (other modules' findings), 'names' (only the table of institutional names).
  * roles: which model slots the module offers ('triage' = economical pass over everything,
  *        'deep' = strong model on what triage or the local layer flagged).
  */
@@ -22,6 +22,8 @@ export const MODULES = [
     desc: 'Pre\u00e1mbulo y parte dispositiva, cursivas, f\u00f3rmulas fijas, cifras, fechas y s\u00edmbolos.' },
   { id: 'coldread', label: 'Lectura en fr\u00edo', short: 'Lectura en fr\u00edo', input: 'target', roles: ['triage'], ai: true,
     desc: 'Lee la traducci\u00f3n sin el original y se\u00f1ala lo que no se entiende o suena a traducci\u00f3n.' },
+  { id: 'names', label: 'Nombres oficiales', short: 'Nombres', input: 'names', roles: ['triage'], ai: true,
+    desc: 'Denominaci\u00f3n oficial y coherencia de organismos, \u00f3rganos, cargos, pa\u00edses y lugares. Solo env\u00eda la lista de esos nombres, sin el texto.' },
   { id: 'verifier', label: 'Verificador', short: 'Verificador', input: 'findings', roles: ['deep'], ai: true,
     desc: 'Revisa solo los hallazgos de los dem\u00e1s m\u00f3dulos y descarta los falsos positivos.' }
 ];
@@ -34,7 +36,7 @@ export function moduleById(id) {
 
 export const ROLE_LABELS = { triage: 'Cribado', deep: 'A fondo' };
 
-export const INPUT_ICONS = { bilingual: '\u21c4', target: '\u00b6', skeleton: '\u2317', findings: '\u2713', local: '\u2699' };
+export const INPUT_ICONS = { names: '\u2630', bilingual: '\u21c4', target: '\u00b6', skeleton: '\u2317', findings: '\u2713', local: '\u2699' };
 export const INPUT_LABELS = {
-  bilingual: 'Biling\u00fce', target: 'Solo espa\u00f1ol', skeleton: 'Esqueleto', findings: 'Solo hallazgos', local: 'Sin IA'
+  names: 'Lista de nombres', bilingual: 'Biling\u00fce', target: 'Solo espa\u00f1ol', skeleton: 'Esqueleto', findings: 'Solo hallazgos', local: 'Sin IA'
 };
