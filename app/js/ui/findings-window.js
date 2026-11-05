@@ -17,9 +17,7 @@ import { el } from '../util/dom.js';
 import { state } from '../state.js';
 import { MODULES, moduleById } from '../review/module-list.js';
 import { CAT_LABELS } from '../review/prompts.js';
-import { SEV_LABELS } from '../rules/rules.js';
-import { STATE_LABELS } from '../review/findings.js';
-import { LOCAL_SUBS } from '../review/local-checks.js';
+import { STATE_LABELS, SEV_LABELS } from '../review/findings.js';
 import { findingPlace } from './nav.js';
 
 const NAME = 'umbra-findings';
@@ -158,8 +156,7 @@ function _visible() {
 function _sug(f) { return (f.edited !== undefined && f.edited !== null) ? f.edited : f.suggestion; }
 
 function _origin(f) {
-  if (f.source === 'local') return 'Sin IA';
-  if (f.source === 'rule') return 'Regla';
+  if (f.source === 'local' || f.source === 'rule') return 'Sin IA';
   if (f.source === 'external') return 'IA externa';
   return (f.model || 'IA') + (f.role === 'deep' ? ' \u00b7 a fondo' : f.role === 'cache' ? ' \u00b7 cach\u00e9' : '');
 }
@@ -269,7 +266,7 @@ function _row(f, s) {
     btns.appendChild(el('button', { title: 'Volver a pendiente', onclick: (e) => { e.stopPropagation(); api.setState(f, 'open'); } }, '\u21ba Deshacer'));
   }
   const left = el('td.chk',
-    el('span.sev.' + f.sev, { title: SEV_LABELS[f.sev] || f.sev }, f.sev), el('span.tag', mod ? mod.short : f.module), f.sub ? el('span.tag', LOCAL_SUBS[f.sub] || f.sub) : null,
+    el('span.sev.' + f.sev, { title: SEV_LABELS[f.sev] || f.sev }, f.sev), el('span.tag', mod ? mod.short : f.module),
     el('div.cat', CAT_LABELS[f.cat] || f.cat),
     f.state !== 'open' ? el('div.stl' + (off ? '.off' : ''), STATE_LABELS[f.state] || f.state) : null,
     btns);

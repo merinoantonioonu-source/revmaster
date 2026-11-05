@@ -3,17 +3,15 @@
  * settings screens, the module cards, the planner and the rules editor all read this list.
  *
  * input: 'bilingual' (source + target), 'target' (Spanish only), 'skeleton' (structure digest),
- *        'findings' (other modules' findings), 'local' (no AI at all).
+ *        'findings' (other modules' findings).
  * roles: which model slots the module offers ('triage' = economical pass over everything,
  *        'deep' = strong model on what triage or the local layer flagged).
  */
 export const MODULES = [
-  { id: 'local', label: 'Comprobaciones sin IA', short: 'Sin IA', input: 'local', roles: [], ai: false,
-    desc: 'Gratis e instant\u00e1neas, sin enviar nada: cifras, etiquetas, p\u00e1rrafos que faltan, paralelismo, convenciones y reglas fijas.' },
   { id: 'grammar', label: 'Gram\u00e1tica', short: 'Gram\u00e1tica', input: 'target', roles: ['triage'], ai: true,
     desc: 'Concordancia, r\u00e9gimen, tiempos verbales y puntuaci\u00f3n del espa\u00f1ol (la ortograf\u00eda la corrige Word).' },
   { id: 'fidelity', label: 'Fidelidad', short: 'Fidelidad', input: 'bilingual', roles: ['triage', 'deep'], ai: true,
-    desc: 'Errores de traducci\u00f3n: sentido, falsos amigos, modalidad, negaciones, agente, intensidad.' },
+    desc: 'Errores de SENTIDO: lo que hace que la traducci\u00f3n diga algo distinto del original.' },
   { id: 'integrity', label: 'Integridad', short: 'Integridad', input: 'bilingual', roles: ['triage', 'deep'], ai: true,
     desc: 'Omisiones y adiciones respecto del original.' },
   { id: 'style', label: 'Estilo', short: 'Estilo', input: 'target', roles: ['triage'], ai: true,

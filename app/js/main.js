@@ -9,12 +9,19 @@ import { state, on, emit, loadData, openFiles, replaceFile, restoreLastProject, 
   deleteProject, closeProject, refreshLists, remaskNow } from './state.js';
 import { mountMaskView } from './ui/mask-view.js';
 import { mountReviewView } from './ui/review-view.js';
-import { mountSettingsView, showSettingsSection } from './ui/settings-view.js';
+import { mountSettingsView, showSettingsSection, preselectSettingsSection } from './ui/settings-view.js';
 import { showGuide } from './ui/guide.js';
 import { helpBtn, showHelp } from './ui/help.js';
 
 const VIEWS = ['welcome', 'mask', 'review', 'settings'];
 let pending = { src: null, tgt: null };
+
+/** Opens Settings at a section, mounting it once (not the previous section first). */
+function goSettings(sec) {
+  if (state.view === 'settings') { showSettingsSection(sec); return; }
+  preselectSettingsSection(sec);
+  setView('settings');
+}
 
 function setView(v) {
   if (!state.project && (v === 'mask' || v === 'review')) v = 'welcome';
@@ -34,9 +41,8 @@ function renderRail() {
   const items = [
     { id: 'mask', icon: '\u29c9', label: 'Entid.', title: 'Entidades', go: () => setView('mask') },
     { id: 'review', icon: '\u2691', label: 'Hallaz.', title: 'Hallazgos', go: () => setView('review'), badge: open },
-    { id: 'modules', icon: '\u25a6', label: 'M\u00f3dul.', title: 'M\u00f3dulos y modelos', go: () => { setView('settings'); showSettingsSection('modules'); } },
-    { id: 'rules', icon: '\u2261', label: 'Reglas', title: 'Reglas', go: () => { setView('settings'); showSettingsSection('rules'); } },
-    { id: 'usage', icon: '$', label: 'Uso IA', title: 'Uso de IA', go: () => { setView('settings'); showSettingsSection('usage'); } }
+    { id: 'modules', icon: '\u25a6', label: 'M\u00f3dul.', title: 'M\u00f3dulos y modelos', go: () => goSettings('modules') },
+    { id: 'usage', icon: '$', label: 'Uso IA', title: 'Uso de IA', go: () => goSettings('usage') }
   ];
   for (const it of items) {
     const on = (it.id === state.view);
@@ -129,7 +135,7 @@ async function renderWelcome() {
       el('li', 'Paso 2: ejecute los ', el('b', 'm\u00f3dulos de revisi\u00f3n'), ' y acepte o rechace los hallazgos.'),
       el('li', 'Paso 3: exporte la traducci\u00f3n con control de cambios y comentarios, o un informe.')),
     el('p.info', 'Junto a cada funci\u00f3n hay un bot\u00f3n ', el('b', '?'), ' que explica al momento c\u00f3mo se usa; F1 abre la ayuda de la pantalla en la que est\u00e9.'),
-    el('p.info', 'Antes de usar la IA, configure al menos un proveedor con su clave en ', el('a', { href: '#', onclick: (e) => { e.preventDefault(); setView('settings'); showSettingsSection('providers'); } }, 'Exportar y ajustes \u203a Proveedores'), '.'));
+    el('p.info', 'Antes de usar la IA, configure al menos un proveedor con su clave en ', el('a', { href: '#', onclick: (e) => { e.preventDefault(); goSettings('providers'); } }, 'Exportar y ajustes \u203a Proveedores'), '.'));
   if (recent.length) {
     box.appendChild(el('h3', { style: { margin: '14px 0 6px', fontSize: '13px' } }, 'Proyectos recientes'));
     const t = el('table.grid');
@@ -205,7 +211,7 @@ async function initServices() {
       const s = sync.getSyncState ? sync.getSyncState() : {};
       if (s.linked && s.state === 'needs_gesture' && sync.saveToSyncFile) {
         try { await sync.saveToSyncFile(); toast('Guardado en el archivo de sincronizaci\u00f3n.', 'ok'); } catch (e) { toast(e.message, 'err'); }
-      } else { setView('settings'); showSettingsSection('sync'); }
+      } else { goSettings('sync'); }
     });
     paint();
     setInterval(() => paint(), 60000);
@@ -308,7 +314,7 @@ async function boot() {
   on('findings', renderRail);
   on('finding', renderRail);
   on('goto', (v) => setView(v));
-  on('goto-settings', (sec) => { setView('settings'); showSettingsSection(sec); });
+  on('goto-settings', (sec) => goSettings(sec));
   await loadData();
   mountMaskView($('#view-mask'), $('#tools'));
   mountReviewView($('#view-review'), $('#tools'));

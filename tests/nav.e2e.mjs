@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 /**
- * nav.e2e.mjs - Segment navigation (as in COMeT Final Check) and the review tools around it:
- *   - sentence offsets; a click marks the sentence and its pair; arrows step through sentences;
- *   - Entities: "Con problemas" by default, "Ver donde no cuadra", the "Emparejar" dialog;
- *   - Review: a finding card marks its exact text and both sentences; labelled filters;
- *   - the findings table window (row click navigates the main window, decisions sync back);
- *   - the "Hallazgos para valorar" Excel (drop-down list, sentence context);
- *   - Settings: the simplified Modules table and the fixed type of a built-in provider.
+ * nav.e2e.mjs - Navigation between the sheets (as in COMeT Final Check) and the tools around it:
+ *   - sentence offsets; a click marks the sentence and its pair; arrows; sentence alignment when the
+ *     two paragraphs do not have the same number of sentences;
+ *   - Entities: "Con problemas" by default; a click on a card goes there (yellow sentences, red glow on
+ *     the entity), also for an entity found on one side only; "Emparejar" with a search box and a
+ *     suggestion chosen in advance; hovering a tag shows only the hidden text and lights its
+ *     counterpart; right click > "Desenmascarar" until another sentence is clicked; no articles;
+ *   - Review: a finding card marks its exact text and both sentences; labelled filters; "Vaciar";
+ *     the table window; the "Hallazgos para valorar" Excel (drop-down list in the right XML order);
+ *   - Settings: no Rules section, the Modules table with "Exigencia", no duplicated content, the fixed
+ *     type of a built-in provider.
  * Builds its own small DOCX pair. Screenshots go to tests/out/nav/. Exit code 1 on failure.
  */
 
@@ -33,14 +37,16 @@ const EN = [
   'The Committee met twice in Geneva. It adopted its report. It also elected its officers.',
   'The Secretary-General spoke. The Secretary-General then left.',
   'In total, 1,250 people attended the session.',
-  'The Committee met again. It decided to act on the basis of the proposal.'
+  'The Committee met again. It decided to act on the basis of the proposal.',
+  'France supported the text. Brazil abstained. Kenya voted against it.'
 ];
 const ES = [
   'Informe de la Comisi\u00f3n',
   'La Comisi\u00f3n se reuni\u00f3 dos veces en Ginebra. Aprob\u00f3 su informe. Tambi\u00e9n eligi\u00f3 a su Mesa.',
   'El Secretario General habl\u00f3 y luego se retir\u00f3.',
   'En total, 1.520 personas asistieron al per\u00edodo de sesiones.',
-  'La Comisi\u00f3n volvi\u00f3 a reunirse. Decidi\u00f3 actuar en base a la propuesta.'
+  'La Comisi\u00f3n volvi\u00f3 a reunirse. Decidi\u00f3 actuar en base a la propuesta.',
+  'Francia apoy\u00f3 el texto y el Brasil se abstuvo. Kenya vot\u00f3 en contra.'
 ];
 const mk = (file, paras) => py('import docx,sys,json\nd=docx.Document()\nfor t in json.loads(sys.argv[2]): d.add_paragraph(t)\nd.save(sys.argv[1])', path.join(OUT, file), JSON.stringify(paras));
 mk('nav_en.docx', EN);
@@ -49,12 +55,13 @@ mk('nav_es.docx', ES);
 async function highlights(page) {
   return page.evaluate(() => {
     const get = (n) => { const h = CSS.highlights.get(n); return h ? Array.from(h).map(r => r.toString()) : []; };
-    return { seg: get('um-seg'), focus: get('um-focus'), flash: document.querySelectorAll('.pane-body .p.flash').length };
+    return { seg: get('um-seg'), focus: get('um-focus'), flash: document.querySelectorAll('.pane-body .p.flash').length,
+      hot: Array.from(document.querySelectorAll('.pane-body .hot')).map(x => x.closest('.pane-body').id + ':' + x.textContent) };
   });
 }
 
-/** Clicks the middle of a word inside the visible sheet `sel`. */
-async function clickWord(page, sel, word) {
+/** Clicks (or right-clicks) the middle of a word inside the visible sheet `sel`. */
+async function clickWord(page, sel, word, button) {
   const pt = await page.evaluate(({ sel, word }) => {
     const host = document.querySelector(sel);
     const w = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
@@ -70,7 +77,7 @@ async function clickWord(page, sel, word) {
     return null;
   }, { sel, word });
   if (!pt) throw new Error('Word not found: ' + word);
-  await page.mouse.click(pt.x, pt.y);
+  await page.mouse.click(pt.x, pt.y, button ? { button } : undefined);
   await page.waitForTimeout(250);
 }
 
@@ -88,7 +95,7 @@ async function main() {
     await page.waitForSelector('.modal', { timeout: 15000 });
     await page.click('.modal-foot .btn');
 
-    // Sentence offsets.
+    // Sentence offsets and alignment.
     const spans = await page.evaluate(async () => {
       const { sentenceSpans } = await import('/app/js/ui/nav.js');
       const t = 'It met.  It adopted its report. It left.';
@@ -102,7 +109,10 @@ async function main() {
     }
     await page.waitForSelector('#view-mask.on .ent', { timeout: 20000 });
 
-    // 1) A click marks the sentence and its pair.
+    const tags = await page.evaluate(async () => (await import('/app/js/state.js')).state.session.ent.entities.map(e => e.tagSrc + '=' + e.tagTgt));
+    ok(tags.length && tags.every(t => { const [a, b] = t.split('='); return a === b && !/\{(el|la|los|las) /.test(b); }), 'Tags carry no article: the same tag on both sides (' + tags.slice(0, 4).join(', ') + ')');
+
+    // 1) A click marks the sentence and its pair; arrows; alignment of 3 sentences with 2.
     await clickWord(page, '#mask-src', 'adopted');
     let h = await highlights(page);
     ok(h.seg.includes('It adopted its report.') && h.seg.includes('Aprob\u00f3 su informe.'), 'Click on a source sentence marks it and its Spanish pair (' + JSON.stringify(h.seg) + ')');
@@ -111,31 +121,59 @@ async function main() {
     await page.waitForTimeout(300);
     h = await highlights(page);
     ok(h.seg.includes('Tambi\u00e9n eligi\u00f3 a su Mesa.') && h.seg.includes('It also elected its officers.'), 'Right arrow goes to the next sentence pair (' + JSON.stringify(h.seg) + ')');
-    await clickWord(page, '#mask-tgt', 'retir');
+    await clickWord(page, '#mask-src', 'abstained');
     h = await highlights(page);
-    // (In the masked view the marked text holds the tag pills: "El elCARGO1 hablo...")
-    ok(h.seg.length === 1 && /habl\u00f3 y luego se retir\u00f3\.$/.test(h.seg[0]) && h.flash === 1, 'Different sentence counts: the sentence is marked and the other paragraph is marked whole (' + JSON.stringify(h) + ')');
+    ok(h.seg.length === 2 && /abstained\.$/.test(h.seg[0]) && /se abstuvo\.$/.test(h.seg[1]) && /apoy/.test(h.seg[1]),
+      'Three sentences against two: the counterpart sentence is found by alignment, not the whole paragraph (' + JSON.stringify(h.seg) + ')');
 
-    // 2) Entities: problems first, "Ver donde no cuadra", "Emparejar".
+    // 2) Entities: problems first; a card click goes there with a red glow.
     const segOn = await page.textContent('#mask-bubbles .seg2 button.on');
     ok(/Con problemas/.test(segOn), 'The entity list starts with the ones that have a problem (' + segOn.trim() + ')');
+    const onlyTgt = page.locator('#mask-entities .ent', { hasText: 'T: 1.520' }).first();
+    await onlyTgt.click();
+    await page.waitForTimeout(500);
+    h = await highlights(page);
+    ok(h.seg.some(x => /personas asistieron al per\u00edodo de sesiones\.$/.test(x)) && h.seg.some(x => /people attended the session\.$/.test(x)) &&
+      h.hot.some(x => /^mask-tgt:NUM/.test(x)),
+      'Card of an entity found only in the translation: both sentences in yellow and the tag with a red glow (' + JSON.stringify(h) + ')');
+    await page.screenshot({ path: path.join(OUT, '2-card.png') });
     const cargo = page.locator('#mask-entities .ent', { hasText: 'Secretary-General' }).first();
     ok(/Aparece 2 veces en el original y 1 en la traducci/.test(await cargo.textContent()), 'The card explains the count difference');
-    await cargo.locator('.where button.primary').click();
+    await cargo.click();
     await page.waitForTimeout(400);
     h = await highlights(page);
-    ok(h.seg.length === 3 && /spoke\.$/.test(h.seg[0]) && /then left\.$/.test(h.seg[1]) && /habl\u00f3 y luego se retir\u00f3\.$/.test(h.seg[2]),
-      '"Ver donde no cuadra" marks the sentences of both sides (' + JSON.stringify(h.seg) + ')');
-    ok(/1\/1/.test(await page.locator('#mask-entities .ent', { hasText: 'Secretary-General' }).first().textContent()), 'The card says which place is shown (1/1)');
-    await page.screenshot({ path: path.join(OUT, '2-where.png') });
-    const num = page.locator('#mask-entities .ent', { hasText: '1,250' }).first();
-    await num.click();   // the buttons show on the selected card
+    ok(h.seg.length === 3 && h.hot.filter(x => /^mask-src:CARGO/.test(x)).length === 2 && h.hot.some(x => /^mask-tgt:CARGO/.test(x)),
+      'Card of a count difference: the sentences of both sides and every occurrence glowing (' + JSON.stringify(h) + ')');
+
+    // Hover: the tooltip is the hidden text only; the counterpart glows.
+    const pill = page.locator('#mask-src .tk', { hasText: /^CARGO/ }).first();
+    ok(await pill.getAttribute('title') === 'Secretary-General', 'The tooltip of a tag is only what it hides');
+    await pill.hover();
+    await page.waitForTimeout(200);
+    ok(await page.locator('#mask-tgt .tk.glow').count() >= 1, 'Hovering a tag lights its counterpart in the other sheet');
+    await page.mouse.move(5, 5);
+
+    // Right click > Desenmascarar: real text until another sentence is clicked.
+    await clickWord(page, '#mask-src', 'spoke', 'right');
+    await page.click('.menu .mi:has-text("Desenmascarar")');
+    await page.waitForTimeout(300);
+    const revealed = await page.$$eval('.pane-body .ent-orig.revealed', ns => ns.map(n => n.closest('.pane-body').id + ':' + n.textContent));
+    ok(revealed.some(x => x === 'mask-src:Secretary-General') && revealed.some(x => x === 'mask-tgt:Secretario General'), 'Desenmascarar shows the real text of the sentence and of its pair (' + revealed.join(', ') + ')');
+    await page.screenshot({ path: path.join(OUT, '3-reveal.png') });
+    await clickWord(page, '#mask-src', 'twice');
+    ok(await page.locator('.pane-body .ent-orig.revealed').count() === 0, 'A click on another sentence masks it again');
+
+    // Emparejar: search box and the likely counterpart chosen in advance.
+    const num = page.locator('#mask-entities .ent', { hasText: 'O: 1,250' }).first();
+    await num.click();
     await page.locator('#mask-entities .ent.sel button:has-text("Emparejar")').click();
     await page.waitForSelector('.modal:has-text("Emparejar")');
-    const firstRow = await page.textContent('.pairlist .pairrow');
-    ok(/1\.520/.test(firstRow) && /Encaja/.test(firstRow), 'Emparejar proposes first the figure found only in the other language (' + firstRow.replace(/\s+/g, ' ').trim() + ')');
-    await page.screenshot({ path: path.join(OUT, '3-pair.png') });
-    await page.click('.pairlist .pairrow input');
+    const pre = await page.textContent('.pairlist .pairrow.on');
+    ok(/1\.520/.test(pre) && /Sugerida/.test(pre), 'Emparejar chooses in advance the figure without a pair in the same paragraph (' + pre.replace(/\s+/g, ' ').trim() + ')');
+    await page.fill('.modal input[type=search]', 'zzz');
+    ok(await page.locator('.pairlist .pairrow').count() === 0, 'The search box filters the list');
+    await page.fill('.modal input[type=search]', '');
+    await page.screenshot({ path: path.join(OUT, '4-pair.png') });
     await page.click('.modal-foot .btn.primary');
     await page.waitForTimeout(500);
     const paired = await page.evaluate(async () => {
@@ -145,59 +183,51 @@ async function main() {
     });
     ok(paired === 'ok:1.520', 'After Emparejar both figures are one entity without problems (' + paired + ')');
 
-    // 3) Review: a finding card goes to the exact text and both sentences.
+    // 3) Review: injected findings (no AI here), card -> exact text and both sentences.
     await page.click('.step[data-view="review"]');
     await page.waitForSelector('#rv-modules .mchip');
-    ok(await page.locator('#rv-modules .mchip[data-mod="local"]:has-text("Comprobaciones sin IA")').count() === 1, 'The module bar names the free checks "Comprobaciones sin IA"');
-    await page.click('#rv-modules .mchip[data-mod="local"] .run');
-    await page.waitForSelector('#rv-modules .mchip[data-mod="local"].done', { timeout: 30000 });
+    ok(await page.locator('#rv-modules .mchip[data-mod="local"]').count() === 0, 'No module without AI any more');
+    const fid = await page.evaluate(async () => {
+      const { state, addFindings } = await import('/app/js/state.js');
+      const { anchorItem } = await import('/app/js/review/findings.js');
+      const s = state.session;
+      const unitByN = new Map(s.units.map(u => [u.n, u]));
+      const n = s.units.find(u => u.tgtPara !== null && /en base a/.test(s.tgt.paras[u.tgtPara].text)).n;
+      const a = anchorItem({ unit: n, cat: 'EST', sev: 'MEN', quote: 'en base a', suggestion: 'sobre la base de', reason: 'Calco.' }, { session: s, unitByN, module: 'style', source: 'ai', model: 'prueba' });
+      const b = anchorItem({ unit: n, cat: 'MIST', sev: 'MAY', quote: 'propuesta', suggestion: 'proposici\u00f3n', reason: 'Prueba.' }, { session: s, unitByN, module: 'fidelity', source: 'ai', model: 'prueba' });
+      addFindings([a, b]);
+      return a.id;
+    });
+    await page.waitForSelector('#rv-findings .iss');
     const labels = await page.$$eval('#rv-bubbles .ffield > span', s => s.map(x => x.textContent));
     ok(labels.join(',') === 'Estado,M\u00f3dulo,Gravedad', 'Findings are filtered with three labelled lists (' + labels.join(', ') + ')');
-    const card = page.locator('#rv-findings .iss', { hasText: 'en base a' }).first();
-    ok(await card.count() === 1, 'The rule "en base a" produced a finding');
-    const fid = await card.getAttribute('data-id');
+    const card = page.locator('#rv-findings .iss[data-id="' + fid + '"]');
     ok(/\u00a75\.2/.test(await card.textContent()), 'The card shows paragraph and sentence (\u00a75.2)');
     await card.click();
     await page.waitForTimeout(500);
     h = await highlights(page);
     ok(h.focus.includes('en base a') && h.seg.includes('Decidi\u00f3 actuar en base a la propuesta.') && h.seg.includes('It decided to act on the basis of the proposal.'),
       'A finding marks its exact text and the sentence pair (' + JSON.stringify(h) + ')');
-    await page.screenshot({ path: path.join(OUT, '4-finding.png') });
-    await page.selectOption('select[data-filter="state"]', 'all');
-    ok(await page.locator('#rv-findings .iss').count() >= 1, 'The state filter can show every finding');
-    await page.selectOption('select[data-filter="state"]', 'open');
+    await page.screenshot({ path: path.join(OUT, '5-finding.png') });
 
-    // 4) The table window.
+    // The table window.
     const [popup] = await Promise.all([page.waitForEvent('popup'), page.click('#view-review button:has-text("Tabla")')]);
     await popup.waitForSelector('tr[data-id]');
-    const rows = await popup.locator('tr[data-id]').count();
-    const openN = await page.evaluate(async () => (await import('/app/js/state.js')).state.findings.filter(f => f.state === 'open').length);
-    ok(rows === openN, 'The table window lists the pending findings (' + rows + '/' + openN + ')');
+    ok(await popup.locator('tr[data-id]').count() === 2, 'The table window lists the pending findings');
     const row = popup.locator('tr[data-id="' + fid + '"]');
     ok(/en base a/.test(await row.locator('td.txt').nth(1).textContent()) && /It decided to act/.test(await row.locator('td.txt').nth(0).textContent()),
       'A row shows the original and the translation at sentence level');
-    await page.click('#rv-findings .iss:not([data-id="' + fid + '"])').catch(() => {});
     await row.locator('td.txt').nth(1).click();
     await page.waitForTimeout(400);
-    const selId = await page.getAttribute('#rv-findings .iss.sel', 'data-id');
-    ok(selId === fid, 'Clicking a row selects that finding in the main window');
-    await popup.screenshot({ path: path.join(OUT, '5-table.png') });
-    await row.locator('button.ok').click().catch(() => {});
+    ok(await page.getAttribute('#rv-findings .iss.sel', 'data-id') === fid, 'Clicking a row selects that finding in the main window');
+    await row.locator('button.ok').click();
     await page.waitForTimeout(400);
     const st = await page.evaluate(async (id) => (await import('/app/js/state.js')).state.findings.find(f => f.id === id).state, fid);
-    ok(st === 'accepted' || st === 'open', 'A decision taken in the table reaches the main window (' + st + ')');
-    if (st === 'open') {
-      // No proposal to accept: reject it instead.
-      await popup.locator('tr[data-id="' + fid + '"] button.no').click();
-      await page.waitForTimeout(300);
-    }
-    const st2 = await page.evaluate(async (id) => (await import('/app/js/state.js')).state.findings.find(f => f.id === id).state, fid);
-    ok(st2 !== 'open', 'The finding left the pending list after the decision in the table (' + st2 + ')');
-    ok(await popup.locator('tr[data-id="' + fid + '"]').count() === 0, 'The table redraws itself after the change');
+    ok(st === 'accepted' && await popup.locator('tr[data-id="' + fid + '"]').count() === 0, 'A decision taken in the table reaches the main window and the table redraws itself');
+    await popup.screenshot({ path: path.join(OUT, '6-table.png') });
     await popup.close();
 
-    // 5) The Excel to judge the findings.
-    await page.selectOption('select[data-filter="state"]', 'all');
+    // The Excel to judge the findings: opens in Excel (drop-down list before ignoredErrors).
     await page.click('#tools button:has-text("Exportar")');
     await page.click('.menu .mi:has-text("Hallazgos para valorar")');
     await page.waitForSelector('.modal:has-text("Hallazgos para valorar")');
@@ -206,28 +236,40 @@ async function main() {
     const xl = path.join(OUT, 'valorar.xlsx');
     await dl.saveAs(xl);
     const chk = py([
-      'import openpyxl,sys', 'wb=openpyxl.load_workbook(sys.argv[1])', 'ws=wb["Hallazgos"]',
+      'import openpyxl,sys,zipfile,re', 'wb=openpyxl.load_workbook(sys.argv[1])', 'ws=wb["Hallazgos"]',
       'head=[c.value for c in ws[1]]',
       'dv=[d.formula1 for d in ws.data_validations.dataValidation]',
       'rows=[[c.value for c in r] for r in ws.iter_rows(min_row=2)]',
       'hit=[r for r in rows if r[8]=="en base a"]',
+      'x=zipfile.ZipFile(sys.argv[1]).read("xl/worksheets/sheet1.xml").decode("utf-8")',
+      // Schema order of CT_Worksheet for the elements present.
+      'order=["sheetData","autoFilter","mergeCells","conditionalFormatting","dataValidations","hyperlinks","pageMargins","pageSetup","ignoredErrors"]',
+      'pos=[x.find("<"+t) for t in order if x.find("<"+t)>=0]',
       'print(",".join(wb.sheetnames)); print("valoracion" if "Su valoraci\\u00f3n" in head else "-"); print("dv" if any("Falso positivo" in (f or "") for f in dv) else "-")',
-      'print(hit[0][12] if hit else "-"); print(hit[0][1] if hit else "-")'].join('\n'), xl).trim().split('\n');
+      'print(hit[0][12] if hit else "-"); print(hit[0][1] if hit else "-"); print("order-ok" if pos==sorted(pos) else "order-bad")'].join('\n'), xl).trim().split('\n');
     ok(chk[0] === 'Hallazgos,Instrucciones' && chk[1] === 'valoracion' && chk[2] === 'dv', 'Excel to judge: two sheets, the column "Su valoraci\u00f3n" and its drop-down list (' + chk.slice(0, 3).join(' | ') + ')');
-    ok(chk[3] === 'It decided to act on the basis of the proposal.' && chk[4] === '5.2', 'Excel to judge: the original sentence and its place (' + chk.slice(3).join(' | ') + ')');
+    ok(chk[3] === 'It decided to act on the basis of the proposal.' && chk[4] === '5.2', 'Excel to judge: the original sentence and its place (' + chk.slice(3, 5).join(' | ') + ')');
+    ok(chk[5] === 'order-ok', 'Excel to judge: the XML elements are in the order Excel requires (no "repair" message)');
 
-    // 6) Settings: simple Modules table; fixed type of a built-in provider.
-    await page.click('.step[data-view="settings"]');
-    await page.click('.settings-nav button[data-sec="modules"]');
+    // Vaciar.
+    await page.click('#view-review button:has-text("Vaciar")');
+    await page.waitForSelector('.modal:has-text("Vaciar los hallazgos")');
+    await page.click('.modal-foot .btn.danger');
+    await page.waitForTimeout(300);
+    ok(await page.evaluate(async () => (await import('/app/js/state.js')).state.findings.length) === 0, '"Vaciar" deletes the findings to start again');
+
+    // 4) Settings: no Rules, the Modules table with Exigencia, no duplicated content.
+    await page.click('#rail button[title="M\u00f3dulos y modelos"]');
     await page.waitForSelector('.modtable');
-    const deep = await page.locator('.modtable select[data-module="fidelity"][data-role="deep"]').count();
-    const semOff = await page.locator('#view-settings select.inp >> nth=0').evaluate(() => {
-      const s = Array.from(document.querySelectorAll('#view-settings select.inp')).find(x => Array.from(x.options).some(o => o.value === 'local'));
-      return s ? s.value : 'none';
-    });
-    ok(deep === 1 && semOff === 'off', 'Modules: model per module in one table; the semantic extra is off by default (' + deep + ', ' + semOff + ')');
-    ok(!/Ortograf/.test(await page.textContent('.modtable')), 'No spelling module any more');
-    await page.screenshot({ path: path.join(OUT, '6-modules.png'), fullPage: true });
+    const secs = await page.$$eval('.settings-nav button', bs => bs.map(b => b.dataset.sec));
+    ok(!secs.includes('rules'), 'No Rules section any more (' + secs.join(', ') + ')');
+    const strict = await page.$eval('.modtable select[data-strict="fidelity"]', s => s.value);
+    ok(strict === 'grave' && await page.locator('.modtable select[data-module="fidelity"][data-role="deep"]').count() === 1, 'Modules: model and Exigencia per module; Fidelity asks only for what matters (' + strict + ')');
+    await page.click('.settings-nav button[data-sec="lists"]');
+    await page.click('.settings-nav button[data-sec="lists"]');
+    await page.waitForTimeout(400);
+    ok(await page.locator('.settings-body .card').count() === 1, 'A section clicked twice is drawn once (no duplicated content)');
+    await page.screenshot({ path: path.join(OUT, '7-modules.png'), fullPage: true });
     await page.click('.settings-nav button[data-sec="providers"]');
     await page.waitForSelector('.pcard');
     await page.locator('.pcard', { hasText: 'Gemini' }).locator('button:has-text("Editar")').click();

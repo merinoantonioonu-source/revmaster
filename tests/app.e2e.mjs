@@ -39,8 +39,6 @@ async function newApp(browser, base) {
   await page.goto(base + '/app/index.html');
   await page.waitForSelector('.modal', { timeout: 15000 });   // the guide on first run
   await page.click('.modal-foot .btn');
-  // The semantic check is an optional extra, off by default (tested in phase6.e2e.mjs).
-  await page.evaluate(async () => { const mc = await import('/app/js/review/module-config.js'); await mc.saveModuleConfig('local', { semantic: 'off' }); });
   return { ctx, page, errors };
 }
 
@@ -79,9 +77,9 @@ async function main() {
       return state.session.ent.entities.map(e => ({ tagSrc: e.tagSrc, tagTgt: e.tagTgt, status: e.status, src: Object.keys(e.srcForms), tgt: Object.keys(e.tgtForms) }));
     });
     const ag = ents.find(e => e.tgt.includes('Asamblea General'));
-    ok(!!ag && /^\{la ORGANO\d+\}$/.test(ag.tagTgt), 'General Assembly tagged as {la ORGANOn} (' + (ag && ag.tagTgt) + ')');
+    ok(!!ag && /^\{ORGANO\d+\}$/.test(ag.tagTgt) && ag.tagTgt === ag.tagSrc, 'General Assembly tagged as {ORGANOn}, the same tag on both sides (' + (ag && ag.tagTgt) + ')');
     const sg = ents.find(e => e.tgt.some(f => /Secretario General/.test(f)));
-    ok(!!sg && /^\{el CARGO\d+\}$/.test(sg.tagTgt) && sg.src.some(f => /Secretary-General/.test(f)), 'Secretary-General paired with Secretario General (' + (sg && sg.tagTgt) + ')');
+    ok(!!sg && /^\{CARGO\d+\}$/.test(sg.tagTgt) && sg.src.some(f => /Secretary-General/.test(f)), 'Secretary-General paired with Secretario General (' + (sg && sg.tagTgt) + ')');
     const n1250 = ents.find(e => e.src.includes('1,250'));
     ok(!!n1250 && n1250.tgt.includes('1.250'), '1,250 and 1.250 share one NUM tag');
     const date = ents.find(e => e.src.some(f => /12 December 2022/.test(f)));
@@ -90,7 +88,7 @@ async function main() {
     // Masked export of the target
     const maskedPath = await download(page, () => menuItem(page, 'Exportar enmascarado', 'Traducci\u00f3n enmascarada'), 'masked_es.docx');
     const maskedText = py('import docx,sys\nd=docx.Document(sys.argv[1])\nprint("\\n".join(p.text for p in d.paragraphs))\nfor t in d.tables:\n  for r in t.rows: print(" | ".join(c.text for c in r.cells))', maskedPath);
-    ok(/\{la ORGANO\d+\}/.test(maskedText) && !/Asamblea General/.test(maskedText), 'Masked DOCX has tags and no "Asamblea General"');
+    ok(/\{ORGANO\d+\}/.test(maskedText) && !/Asamblea General/.test(maskedText), 'Masked DOCX has tags and no "Asamblea General"');
     ok(!/1\.250/.test(maskedText), 'Masked DOCX hides the figures');
 
     // External AI text
@@ -99,7 +97,7 @@ async function main() {
       const { buildExternalText } = await import('/app/js/review/external.js');
       return buildExternalText(state.session, {});
     });
-    ok(!/Asamblea General|Secretario General|1\.250/.test(ext) && /\{la ORGANO\d+\}/.test(ext), 'Text for external AI is masked');
+    ok(!/Asamblea General|Secretario General|1\.250/.test(ext) && /\{ORGANO\d+\}/.test(ext) && !/\{(el|la|los|las) /.test(ext), 'Text for external AI is masked, tags without articles');
 
     // Provider set-up (mock) and units of interest
     const info = await page.evaluate(async () => {
@@ -123,8 +121,10 @@ async function main() {
         { match: 'GRUPO ', response: 'FIN 3' },
         { match: 'DOCUMENTO: resoluci', response: 'FIN 0' },
         { match: 'P\u00c1RRAFOS DE LA TRADUCCI\u00d3N', response: info.uGram + ' | GRA | MEN | fueron desplegado | fueron desplegados | Concordancia con \u00abfuncionarios\u00bb.\n' +
-          info.uDec + ' | EST | SUG | asignar | destinar | Verbo m\u00e1s preciso.\nFIN 20' },
-        { match: 'O: ', response: info.uReq + ' | MIST | MAY | presente | presente | Revisar el modo verbal.\n' +
+          info.uDec + ' | EST | MEN | asignar | destinar | Verbo m\u00e1s preciso.\n' +
+          info.uDec + ' | GRA | SUG | asignar | asignar | Igual: se descarta.\nFIN 20' },
+        { match: 'O: ', response: info.uReq + ' | MIST | MAY | presente | presentara | Revisar el modo verbal.\n' +
+          info.uReq + ' | MIST | MEN | informe | memoria | Matiz menor: se descarta por la exigencia.\n' +
           info.uDec + ' | OMI | MAY |  | tras \u00abprograma\u00bb: previsto | Falta un matiz.\nFIN 20' }
       ],
       def: 'FIN 0'
@@ -158,6 +158,10 @@ async function main() {
     const gram = res.find(f => f.module === 'grammar' && /desplegado/.test(f.quote || ''));
     ok(!!gram && gram.start !== null, 'Grammar finding anchored in the real text');
     ok(res.some(f => f.state === 'discarded' || f.verified), 'Verifier verdicts applied');
+    ok(!res.some(f => f.module === 'fidelity' && f.sev === 'MEN'), 'Fidelity asks only for important errors: a minor one is dropped');
+    ok(fused.length >= 1 && /EXIGENCIA/.test(fused[0].system) && !/art\u00edculo que va DENTRO/.test(fused[0].system), 'Prompts carry the strictness and no article explanation');
+    const bil = log.filter(r => /\nO: /.test(r.prompt));
+    ok(bil.length >= 1 && /FIDELIDAD DE SENTIDO/.test(bil[0].system) && bil[0].system.length < 4500, 'Fidelity prompt is about meaning and compact (' + (bil[0] ? bil[0].system.length : 0) + ' characters)');
     await page.screenshot({ path: path.join(OUT, '3-review.png') });
 
     // Accept the grammar finding through the UI, then export with tracked changes and comments
@@ -221,7 +225,7 @@ async function main() {
     await page.waitForSelector('.modal:has-text("Enmascarar selecci")');
     await page.fill('.modal input.inp', 'Primera l\u00ednea');
     // The translation is already masked (Alt+E above): typing its form selects that entity.
-    const autoPair = await page.locator('.modal select.inp').nth(2).inputValue();
+    const autoPair = await page.$eval('.modal .pairrow.on', r => r.dataset.key || '').catch(() => '');
     ok(!!autoPair, 'Typing an already masked translation pairs it automatically (' + autoPair + ')');
     await page.click('.modal-foot .btn.primary');
     await page.waitForTimeout(400);
@@ -236,44 +240,15 @@ async function main() {
     const extF = await page.evaluate(async () => { const { state } = await import('/app/js/state.js'); return state.findings.filter(f => f.source === 'external').length; });
     ok(extF === 1, 'External AI answer imported as a finding (a proposal identical to its quote is dropped)');
 
-    // A user rule created in the editor is applied by layer 0
-    await page.click('.step[data-view="settings"]');
-    await page.click('.settings-nav button[data-sec="rules"]');
-    await page.click('.settings-body button:has-text("+ Nueva regla")');
-    await page.waitForSelector('.modal:has-text("Nueva regla")');
-    await page.selectOption('.modal select.inp >> nth=0', 'forbid');
-    await page.fill('.modal input[placeholder="actores"]', 'septuag\u00e9simo noveno');
-    await page.fill('.modal input[placeholder="partes interesadas"]', '79.\u00ba');
-    await page.click('.modal-foot .btn.primary');
-    await page.waitForTimeout(400);
-    await page.click('.step[data-view="review"]');
-    await page.click('#rv-modules .mchip[data-mod="local"] .run');
-    await page.waitForTimeout(1500);
-    const ruleHit = await page.evaluate(async () => { const { state } = await import('/app/js/state.js'); return state.findings.some(f => f.sub === 'rules' && /septuag/.test(f.quote)); });
-    ok(ruleHit, 'New user rule detected by layer 0');
-
     // Settings screens render
     await page.click('.step[data-view="settings"]');
-    for (const sec of ['providers', 'modules', 'rules', 'lists', 'sync', 'usage', 'privacy', 'export']) {
+    for (const sec of ['providers', 'modules', 'lists', 'sync', 'usage', 'privacy', 'export']) {
       await page.click('.settings-nav button[data-sec="' + sec + '"]');
       await page.waitForTimeout(300);
       const err = await page.$('.settings-body .note.err');
       ok(!err, 'Settings section renders: ' + sec);
       await page.screenshot({ path: path.join(OUT, '4-settings-' + sec + '.png') });
     }
-    // Built-in rule edit + restore
-    const ruleRes = await page.evaluate(async () => {
-      const R = await import('/app/js/rules/rules.js');
-      const rules = await R.getEffectiveRules();
-      const d = rules.find(r => r.status === 'serie');
-      if (!d) return 'no-default-rules';
-      await R.upsertRule(Object.assign({}, d, { note: 'Editada en la prueba' }));
-      const after = (await R.getEffectiveRules()).find(r => r.id === d.id);
-      await R.restoreDefault(d.id);
-      const restored = (await R.getEffectiveRules()).find(r => r.id === d.id);
-      return after.status + '/' + restored.status;
-    });
-    ok(ruleRes === 'mod/serie', 'Built-in rule editable and restorable (' + ruleRes + ')');
     const usage = await page.evaluate(async () => { const u = await import('/app/js/ai/usage.js'); return (await u.readUsageRows()).length; });
     ok(usage > 0, 'Usage recorded (' + usage + ' rows)');
     // Project file round trip (.umbra) and dark mode
@@ -298,7 +273,7 @@ async function main() {
     ok(!errors.length, 'No console errors in the DOCX flow' + (errors.length ? ': ' + errors.slice(0, 5).join(' || ') : ''));
     await ctx.close();
 
-    // ================= Layer 0 on a document with deliberate errors
+    // ================= Masking of a document with deliberate errors (the review has no AI-free layer any more)
     {
       const { ctx: c1, page: p1, errors: e1 } = await newApp(browser, base);
       await load(p1, 'e2e_en.docx', 'e2e_es.docx');
@@ -306,21 +281,8 @@ async function main() {
       ok(nopair >= 2, 'Masking shows the figures without a pair (1,250 vs 1.520): ' + nopair);
       await p1.click('.step[data-view="review"]');
       await p1.waitForSelector('#rv-modules .mchip');
-      await p1.click('#rv-modules .mchip[data-mod="local"] .run');
-      await p1.waitForSelector('#rv-modules .mchip[data-mod="local"].done', { timeout: 30000 });
-      const loc = await p1.evaluate(async () => {
-        const { state } = await import('/app/js/state.js');
-        return state.findings.filter(f => f.module === 'local').map(f => ({ sub: f.sub, cat: f.cat, sev: f.sev, quote: f.quote, sug: f.suggestion }));
-      });
-      const has = (sub, pred) => loc.some(f => f.sub === sub && (!pred || pred(f)));
-      ok(has('numbers', f => f.sev === 'CRI' && f.quote === '1.520' && f.sug === '1.250'), 'Layer 0: different figure 1.520 -> 1.250');
-      ok(has('parallel', f => /Desarrollo/.test(f.quote)), 'Layer 0: list item breaking the parallelism');
-      ok(has('hygiene', f => /y y/.test(f.quote)), 'Layer 0: doubled word');
-      ok(has('untranslated'), 'Layer 0: untranslated paragraph');
-      ok(has('sentences') || has('length'), 'Layer 0: possible omission (sentences or length)');
-      ok(has('rules', f => /en base a/i.test(f.quote)), 'Layer 0: built-in rule "en base a"');
-      await p1.screenshot({ path: path.join(OUT, '3b-layer0.png') });
-      ok(!e1.length, 'No console errors in the layer-0 flow' + (e1.length ? ': ' + e1.slice(0, 3).join(' || ') : ''));
+      ok(await p1.locator('#rv-modules .mchip[data-mod="local"]').count() === 0, 'No module without AI in the review bar');
+      ok(!e1.length, 'No console errors in the second document' + (e1.length ? ': ' + e1.slice(0, 3).join(' || ') : ''));
       await c1.close();
     }
     // ================= PPTX

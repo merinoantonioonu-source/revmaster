@@ -89,15 +89,100 @@ export function peerPid(session, side, pid) {
   return o === undefined ? null : o;
 }
 
-/** The sentence paired with sentence `index` of a paragraph -> { pid, index|null } (index null: the
- *  sentence counts differ, so only the paragraph is known), or null when the paragraph has no pair. */
-export function peerSentence(session, side, pid, index) {
+/**
+ * Sentence alignment of a paragraph pair -> for each sentence of `side`, the indexes of its
+ * counterpart(s) on the other side ([] = no counterpart). Same number of sentences: one to one, by
+ * position (as Final Check). Otherwise a small dynamic programme (1-1, 1-2, 2-1, 1-0, 0-1) on the
+ * lengths, with the entities (tags) shared by the two sentences as anchors.
+ */
+export function alignSentences(session, side, pid, opid) {
+  const other = side === 'src' ? 'tgt' : 'src';
+  const A = sentencesOf(session, side, pid), B = sentencesOf(session, other, opid);
+  if (!session.__navAlign || session.__navAlign.units !== session.units) session.__navAlign = { units: session.units, map: new Map() };
+  const ck = side + ':' + pid + '|' + opid + '|' + A.length + ':' + B.length;
+  const hit = session.__navAlign.map.get(ck);
+  if (hit) return hit;
+  let out;
+  if (A.length === B.length) out = A.map((_, i) => [i]);
+  else if (!A.length || !B.length) out = A.map(() => []);
+  else {
+    const keysIn = (sd, p, spans) => spans.map(sp => {
+      const set = new Set();
+      const occ = session.ent && session.ent.occ && session.ent.occ[sd] ? (session.ent.occ[sd].get(p) || []) : [];
+      for (const o of occ) if (o.start >= sp.start && o.start < sp.end) set.add(o.key);
+      return set;
+    });
+    const ka = keysIn(side, pid, A), kb = keysIn(other, opid, B);
+    const la = A.map(x => x.end - x.start), lb = B.map(x => x.end - x.start);
+    const ratio = (lb.reduce((x, y) => x + y, 0) + 1) / (la.reduce((x, y) => x + y, 0) + 1);
+    const sum = (arr, i0, i1) => { let t = 0; for (let i = i0; i < i1; i++) t += arr[i]; return t; };
+    const union = (arr, i0, i1) => { const u = new Set(); for (let i = i0; i < i1; i++) for (const k of arr[i]) u.add(k); return u; };
+    const cost = (i0, i1, j0, j1) => {
+      if (i1 === i0 || j1 === j0) return 3.5;   // a sentence without counterpart
+      const a = sum(la, i0, i1) * ratio, b = sum(lb, j0, j1);
+      let c = Math.abs(Math.log((b + 1) / (a + 1))) * 3 + ((i1 - i0) + (j1 - j0) > 2 ? 0.7 : 0);
+      const sa = union(ka, i0, i1), sb = union(kb, j0, j1);
+      let shared = 0;
+      for (const k of sa) if (sb.has(k)) shared++;
+      c += ((sa.size - shared) + (sb.size - shared)) * 0.6 - shared * 1.5;
+      return c;
+    };
+    const n = A.length, m = B.length, INF = 1e9;
+    const D = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(INF));
+    const P = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(null));
+    D[0][0] = 0;
+    const moves = [[1, 1], [1, 2], [2, 1], [1, 0], [0, 1]];
+    for (let i = 0; i <= n; i++) for (let j = 0; j <= m; j++) {
+      if (D[i][j] >= INF) continue;
+      for (const [di, dj] of moves) {
+        const ni = i + di, nj = j + dj;
+        if (ni > n || nj > m) continue;
+        const c = D[i][j] + cost(i, ni, j, nj);
+        if (c < D[ni][nj]) { D[ni][nj] = c; P[ni][nj] = [i, j]; }
+      }
+    }
+    out = A.map(() => []);
+    let i = n, j = m;
+    while (i > 0 || j > 0) {
+      const pr = P[i][j];
+      if (!pr) break;
+      for (let x = pr[0]; x < i; x++) for (let y = pr[1]; y < j; y++) out[x].push(y);
+      i = pr[0]; j = pr[1];
+    }
+    for (const l of out) l.sort((x, y) => x - y);
+  }
+  session.__navAlign.map.set(ck, out);
+  return out;
+}
+
+/** The counterpart of sentence `index` -> { pid, list:[indexes] } ([] = only the paragraph is known),
+ *  or null when the paragraph has no counterpart at all. */
+export function sentencePeers(session, side, pid, index) {
   const other = side === 'src' ? 'tgt' : 'src';
   const opid = peerPid(session, side, pid);
   if (opid === null) return null;
-  const mine = sentencesOf(session, side, pid).length;
-  const theirs = sentencesOf(session, other, opid).length;
-  return { pid: opid, index: mine && mine === theirs ? index : null };
+  if (index === null || index === undefined || index < 0) return { pid: opid, list: [] };
+  const al = alignSentences(session, side, pid, opid);
+  return { pid: opid, list: (al[index] || []).filter(i => i < sentencesOf(session, other, opid).length) };
+}
+
+/** Compatibility: the first counterpart sentence -> { pid, index|null }. */
+export function peerSentence(session, side, pid, index) {
+  const p = sentencePeers(session, side, pid, index);
+  return p ? { pid: p.pid, index: p.list.length ? p.list[0] : null } : null;
+}
+
+/** For a unit without a paragraph on `side` (text added or left out): the closest paragraph of that
+ *  side, looking back first (as Final Check), then forward. */
+export function nearestPara(session, side, unitIdx) {
+  const key = side === 'src' ? 'srcPara' : 'tgtPara';
+  for (let d = 1; d <= 30; d++) {
+    for (const k of [unitIdx - d, unitIdx + d]) {
+      const u = session.units[k];
+      if (u && u[key] !== null && u[key] !== undefined) return u[key];
+    }
+  }
+  return null;
 }
 
 /**
@@ -109,25 +194,29 @@ export function findingPlace(session, f) {
   const u = session.units[f.unit];
   if (!u) return null;
   const out = { unit: u.idx, tgtPid: u.tgtPara, srcPid: u.srcPara, tgtIndex: null, srcIndex: null, label: String(u.n) };
+  let tgtList = null, srcList = null;
   if (u.tgtPara !== null && u.tgtPara !== undefined && f.start !== null && f.start !== undefined) {
     out.tgtIndex = sentenceAt(sentencesOf(session, 'tgt', u.tgtPara), f.start);
-    const peer = peerSentence(session, 'tgt', u.tgtPara, out.tgtIndex);
-    if (peer) out.srcIndex = peer.index;
+    const peer = sentencePeers(session, 'tgt', u.tgtPara, out.tgtIndex);
+    if (peer && peer.list.length) { srcList = peer.list; out.srcIndex = peer.list[0]; }
   } else if (u.srcPara !== null && u.srcPara !== undefined && f.srcStart !== null && f.srcStart !== undefined) {
     out.srcIndex = sentenceAt(sentencesOf(session, 'src', u.srcPara), f.srcStart);
-    const peer = peerSentence(session, 'src', u.srcPara, out.srcIndex);
-    if (peer) out.tgtIndex = peer.index;
+    const peer = sentencePeers(session, 'src', u.srcPara, out.srcIndex);
+    if (peer && peer.list.length) { tgtList = peer.list; out.tgtIndex = peer.list[0]; }
   }
   const idx = out.tgtIndex !== null ? out.tgtIndex : out.srcIndex;
   if (idx !== null && idx >= 0) out.label = u.n + '.' + (idx + 1);
-  // The text of the sentence (or of the whole paragraph) and where it starts in the paragraph.
-  const cut = (side, pid, i) => {
+  // The text of the sentence(s) (or of the whole paragraph) and where it starts in the paragraph.
+  const cut = (side, pid, list) => {
     const text = paraText(session, side, pid);
-    const sp = (i === null || i < 0) ? null : sentencesOf(session, side, pid)[i];
-    return sp ? { text: text.slice(sp.start, sp.end), off: sp.start } : { text, off: 0 };
+    const spans = sentencesOf(session, side, pid);
+    const sel = (list || []).map(i => spans[i]).filter(Boolean);
+    if (!sel.length) return { text, off: 0 };
+    const a = Math.min(...sel.map(x => x.start)), b = Math.max(...sel.map(x => x.end));
+    return { text: text.slice(a, b), off: a };
   };
-  const t = (u.tgtPara !== null && u.tgtPara !== undefined) ? cut('tgt', u.tgtPara, out.tgtIndex) : { text: '', off: 0 };
-  const so = (u.srcPara !== null && u.srcPara !== undefined) ? cut('src', u.srcPara, out.srcIndex) : { text: '', off: 0 };
+  const t = (u.tgtPara !== null && u.tgtPara !== undefined) ? cut('tgt', u.tgtPara, tgtList || (out.tgtIndex !== null ? [out.tgtIndex] : null)) : { text: '', off: 0 };
+  const so = (u.srcPara !== null && u.srcPara !== undefined) ? cut('src', u.srcPara, srcList || (out.srcIndex !== null ? [out.srcIndex] : null)) : { text: '', off: 0 };
   out.tgt = t.text; out.tgtOff = t.off;
   out.src = so.text; out.srcOff = so.off;
   return out;
@@ -252,6 +341,8 @@ export function revealIn(pane, target, margin) {
 /**
  * createNav({ panes:{src,tgt}, session: () => session, onSelect(sel) }) -> controller.
  * sel = { side, pid, index } of the sentence that was marked last.
+ * In the masking view the tags carry data-key: the entity being looked at gets the class "hot" (red
+ * glow), so it can be found inside a long sentence.
  */
 export function createNav(opts) {
   const o = opts || {};
@@ -265,10 +356,29 @@ export function createNav(opts) {
     for (const e of els) if (e) e.classList.add('flash');
   }
 
-  function _sentenceRange(side, pid, index) {
+  function _hot(key, paras) {
+    for (const side of ['src', 'tgt']) for (const x of panes[side].querySelectorAll('.hot')) x.classList.remove('hot');
+    if (!key) return;
+    const sel = '[data-key="' + (window.CSS && CSS.escape ? CSS.escape(key) : key) + '"]';
+    for (const p of paras) if (p) for (const x of p.querySelectorAll(sel)) x.classList.add('hot');
+  }
+
+  function _ranges(side, pid, list) {
     const s = o.session();
-    const sp = sentencesOf(s, side, pid)[index];
-    return sp ? rangeOf(paraEl(side, pid), sp.start, sp.end) : null;
+    const spans = sentencesOf(s, side, pid);
+    const pe = paraEl(side, pid);
+    return (list || []).map(i => spans[i] ? rangeOf(pe, spans[i].start, spans[i].end) : null).filter(Boolean);
+  }
+
+  /** The other side of a sentence: its sentence(s), else its paragraph, else the nearest paragraph. */
+  function _peerOf(side, pid, index) {
+    const s = o.session();
+    const os = other(side);
+    const peer = sentencePeers(s, side, pid, index);
+    if (peer) return { pid: peer.pid, ranges: _ranges(os, peer.pid, peer.list), el: paraEl(os, peer.pid), approx: false };
+    const u = unitOf(s, side, pid);
+    const near = u ? nearestPara(s, os, u.idx) : null;
+    return { pid: near, ranges: [], el: paraEl(os, near), approx: true };
   }
 
   /** Marks sentence `index` of a paragraph and its counterpart. how: 'align' | 'center' | 'reveal' | null */
@@ -276,16 +386,14 @@ export function createNav(opts) {
     const s = o.session();
     if (!s) return null;
     const mineEl = paraEl(side, pid);
-    const mine = index !== null && index >= 0 ? _sentenceRange(side, pid, index) : null;
-    const peer = peerSentence(s, side, pid, index);
-    const peerEl = peer ? paraEl(other(side), peer.pid) : null;
-    const peerRange = peer && peer.index !== null ? _sentenceRange(other(side), peer.pid, peer.index) : null;
-    const painted = paint('um-seg', [mine, peerRange], -1);
+    const mine = index !== null && index >= 0 ? _ranges(side, pid, [index]) : [];
+    const peer = _peerOf(side, pid, index);
+    const painted = paint('um-seg', mine.concat(peer.ranges), -1);
     // Paragraph level where the sentence cannot be marked (or the browser has no highlights).
-    _flash([(!painted || !mine) ? mineEl : null, peerEl && (!painted || !peerRange) ? peerEl : null]);
+    _flash([(!painted || !mine.length) ? mineEl : null, peer.el && (!painted || !peer.ranges.length) ? peer.el : null]);
     st.sel = { side, pid, index };
     st.unit = null;
-    const a = mine || mineEl, b = peerRange || peerEl;
+    const a = mine[0] || mineEl, b = peer.ranges[0] || peer.el;
     if (how === 'align' && a && b) alignOther(a, panes[side], b, panes[other(side)]);
     else if (how === 'center') { if (a) centerIn(panes[side], a); if (b) centerIn(panes[other(side)], b); }
     else if (how === 'reveal' && a) {
@@ -293,7 +401,7 @@ export function createNav(opts) {
       if (b) { if (moved) setTimeout(() => alignOther(a, panes[side], b, panes[other(side)]), 320); else revealIn(panes[other(side)], b); }
     }
     if (o.onSelect) o.onSelect(st.sel);
-    return { mine, peerRange, mineEl, peerEl };
+    return { mine: mine[0] || null, peerRange: peer.ranges[0] || null, mineEl, peerEl: peer.el };
   }
 
   /** A click in a sheet: marks the sentence under the pointer and its pair. */
@@ -304,13 +412,13 @@ export function createNav(opts) {
     const s = o.session();
     const off = offsetAt(ev, pe);
     paint('um-focus', []);
+    _hot(null, []);
     st.focus = null;
     if (off === null) {
-      const opid = peerPid(s, side, pid);
-      const oe = paraEl(other(side), opid);
+      const peer = _peerOf(side, pid, null);
       paint('um-seg', []);
-      _flash([pe, oe]);
-      if (oe) alignOther(pe, panes[side], oe, panes[other(side)]);
+      _flash([pe, peer.el]);
+      if (peer.el) alignOther(pe, panes[side], peer.el, panes[other(side)]);
       st.sel = { side, pid, index: null };
       if (o.onSelect) o.onSelect(st.sel);
       return { side, pid, offset: null, index: null };
@@ -321,7 +429,7 @@ export function createNav(opts) {
   }
 
   /** Goes to a span of a paragraph (a finding): its sentence and pair marked, the span itself in
-   *  stronger yellow, both sheets centred. */
+   *  stronger yellow, both sheets centred (opt.quiet: no scrolling). */
   function focusSpan(side, pid, start, end, opt) {
     const s = o.session();
     if (!s || pid === null || pid === undefined) return;
@@ -342,44 +450,55 @@ export function createNav(opts) {
     const u = s && s.units[unitIdx];
     if (!u) return;
     paint('um-seg', []); paint('um-focus', []);
-    const a = paraEl('src', u.srcPara), b = paraEl('tgt', u.tgtPara);
+    const a = paraEl('src', u.srcPara !== null ? u.srcPara : nearestPara(s, 'src', u.idx));
+    const b = paraEl('tgt', u.tgtPara !== null ? u.tgtPara : nearestPara(s, 'tgt', u.idx));
     _flash([a, b]);
     if (a) centerIn(panes.src, a);
     if (b) centerIn(panes.tgt, b);
     st.sel = null; st.focus = null; st.unit = { unitIdx, key: null };
   }
 
-  /** The sentences of a unit where an entity occurs (by its occurrences on each side). */
+  /**
+   * An entity in a unit: the sentences where it occurs on each side (and, where it is missing, the
+   * sentences paired with them) in yellow, the entity itself with a red glow, both sheets centred.
+   * A side without a paragraph in this unit shows the nearest one (marked whole). opt = { key, quiet }
+   */
   function focusUnit(unitIdx, opt) {
     const s = o.session();
     const u = s && s.units[unitIdx];
     if (!u) return;
     const key = opt && opt.key;
-    const occIdx = (side, pid) => {
+    const pids = { src: u.srcPara, tgt: u.tgtPara };
+    const approx = { src: null, tgt: null };
+    for (const side of ['src', 'tgt']) if (pids[side] === null || pids[side] === undefined) approx[side] = nearestPara(s, side, u.idx);
+    const occIdx = (side) => {
+      const pid = pids[side];
       if (pid === null || pid === undefined || !key) return [];
       const spans = sentencesOf(s, side, pid);
       const set = new Set();
       for (const oc of (s.ent.occ[side].get(pid) || [])) if (oc.key === key) set.add(sentenceAt(spans, oc.start));
       return Array.from(set).sort((x, y) => x - y);
     };
-    const idx = { src: occIdx('src', u.srcPara), tgt: occIdx('tgt', u.tgtPara) };
-    const pids = { src: u.srcPara, tgt: u.tgtPara };
-    // The side without the entity shows the sentences paired with those of the other side.
+    const idx = { src: occIdx('src'), tgt: occIdx('tgt') };
+    // The side without the entity shows the sentences aligned with those of the other side.
     for (const side of ['src', 'tgt']) {
       const os = other(side);
-      if (!idx[side].length && idx[os].length && pids[side] !== null && pids[side] !== undefined) {
-        const same = sentencesOf(s, side, pids[side]).length === sentencesOf(s, os, pids[os]).length;
-        if (same) idx[side] = idx[os].slice();
+      if (!idx[side].length && idx[os].length && pids[side] !== null && pids[side] !== undefined && pids[os] !== null && pids[os] !== undefined) {
+        const al = alignSentences(s, os, pids[os], pids[side]);
+        const set = new Set();
+        for (const i of idx[os]) for (const j of (al[i] || [])) set.add(j);
+        idx[side] = Array.from(set).sort((x, y) => x - y);
       }
     }
-    const ranges = { src: [], tgt: [] };
-    for (const side of ['src', 'tgt']) for (const i of idx[side]) ranges[side].push(_sentenceRange(side, pids[side], i));
+    const ranges = { src: pids.src !== null ? _ranges('src', pids.src, idx.src) : [], tgt: pids.tgt !== null ? _ranges('tgt', pids.tgt, idx.tgt) : [] };
     const painted = paint('um-seg', ranges.src.concat(ranges.tgt), -1);
     paint('um-focus', []);
-    const a = paraEl('src', pids.src), b = paraEl('tgt', pids.tgt);
-    _flash([(!painted || !ranges.src.length) ? a : null, (!painted || !ranges.tgt.length) ? b : null]);
-    const ta = ranges.src[0] || a, tb = ranges.tgt[0] || b;
+    const els = { src: paraEl('src', pids.src !== null ? pids.src : approx.src), tgt: paraEl('tgt', pids.tgt !== null ? pids.tgt : approx.tgt) };
+    _flash([(!painted || !ranges.src.length) ? els.src : null, (!painted || !ranges.tgt.length) ? els.tgt : null]);
+    _hot(key, [paraEl('src', pids.src), paraEl('tgt', pids.tgt)]);
     if (!(opt && opt.quiet)) {
+      const firstHot = (side) => { const p = paraEl(side, pids[side]); return p ? p.querySelector('.hot') : null; };
+      const ta = firstHot('src') || ranges.src[0] || els.src, tb = firstHot('tgt') || ranges.tgt[0] || els.tgt;
       if (ta) centerIn(panes.src, ta);
       if (tb) centerIn(panes.tgt, tb);
     }
@@ -405,6 +524,7 @@ export function createNav(opts) {
     }
     const next = list[at < 0 ? (dir > 0 ? 0 : list.length - 1) : (at + dir + list.length) % list.length];
     paint('um-focus', []);
+    _hot(null, []);
     st.focus = null;
     markSentence('tgt', next.pid, next.index, 'reveal');
   }
@@ -413,10 +533,10 @@ export function createNav(opts) {
   function refresh() {
     if (st.focus) { const f = st.focus; const i = sentenceAt(sentencesOf(o.session(), f.side, f.pid), f.start); markSentence(f.side, f.pid, i, null); paint('um-focus', [rangeOf(paraEl(f.side, f.pid), f.start, f.end)], 3); st.focus = f; return; }
     if (st.sel && st.sel.index !== null) { markSentence(st.sel.side, st.sel.pid, st.sel.index, null); return; }
-    if (st.unit && st.unit.key) focusUnit(st.unit.unitIdx, { key: st.unit.key, quiet: true });
+    if (st.unit) focusUnit(st.unit.unitIdx, { key: st.unit.key, quiet: true });
   }
 
-  function clear() { clearPaint(); _flash([]); st.sel = null; st.focus = null; st.unit = null; }
+  function clear() { clearPaint(); _flash([]); _hot(null, []); st.sel = null; st.focus = null; st.unit = null; }
 
   /** Hover: the counterpart paragraph is outlined too. */
   function attachHover() {
@@ -436,5 +556,5 @@ export function createNav(opts) {
     }
   }
 
-  return { markSentence, clickAt, focusSpan, focusParas, focusUnit, step, refresh, clear, attachHover, get selection() { return st.sel; } };
+  return { markSentence, clickAt, focusSpan, focusParas, focusUnit, step, refresh, clear, attachHover, paraEl, get selection() { return st.sel; } };
 }

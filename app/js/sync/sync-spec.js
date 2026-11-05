@@ -53,8 +53,7 @@ export const SYNC_SPEC = [
 export const TRAVELS = [
   'Perfiles de proveedor y modelos configurados',
   'Modelo por m\u00f3dulo y ajustes de cada m\u00f3dulo',
-  'Reglas del usuario, ediciones de las reglas de serie y l\u00e1pidas de borrado',
-  'Perfiles de reglas e indicaciones (prompts)',
+  'Instrucciones de cada m\u00f3dulo (prompts) modificadas',
   'Diccionario personal de entidades y listas editadas',
   'Registro del gasto, precios y notas',
   'Preferencias (modo oscuro, zoom, color...)',

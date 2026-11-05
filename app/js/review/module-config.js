@@ -3,7 +3,8 @@
  * storage key 'module_cfg' = { updatedAt, map:{ <moduleId>: cfg } }, travels in the sync file.
  *
  * cfg = { enabled, thinking:'minimal'|'low'|'high'|'', batchWords (0 = automatic), merge, verify,
- *         budget (US$ per run, 0 = no limit), scope:'all'|'changed', context }
+ *         budget (US$ per run, 0 = no limit), scope:'all'|'changed', context,
+ *         strictness:'grave'|'normal'|'estricta' (how demanding: prompts.js STRICTNESS) }
  */
 
 import { getValue, setValue, storage } from '../store/storage.js';
@@ -12,14 +13,13 @@ import { MODULES } from './module-list.js';
 export const CFG_KEY = 'module_cfg';
 
 export const DEFAULTS = {
-  local: { enabled: true, semantic: 'off', semModel: '', semProvider: '', semApiModel: '', semSensitivity: 'normal' },
-  grammar: { enabled: true, thinking: 'minimal', batchWords: 0, merge: true, verify: true, budget: 0, scope: 'all' },
-  fidelity: { enabled: true, thinking: 'low', batchWords: 0, merge: true, verify: true, budget: 0, scope: 'all' },
-  integrity: { enabled: true, thinking: 'low', batchWords: 0, merge: true, verify: true, budget: 0, scope: 'all' },
-  style: { enabled: true, thinking: 'minimal', batchWords: 0, merge: true, verify: true, budget: 0, scope: 'all' },
-  coherence: { enabled: true, thinking: 'low', batchWords: 0, merge: false, verify: false, budget: 0, scope: 'all' },
-  conventions: { enabled: true, thinking: 'minimal', batchWords: 0, merge: false, verify: false, budget: 0, scope: 'all' },
-  coldread: { enabled: false, thinking: 'minimal', batchWords: 0, merge: false, verify: true, budget: 0, scope: 'all' },
+  grammar: { enabled: true, thinking: 'minimal', batchWords: 0, merge: true, verify: true, budget: 0, scope: 'all', strictness: 'normal' },
+  fidelity: { enabled: true, thinking: 'low', batchWords: 0, merge: true, verify: true, budget: 0, scope: 'all', strictness: 'grave' },
+  integrity: { enabled: true, thinking: 'low', batchWords: 0, merge: true, verify: true, budget: 0, scope: 'all', strictness: 'grave' },
+  style: { enabled: true, thinking: 'minimal', batchWords: 0, merge: true, verify: true, budget: 0, scope: 'all', strictness: 'normal' },
+  coherence: { enabled: true, thinking: 'low', batchWords: 0, merge: false, verify: false, budget: 0, scope: 'all', strictness: 'normal' },
+  conventions: { enabled: true, thinking: 'minimal', batchWords: 0, merge: false, verify: false, budget: 0, scope: 'all', strictness: 'normal' },
+  coldread: { enabled: false, thinking: 'minimal', batchWords: 0, merge: false, verify: true, budget: 0, scope: 'all', strictness: 'grave' },
   verifier: { enabled: true, thinking: 'high', batchWords: 0, merge: false, verify: false, budget: 0, scope: 'all' }
 };
 

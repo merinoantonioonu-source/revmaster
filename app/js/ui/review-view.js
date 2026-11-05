@@ -5,17 +5,15 @@
 
 import { helpBtn, helpItem } from './help.js';
 import { el, $, clear, toast, modal, fmtInt, fmtMoney, promptDialog, confirmDialog } from '../util/dom.js';
-import { state, on, emit, addFindings, updateFinding, saveProjectSoon, setProfile } from '../state.js';
+import { state, on, emit, addFindings, updateFinding, saveProjectSoon } from '../state.js';
 import { renderDoc } from './preview.js';
 import { MODULES, moduleById, INPUT_ICONS, INPUT_LABELS, ROLE_LABELS } from '../review/module-list.js';
-import { runLocalChecks, LOCAL_SUBS } from '../review/local-checks.js';
 import { makePlan } from '../review/planner.js';
 import { deferredCapability, startDeferred, checkDeferred, cancelDeferredRecord, DEFERRED_STATUS } from '../review/deferred.js';
 import { runPlan, verifyFindings } from '../review/runner.js';
 import { loadModuleConfig, saveModuleConfig } from '../review/module-config.js';
 import { loadPrompts, CAT_LABELS } from '../review/prompts.js';
-import { getEffectiveRules, loadRulesStore, upsertRule, SEV_LABELS } from '../rules/rules.js';
-import { STATE_LABELS } from '../review/findings.js';
+import { STATE_LABELS, SEV_LABELS } from '../review/findings.js';
 import { externalDialog, importDialog } from './mask-view.js';
 import { exportCorrected, exportReportHtml, exportReportXlsx, exportFindingsJson, exportFeedbackXlsx } from '../export/exports.js';
 import { createNav, findingPlace, peerSentence, sentencesOf } from './nav.js';
@@ -28,7 +26,7 @@ let selected = null;
 let running = null;           // { abort: AbortController, modules:[] }
 let progress = {};            // moduleId -> { done, total, label, state:'run'|'done'|'err', msg }
 let estimates = {};           // moduleId -> { tok, cost } | { error }
-let selectedModules = new Set(['local', 'grammar', 'fidelity', 'integrity', 'style', 'coherence', 'conventions']);
+let selectedModules = new Set(['grammar', 'fidelity', 'integrity', 'style', 'coherence', 'conventions']);
 let estTimer = null;
 let nav = null;
 
@@ -38,6 +36,7 @@ export function mountReviewView(host, tools) {
   root.appendChild(el('div.list',
     el('h4', 'Hallazgos', helpBtn('findings'), el('span.grow'),
       el('button.btn.sm', { title: 'Abrir los hallazgos en una ventana aparte, en forma de tabla', onclick: openTable }, '\u29c9 Tabla'),
+      el('button.btn.sm', { title: 'Borrar los hallazgos para empezar de cero', onclick: resetFindings }, '\ud83d\uddd1 Vaciar'),
       el('button.btn.sm', { title: 'Opciones de la lista', onclick: (e) => listMenu(e.currentTarget) }, '\u22ef')),
     el('div.filters#rv-bubbles'),
     el('div.scroll#rv-findings')));
@@ -74,7 +73,7 @@ let _toolsGen = 0;
 async function renderTools() {
   if (state.view !== 'review') return;
   const gen = ++_toolsGen;
-  const store = await loadRulesStore();
+  await Promise.resolve();
   if (gen !== _toolsGen || state.view !== 'review') return;   // a newer call is drawing the bar
   clear(toolsHost);
   if (!state.project) return;
@@ -87,10 +86,6 @@ async function renderTools() {
     n('SUG') ? el('span.pill.gray', n('SUG') + (n('SUG') === 1 ? ' sugerencia' : ' sugerencias')) : null,
     !open.length ? el('span.pill.ok', 'Sin hallazgos pendientes') : null));
   toolsHost.appendChild(el('div.grow'));
-  const prof = el('select', { title: 'Perfil de reglas', onchange: (e) => { setProfile(e.target.value); estimates = {}; scheduleEstimates(); } },
-    el('option', { value: '' }, 'Todas las reglas'), store.profiles.map(p => el('option', { value: p }, 'Perfil: ' + p)));
-  prof.value = state.project.profile || '';
-  toolsHost.appendChild(prof);
   if (running) toolsHost.appendChild(el('button.btn.danger', { onclick: () => running.abort.abort() }, '\u25a0 Detener'));
   else toolsHost.appendChild(el('button.btn.amber', { onclick: () => runModules(Array.from(selectedModules)) }, '\u25b6 Ejecutar seleccionados'));
   toolsHost.appendChild(el('button.btn', { onclick: (e) => moreMenu(e.currentTarget) }, 'M\u00e1s \u25be'));
@@ -105,7 +100,6 @@ function moreMenu(anchor) {
     { sep: true },
     { label: 'Verificar los hallazgos pendientes de la IA', onClick: reverify },
     { label: 'Configurar m\u00f3dulos y modelos', onClick: () => emit('goto-settings', 'modules') },
-    { label: 'Editar reglas', onClick: () => emit('goto-settings', 'rules') },
     { sep: true },
     helpItem('review-more', anchor)
   ]);
@@ -201,7 +195,8 @@ async function renderModules() {
   let total = 0, anyEst = false;
   for (const m of MODULES) {
     if (m.id === 'verifier') continue;
-    const off = m.ai && cfg[m.id] && cfg[m.id].enabled === false;
+    if (!m.ai) continue;
+    const off = cfg[m.id] && cfg[m.id].enabled === false;
     const on = selectedModules.has(m.id) && !off;
     const p = progress[m.id];
     const st = p ? (p.state === 'run' ? 'run' : (p.state === 'err' ? 'err' : 'done')) : '';
@@ -214,7 +209,7 @@ async function renderModules() {
     else if (count) stat = '\u2691 ' + count;
     else if (p && p.state === 'done') stat = '\u2713';
     const tip = [m.desc,
-      m.ai ? (est ? (est.error || ('Coste estimado: ~' + fmtMoney(est.cost) + ' (' + fmtInt(est.tok) + ' tokens' + (est.cached ? ', ' + est.cached + ' p\u00e1rrafos en cach\u00e9' : '') + ')')) : 'Calculando el coste\u2026') : 'Sin IA: gratis.',
+      est ? (est.error || ('Coste estimado: ~' + fmtMoney(est.cost) + ' (' + fmtInt(est.tok) + ' tokens' + (est.cached ? ', ' + est.cached + ' p\u00e1rrafos en cach\u00e9' : '') + ')')) : 'Calculando el coste\u2026',
       off ? 'Desactivado en Ajustes \u203a M\u00f3dulos.' : '',
       p && p.msg ? (p.state === 'err' ? 'Error: ' : '') + p.msg : '',
       count ? count + ' hallazgos pendientes.' : ''].filter(Boolean).join('\n');
@@ -225,12 +220,12 @@ async function renderModules() {
     } });
     const chip = el('label.mchip' + (on ? '.on' : '') + (off ? '.off' : '') + (st ? '.' + st : ''), { title: tip, 'data-mod': m.id },
       chk, el('span.nm', m.label),
-      el('span.cost' + (est && est.error ? '.warn-t' : ''), m.ai ? (est && !est.error ? fmtMoney(est.cost) : (est && est.error ? (/clave/.test(est.error) ? 'sin clave' : 'sin estimar') : '')) : 'gratis'),
+      el('span.cost' + (est && est.error ? '.warn-t' : ''), est && !est.error ? fmtMoney(est.cost) : (est && est.error ? (/clave/.test(est.error) ? 'sin clave' : 'sin estimar') : '')),
       stat ? el('span.stat', stat) : null,
       el('button.run', { type: 'button', title: 'Ejecutar solo ' + m.label, disabled: running ? true : null,
         onclick: (e) => { e.preventDefault(); e.stopPropagation(); runModules([m.id]); } }, '\u25b6'));
     if (p && p.state === 'run') chip.appendChild(el('i.bar', { style: { width: (p.total ? Math.round(100 * (p.done || 0) / Math.max(1, p.total)) : 30) + '%' } }));
-    if (m.ai) modelLabel(m.id, m.roles[0]).then(t => { chip.title = tip + '\nModelo: ' + t + (m.roles.length > 1 ? ' (cribado)' : ''); });
+    modelLabel(m.id, m.roles[0]).then(t => { chip.title = tip + '\nModelo: ' + t + (m.roles.length > 1 ? ' (cribado)' : ''); });
     host.appendChild(chip);
   }
   host.appendChild(el('span.grow'));
@@ -255,7 +250,7 @@ function scheduleEstimates() {
 }
 
 async function _ctx() {
-  return { rules: await getEffectiveRules(), prompts: await loadPrompts(), cfg: await loadModuleConfig(), profile: state.project ? state.project.profile : '' };
+  return { prompts: await loadPrompts(), cfg: await loadModuleConfig() };
 }
 
 async function computeEstimates() {
@@ -274,52 +269,10 @@ async function computeEstimates() {
 
 // ------------------------------------------------------------------ running
 
-// The semantic check needs a choice the first time (the local model is a large download).
-function _semanticMode(ctx) {
-  // An optional extra, off unless switched on in Ajustes > Modulos (no question, no download by surprise).
-  const c = ctx.cfg.local || {};
-  if (c.semantic === 'api' && !c.semProvider) { toast('Similitud sem\u00e1ntica: falta elegir el proveedor en Ajustes \u203a M\u00f3dulos.', 'warn', 7000); return null; }
-  return c.semantic === 'local' || c.semantic === 'api' ? c.semantic : null;
-}
-
-/** Units the local layer suspects of an omission, an addition or a change of meaning. */
-function _localFlags() {
-  const flags = new Set();
-  for (const f of state.findings) {
-    if (f.module !== 'local' || f.state !== 'open') continue;
-    if (['semantic', 'sentences', 'length', 'numbers', 'tags'].includes(f.sub) && ['OMI', 'ADD', 'MIST'].includes(f.cat)) {
-      const u = state.session.units[f.unit];
-      if (u) flags.add(u.n);
-    }
-  }
-  return flags;
-}
-
 async function runModules(ids) {
   if (!state.session || running) return;
   const ctx = await _ctx();
-  const wantLocal = ids.includes('local');
-  const ai = ids.filter(id => id !== 'local' && id !== 'verifier' && moduleById(id) && moduleById(id).ai && ctx.cfg[id].enabled !== false);
-  if (wantLocal) {
-    let list = runLocalChecks(state.session, { rules: ctx.rules, conventions: state.data.conventions, profile: ctx.profile });
-    const sem = _semanticMode(ctx);
-    if (sem) {
-      progress.local = { state: 'run', msg: 'Similitud sem\u00e1ntica\u2026' };
-      renderModules();
-      try {
-        const { semanticFindings } = await import('../review/semantic.js');
-        const r = await semanticFindings(state.session, Object.assign({}, ctx.cfg.local, { semantic: sem }), {
-          project: { name: state.project.name, file: state.project.tgtName },
-          onStatus: (msg) => { progress.local = { state: 'run', msg }; renderModules(); } });
-        // The semantic finding names the missing sentence: it replaces the coarser ones of that paragraph.
-        const semUnits = new Set(r.findings.filter(f => f.cat === 'OMI' || f.cat === 'MIST').map(f => f.unit));
-        list = list.filter(f => !(semUnits.has(f.unit) && f.cat === 'OMI' && (f.sub === 'sentences' || f.sub === 'length'))).concat(r.findings);
-      } catch (e) { console.warn('semantic', e); toast('Similitud sem\u00e1ntica: ' + e.message, 'warn', 9000); }
-    }
-    addFindings(list, ['local']);
-    progress.local = { state: 'done', msg: list.length + ' hallazgos' };
-    if (!ai.length) { toast('Comprobaciones sin IA: ' + list.length + ' hallazgos.', 'ok'); renderModules(); return; }
-  }
+  const ai = ids.filter(id => id !== 'verifier' && moduleById(id) && moduleById(id).ai && ctx.cfg[id].enabled !== false);
   if (!ai.length) { renderModules(); return; }
   const plan = await makePlan(state.session, ctx, { modules: ai });
   if (plan.errors.length && !plan.groups.length && !plan.skeleton.length) {
@@ -352,8 +305,8 @@ async function runModules(ids) {
   let res;
   try {
     res = await runPlan(plan, { session: state.session, project: { name: state.project.name, file: state.project.tgtName },
-      prompts: ctx.prompts, cfg: ctx.cfg, rules: ctx.rules }, {
-      signal: running.abort.signal, budget: ok.budget, localFlags: _localFlags(),
+      prompts: ctx.prompts, cfg: ctx.cfg }, {
+      signal: running.abort.signal, budget: ok.budget,
       onProgress: (p) => {
         const mods = p.module ? String(p.module).split('+') : ai;
         for (const id of mods) if (progress[id]) Object.assign(progress[id], { done: p.done, total: p.total, msg: p.label });
@@ -490,7 +443,7 @@ function renderFindings() {
   const list = visibleFindings();
   if (!list.length) {
     host.appendChild(el('div.empty', all.length ? 'No hay hallazgos con estos filtros.' :
-      'Todav\u00eda no hay hallazgos. Marque los m\u00f3dulos arriba y pulse \u00abEjecutar seleccionados\u00bb, o empiece por las comprobaciones sin IA (gratis).'));
+      'Todav\u00eda no hay hallazgos. Marque los m\u00f3dulos arriba y pulse \u00abEjecutar seleccionados\u00bb.'));
     return;
   }
   for (const f of list.slice(0, 600)) host.appendChild(findingCard(f));
@@ -509,7 +462,6 @@ function findingCard(f) {
   if (!f.quote && !sug) body.appendChild(el('span.muted', CAT_LABELS[f.cat] || f.cat));
   const card = el('div.iss.' + f.sev + (sel ? '.sel' : '') + (f.state !== 'open' ? '.done' : ''), { 'data-id': f.id, onclick: (e) => { if (e.target.closest('button')) return; select(f.id); } },
     el('div.h', el('span.sev.' + f.sev, f.sev), el('span.mod', mod ? mod.short : f.module),
-      f.sub ? el('span.mod', LOCAL_SUBS[f.sub] || f.sub) : null,
       f.verified === 'ok' ? el('span.state.accepted', '\u2713 verificado') : null,
       f.verified === 'edit' ? el('span.state.accepted', '\u270e verificado') : null,
       f.state !== 'open' ? el('span.state.' + f.state, STATE_LABELS[f.state]) : null,
@@ -517,7 +469,7 @@ function findingCard(f) {
     body,
     el('div.why', f.reason || ''),
     f.verifierReason ? el('div.why', 'Verificador: ' + f.verifierReason) : null,
-    el('div.src', (f.source === 'local' ? 'Sin IA \u00b7 0 tokens' : f.source === 'rule' ? 'Regla \u00b7 sin IA' : f.source === 'external' ? 'IA externa' : (f.model || 'IA') + (f.role === 'deep' ? ' \u00b7 a fondo' : f.role === 'cache' ? ' \u00b7 cach\u00e9' : '')) +
+    el('div.src', (f.source === 'local' || f.source === 'rule' ? 'Sin IA' : f.source === 'external' ? 'IA externa' : (f.model || 'IA') + (f.role === 'deep' ? ' \u00b7 a fondo' : f.role === 'cache' ? ' \u00b7 cach\u00e9' : '')) +
       (f.unanchored ? ' \u00b7 cita no localizada' : '')));
   const acts = el('div.acts');
   if (f.state === 'open') {
@@ -541,28 +493,12 @@ async function edit(f) {
   const v = await promptDialog('Editar la correcci\u00f3n', 'Texto que sustituir\u00e1 a \u00ab' + (f.quote || '') + '\u00bb', (f.edited != null ? f.edited : f.suggestion) || '');
   if (v === null) return;
   updateFinding(f.id, { edited: v, state: 'accepted' });
-  if (f.quote && v !== f.suggestion) {
-    const r = await modal({ title: 'Crear una regla', body: el('p', '\u00bfQuiere crear una regla para que, en adelante, \u00ab' + f.quote + '\u00bb se se\u00f1ale y se proponga \u00ab' + v + '\u00bb?'),
-      buttons: [{ label: 'No', value: null }, { label: 'Crear regla', kind: 'primary', value: 'ok' }] });
-    if (r === 'ok') {
-      await upsertRule({ origin: 'usuario', kind: 'forbid', modules: [f.module === 'local' ? 'style' : f.module], avoid: f.quote, es: v,
-        note: 'Creada al corregir un hallazgo.', severity: f.sev, on: true });
-      toast('Regla creada (Ajustes \u203a Reglas).', 'ok');
-    }
-  }
   moveNext(f.id);
 }
 
 async function reject(f) {
   updateFinding(f.id, { state: 'rejected' });
   moveNext(f.id);
-  if (!f.quote || f.source === 'local') return;
-  const t = toast('Rechazado. ', '', 6000);
-  t.appendChild(el('button.btn.sm', { style: { marginLeft: '6px' }, onclick: async () => {
-    await upsertRule({ origin: 'usuario', kind: 'ignore', modules: [f.module], avoid: f.quote, note: 'No se\u00f1alar: ' + (f.reason || '').slice(0, 120), severity: 'SUG', on: true });
-    t.remove();
-    toast('Regla \u00abignorar\u00bb creada: no se volver\u00e1 a se\u00f1alar.', 'ok');
-  } }, 'No volver a se\u00f1alarlo'));
 }
 
 function moveNext(id) {
@@ -748,8 +684,8 @@ async function pollDeferredNow(manual) {
     const ctx = await _ctx();
     for (const rec of recs) {
       let cleared = false;
-      const r = await checkDeferred(rec, { session: state.session, prompts: ctx.prompts, cfg: ctx.cfg, rules: ctx.rules }, {
-        project: { name: state.project.name, file: state.project.tgtName }, localFlags: _localFlags(),
+      const r = await checkDeferred(rec, { session: state.session, prompts: ctx.prompts, cfg: ctx.cfg }, {
+        project: { name: state.project.name, file: state.project.tgtName },
         onFindings: (list) => {
           if (!cleared) {
             cleared = true;
@@ -814,7 +750,7 @@ async function feedbackDialog() {
   if (r !== 'ok') return;
   const ids = vis.checked ? new Set(visibleFindings().map(f => f.id)) : null;
   try {
-    const n = await exportFeedbackXlsx({ masked: masked.checked, filter: ids ? (f) => ids.has(f.id) : null, subLabels: LOCAL_SUBS,
+    const n = await exportFeedbackXlsx({ masked: masked.checked, filter: ids ? (f) => ids.has(f.id) : null, 
       segText: (f, isMasked) => {
         if (isMasked) return null;   // the masked texts are whole paragraphs (tags keep their positions there)
         const pl = findingPlace(state.session, f);
@@ -824,3 +760,29 @@ async function feedbackDialog() {
   } catch (e) { console.error(e); toast('No se pudo exportar: ' + e.message, 'err', 8000); }
 }
 
+/** "Vaciar": delete findings (all or the pending ones) and, if wanted, the stored AI answers too, so
+ *  the next run really reviews again instead of repeating what is in the cache. */
+async function resetFindings() {
+  if (!state.project) return;
+  const all = el('input', { type: 'radio', name: 'rsWhich', value: 'all', checked: true });
+  const open = el('input', { type: 'radio', name: 'rsWhich', value: 'open' });
+  const cache = el('input', { type: 'checkbox', checked: true });
+  const nOpen = state.findings.filter(f => f.state === 'open').length;
+  const r = await modal({ title: 'Vaciar los hallazgos', help: helpBtn('findings-reset'), width: '560px', body: el('div',
+    el('div', el('label.row', all, ' Todos (' + state.findings.length + '), tambi\u00e9n los aceptados y rechazados')),
+    el('div', el('label.row', open, ' Solo los pendientes (' + nOpen + ')')),
+    el('div', { style: { marginTop: '10px' } }, el('label.row', cache, ' Olvidar tambi\u00e9n las respuestas guardadas de la IA (si no, al volver a ejecutar un m\u00f3dulo saldr\u00edan los mismos hallazgos sin preguntar de nuevo)')),
+    el('p.info', { style: { marginTop: '8px' } }, 'Los documentos y las entidades no se tocan.')),
+    buttons: [{ label: 'Cancelar', value: null }, { label: 'Vaciar', kind: 'danger', value: 'ok' }] });
+  if (r !== 'ok') return;
+  state.findings = open.checked ? state.findings.filter(f => f.state !== 'open') : [];
+  if (cache.checked) { try { const { idbClear } = await import('../store/idb.js'); await idbClear('cache'); } catch (e) { console.warn('cache', e); } }
+  selected = null;
+  progress = {};
+  estimates = {};
+  emit('findings');
+  saveProjectSoon();
+  nav.clear();
+  scheduleEstimates();
+  toast('Hallazgos borrados' + (cache.checked ? ' y respuestas guardadas olvidadas' : '') + '.', 'ok');
+}

@@ -125,8 +125,10 @@ export function computeEntities(input) {
       e.art = best || '';
     }
     delete e.arts;
+    // No article inside the tag any more (2026-11-05, at the user's request: it confused more than it
+    // helped). The same tag on both sides; TAG_RE still reads an article for old texts.
     e.tagSrc = '{' + e.cat + e.n + '}';
-    e.tagTgt = '{' + (e.art ? e.art + ' ' : '') + e.cat + e.n + '}';
+    e.tagTgt = e.tagSrc;
     const tgtFormsN = Object.keys(e.tgtForms).length;
     if (!e.srcCount || !e.tgtCount) e.status = 'nopair';
     else if (e.srcCount !== e.tgtCount) e.status = 'count';

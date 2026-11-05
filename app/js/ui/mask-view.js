@@ -7,11 +7,11 @@ import { helpBtn, helpItem } from './help.js';
 import { el, $, clear, toast, modal, copyText, download, pickFiles, promptDialog, uid } from '../util/dom.js';
 import { state, on, emit, setMask, remaskNow, saveDictItem, addFindings } from '../state.js';
 import { renderDoc } from './preview.js';
-import { CATS, CAT_LABELS, CAT_SINGULAR, ARTICLES, STATUS_LABELS, mainForm } from '../redact/entities.js';
+import { CATS, CAT_LABELS, CAT_SINGULAR, STATUS_LABELS, mainForm } from '../redact/entities.js';
 import { exportMasked, exportBilingualXlsx, exportBilingualHtml, exportKeyMap } from '../export/exports.js';
 import { buildExternalText, importExternal } from '../review/external.js';
 import { openMenu } from './menu.js';
-import { createNav } from './nav.js';
+import { createNav, sentencesOf, sentenceAt, sentencePeers, unitOf, peerPid, offsetAt, paraText } from './nav.js';
 
 let root, toolsHost;
 let showOriginal = false;
@@ -21,6 +21,7 @@ let placeIdx = {};       // entity key -> index of the problem place shown last 
 let selectedKey = null;
 let panes = {};
 let nav = null;
+let revealed = null;      // { src:{pid,start,end}, tgt:{...} }: a sentence pair shown unmasked for a moment
 
 export function mountMaskView(host, tools) {
   root = host;
@@ -39,6 +40,7 @@ export function mountMaskView(host, tools) {
   panes = { src: $('#mask-src'), tgt: $('#mask-tgt') };
   nav = createNav({ panes, session: () => state.session });
   nav.attachHover();
+  attachTagHover();
   on('masked', render);
   on('view', (v) => { if (v === 'mask') { renderTools(); render(); } });
   document.addEventListener('keydown', (e) => {
@@ -240,32 +242,59 @@ function _problemText(e) {
 function entityCard(e) {
   const sel = selectedKey === e.key;
   const stCls = e.status === 'ok' ? 'ok' : (e.status === 'nopair' ? 'bad' : 'mid');
-  const card = el('div.ent' + (sel ? '.sel' : ''), { 'data-key': e.key, onclick: (ev) => { if (ev.target.closest('.acts, .where')) return; selectEntity(sel ? null : e.key, true); } },
-    el('div.row', el('span.tk.' + e.cat, e.art ? el('span.art', e.art) : null, e.cat + e.n), el('span.st.' + stCls, STATUS_LABELS[e.status])),
+  const card = el('div.ent' + (sel ? '.sel' : ''), { 'data-key': e.key, title: 'Pulse para ir a la entidad (otra vez: la siguiente aparici\u00f3n)',
+    onclick: (ev) => { if (ev.target.closest('.acts, .where')) return; gotoEntity(e); } },
+    el('div.row', el('span.tk.' + e.cat, e.cat + e.n), el('span.st.' + stCls, STATUS_LABELS[e.status])),
     el('div.forms', 'O: ' + _forms(e.srcForms)),
-    el('div.forms', 'T: ' + _forms(e.tgtForms) + (e.art ? ' \u00b7 ' + e.art : '')));
-  if (e.status !== 'ok') {
-    const places = problemPlaces(e);
-    const i = placeIdx[e.key];
-    const at = (i !== undefined && places[i]) ? places[i] : null;
-    card.appendChild(el('div.why', _problemText(e)));
-    if (places.length) {
-      card.appendChild(el('div.where',
-        el('button.btn.sm.primary', { title: 'Lleva a cada p\u00e1rrafo en el que no cuadra y resalta los dos lados', onclick: () => gotoPlace(e, places, +1) },
-          at ? 'Siguiente \u203a' : 'Ver d\u00f3nde no cuadra \u203a'),
-        places.length > 1 && at ? el('button.btn.sm', { title: 'Anterior', onclick: () => gotoPlace(e, places, -1) }, '\u2039') : null,
-        el('span.muted', at ? ' \u00a7' + state.session.units[at.unit].n + ' \u00b7 ' + (at.form ? '\u00ab' + at.form + '\u00bb' : at.src + ' en el original, ' + at.tgt + ' en la traducci\u00f3n') + ' \u00b7 ' + (i + 1) + '/' + places.length
-          : ' ' + places.length + (places.length > 1 ? ' lugares' : ' lugar'))));
-    }
+    el('div.forms', 'T: ' + _forms(e.tgtForms)));
+  const places = placesOf(e);
+  const i = placeIdx[e.key];
+  const at = (i !== undefined && places[i]) ? places[i] : null;
+  if (e.status !== 'ok') card.appendChild(el('div.why', _problemText(e)));
+  if (places.length && (e.status !== 'ok' || sel)) {
+    card.appendChild(el('div.where',
+      el('button.btn.sm' + (e.status !== 'ok' ? '.primary' : ''), { title: e.status !== 'ok' ? 'Lleva a cada p\u00e1rrafo en el que no cuadra y resalta los dos lados' : 'Siguiente aparici\u00f3n',
+        onclick: () => gotoPlace(e, places, +1) }, at ? 'Siguiente \u203a' : (e.status !== 'ok' ? 'Ver d\u00f3nde no cuadra \u203a' : 'Ir \u203a')),
+      places.length > 1 && at ? el('button.btn.sm', { title: 'Anterior', onclick: () => gotoPlace(e, places, -1) }, '\u2039') : null,
+      el('span.muted', at ? ' \u00a7' + state.session.units[at.unit].n + (e.status !== 'ok' ? ' \u00b7 ' + (at.form ? '\u00ab' + at.form + '\u00bb' : at.src + ' en el original, ' + at.tgt + ' en la traducci\u00f3n') : '') + ' \u00b7 ' + (i + 1) + '/' + places.length
+        : ' ' + places.length + (places.length > 1 ? ' lugares' : ' lugar'))));
   }
   const acts = el('div.acts',
     el('button.btn.sm', { onclick: () => changeCat(e) }, 'Categor\u00eda'),
-    el('button.btn.sm', { onclick: (ev) => changeArt(e, ev.currentTarget) }, 'Art\u00edculo'),
     el('button.btn.sm', { title: 'Es la misma entidad que otra etiqueta (por ejemplo, la sigla del original y el nombre completo de la traducci\u00f3n)', onclick: () => mergeDialog(e) }, 'Emparejar\u2026'),
     el('button.btn.sm', { onclick: () => saveToDict(e) }, 'A mi diccionario'),
     el('button.btn.sm.danger', { onclick: () => { setMask({ removedKeys: (state.project.mask.removedKeys || []).concat([e.key]) }); toast('Ya no se enmascara ' + e.cat + e.n + '.', 'ok'); } }, 'No enmascarar'));
   card.appendChild(acts);
   return card;
+}
+
+/** Units where an entity occurs on either side, in document order. */
+function occurrenceUnits(key) {
+  const s = state.session;
+  const set = new Set();
+  for (const side of ['src', 'tgt']) {
+    for (const [pid, occs] of s.ent.occ[side]) {
+      if (!occs.some(o => o.key === key)) continue;
+      const u = unitOf(s, side, pid);
+      if (u) set.add(u.idx);
+    }
+  }
+  return Array.from(set).sort((a, b) => a - b);
+}
+
+/** Where a click on the card goes: the places where it does not add up, or else every occurrence. */
+function placesOf(e) {
+  const prob = e.status !== 'ok' ? problemPlaces(e) : [];
+  if (prob.length) return prob;
+  return occurrenceUnits(e.key).map(unit => ({ unit }));
+}
+
+/** Click on a card: first place (again: the next one), the sentences in yellow, the entity in red. */
+function gotoEntity(e) {
+  const places = placesOf(e);
+  if (selectedKey !== e.key) delete placeIdx[e.key];
+  if (!places.length) { selectedKey = e.key; renderList(); renderPanes(); return; }
+  gotoPlace(e, places, +1);
 }
 
 function gotoPlace(e, places, step) {
@@ -276,18 +305,16 @@ function gotoPlace(e, places, step) {
   renderList();
   renderPanes();
   focusUnit(places[i].unit, { key: e.key });
+  const card = document.querySelector('#mask-entities .ent.sel');
+  if (card) card.scrollIntoView({ block: 'nearest' });
 }
 
 function selectEntity(key, scroll) {
+  const e = key ? state.session.ent.byKey.get(key) : null;
+  if (e && scroll) { gotoEntity(e); return; }
   selectedKey = key;
   renderList();
   renderPanes();
-  if (key && scroll) {
-    for (const side of ['src', 'tgt']) {
-      const first = panes[side].querySelector('.sel');
-      if (first) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }
-  }
 }
 
 async function changeCat(e) {
@@ -299,53 +326,146 @@ async function changeCat(e) {
   setMask({ catOverride: Object.assign({}, state.project.mask.catOverride, { [e.key]: sel.value }) });
 }
 
-function changeArt(e, anchor) {
-  openMenu(anchor, ARTICLES.map(a => ({ label: a ? a + ' (' + { el: 'masculino singular', la: 'femenino singular', los: 'masculino plural', las: 'femenino plural' }[a] + ')' : 'Sin art\u00edculo (desconocido)',
-    onClick: () => setMask({ artOverride: Object.assign({}, state.project.mask.artOverride, { [e.key]: a }) }) })));
+// ------------------------------------------------------------------ pairing suggestions
+
+const _STOP = new Set(['of', 'the', 'and', 'for', 'on', 'in', 'to', 'de', 'la', 'las', 'los', 'del', 'el', 'y', 'para', 'en', 'et', 'des', 'du', 'le', 'les', 'pour', 'sur', 'a', 'al']);
+const _fold = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const _words = (x) => _fold(x).split(/[^a-z0-9]+/).filter(w => w && !_STOP.has(w));
+const _isAcr = (x) => /^[A-Z\u00c0-\u00de]{2,8}$/.test(String(x || '').trim());
+const _letters = (x) => _fold(x).replace(/[^a-z]/g, '').split('').sort().join('');
+const _initials = (x) => _words(x).map(w => w[0]).join('');
+
+/** key -> Set(unit idx) where it occurs on `side`. */
+function _unitsByKey(side) {
+  const s = state.session;
+  const map = new Map();
+  for (const [pid, occs] of s.ent.occ[side]) {
+    const u = unitOf(s, side, pid);
+    if (!u) continue;
+    for (const o of occs) { if (!map.has(o.key)) map.set(o.key, new Set()); map.get(o.key).add(u.idx); }
+  }
+  return map;
+}
+
+/** How alike two forms are (0-5): same text, the same acronym in another order (UNDP / PNUD), an
+ *  acronym and its full name, the same figure, a short form, words with the same stem. */
+function _formSim(a, b) {
+  const fa = _fold(a), fb = _fold(b);
+  if (!fa || !fb) return 0;
+  if (fa === fb) return 5;
+  if (_isAcr(a) && _isAcr(b) && _letters(a) === _letters(b)) return 4;
+  if (_isAcr(a) && !_isAcr(b) && _letters(_initials(b)) === _letters(a)) return 4;
+  if (_isAcr(b) && !_isAcr(a) && _letters(_initials(a)) === _letters(b)) return 4;
+  const na = String(a).replace(/[^\d]/g, ''), nb = String(b).replace(/[^\d]/g, '');
+  if (na && nb && na === nb && na.length >= 2) return 4;
+  if (fa.length > 3 && fb.length > 3 && (fa.includes(fb) || fb.includes(fa))) return 3;
+  let st = 0;
+  for (const p of _words(a)) for (const q of _words(b)) if (p.length >= 4 && q.length >= 4 && p.slice(0, 4) === q.slice(0, 4)) st++;
+  return st ? Math.min(3, st + 1) : 0;
+}
+
+/**
+ * The entities of the OTHER language that may be the same as the subject, best first.
+ * subj = { side, forms:[text], units:Set(unit idx), cat, excludeKey }
+ * -> [{ x (entity), score, why:[text] }]
+ */
+function rankCandidates(subj) {
+  const s = state.session;
+  const other = subj.side === 'src' ? 'tgt' : 'src';
+  const byKey = _unitsByKey(other);
+  const out = [];
+  for (const x of s.ent.entities) {
+    if (x.key === subj.excludeKey) continue;
+    const xForms = Object.keys(other === 'src' ? x.srcForms : x.tgtForms);
+    if (!xForms.length) continue;
+    const xUnits = byKey.get(x.key) || new Set();
+    let score = 0;
+    const why = [];
+    const co = [...subj.units].some(u => xUnits.has(u));
+    const fits = !(subj.side === 'src' ? x.srcCount : x.tgtCount);
+    const sameCat = !subj.cat || x.cat === subj.cat;
+    if (co) { score += 6; why.push('mismo p\u00e1rrafo'); }
+    if (fits) { score += 3; why.push('sin pareja'); }
+    if (subj.cat && x.cat === subj.cat) score += 2;
+    let sim = 0;
+    for (const a of subj.forms) for (const b of xForms) sim = Math.max(sim, _formSim(a, b));
+    if (sim) { score += sim; why.push(sim >= 4 ? 'misma sigla o cifra' : 'forma parecida'); }
+    let d = 999;
+    for (const u of xUnits) for (const v of subj.units) d = Math.min(d, Math.abs(u - v));
+    score += 2 / (1 + d);
+    // Strong enough to be chosen in advance: a similar form, or an unpaired one of the same kind in
+    // the same paragraph.
+    const strong = sim >= 3 || (co && fits && sameCat);
+    out.push({ x, score, why, strong });
+  }
+  return out.sort((a, b) => b.score - a.score);
+}
+
+/**
+ * A list of candidates with a search box; the best one is chosen in advance when it is a likely match.
+ * -> { node, get value(), setSubject(subj), choose(key) }   opts = { allowNone, onChoose(x|null) }
+ */
+function pairPicker(subj, opts) {
+  const o = opts || {};
+  let ranked = rankCandidates(subj);
+  let chosen = null, best = null;
+  const pick = () => { const top = ranked.find(r => r.strong); best = top && top.score >= 6 ? top.x.key : null; };
+  pick();
+  chosen = best;
+  const q = el('input.inp', { type: 'search', placeholder: 'Buscar por etiqueta (ORG25) o por texto\u2026', style: { width: '100%' } });
+  const list = el('div.pairlist');
+  const draw = () => {
+    clear(list);
+    const fq = _fold(q.value.trim());
+    const rows = ranked.filter(r => !fq || _fold(r.x.cat + r.x.n).includes(fq) ||
+      Object.keys(r.x.srcForms).concat(Object.keys(r.x.tgtForms)).some(f => _fold(f).includes(fq)));
+    if (o.allowNone) {
+      list.appendChild(el('label.pairrow' + (chosen === null ? '.on' : ''), el('input', { type: 'radio', name: 'pairpick', checked: chosen === null ? true : null,
+        onchange: () => { chosen = null; draw(); if (o.onChoose) o.onChoose(null); } }), el('span', 'No: es una entidad nueva')));
+    }
+    if (!rows.length) list.appendChild(el('div.empty', q.value ? 'Nada coincide con la b\u00fasqueda.' : 'No hay ninguna entidad en la otra lengua.'));
+    for (const r of rows.slice(0, 150)) {
+      const x = r.x;
+      list.appendChild(el('label.pairrow' + (chosen === x.key ? '.on' : ''), { 'data-key': x.key },
+        el('input', { type: 'radio', name: 'pairpick', checked: chosen === x.key ? true : null, onchange: () => { chosen = x.key; draw(); if (o.onChoose) o.onChoose(x); } }),
+        el('span.tk.' + x.cat, x.cat + x.n),
+        el('span.pairforms', x.srcCount ? 'O: ' + Object.keys(x.srcForms).join(' \u00b7 ') : '', x.srcCount && x.tgtCount ? '  ' : '', x.tgtCount ? 'T: ' + Object.keys(x.tgtForms).join(' \u00b7 ') : ''),
+        x.key === best ? el('span.pill.ok', 'Sugerida') : (r.why.length ? el('span.pill.gray', r.why[0]) : null)));
+    }
+  };
+  q.addEventListener('input', draw);
+  draw();
+  return {
+    node: el('div', q, list),
+    get value() { return chosen; },
+    get best() { return best; },
+    setSubject(next) { ranked = rankCandidates(next); const was = chosen === best; pick(); if (was) chosen = best; draw(); },
+    choose(key) { chosen = key; draw(); }
+  };
 }
 
 async function mergeDialog(e) {
   // The usual case: an entity found on one side only whose counterpart got a tag of its own
-  // (UNDP in the original, PNUD in the translation). Those come first.
-  const onlySrc = e.srcCount > 0 && !e.tgtCount, onlyTgt = e.tgtCount > 0 && !e.srcCount;
-  const fits = (x) => (onlySrc && x.tgtCount > 0 && !x.srcCount) || (onlyTgt && x.srcCount > 0 && !x.tgtCount);
-  const others = state.session.ent.entities.filter(x => x.key !== e.key);
-  const score = (x) => (fits(x) ? 0 : 2) + (x.cat === e.cat ? 0 : 1);
-  others.sort((x, y) => score(x) - score(y) || (Math.abs((x.firstUnit || 0) - (e.firstUnit || 0)) - Math.abs((y.firstUnit || 0) - (e.firstUnit || 0))));
-  let chosen = null;
-  const listBox = el('div.pairlist');
-  let showAll = false;
-  const draw = () => {
-    clear(listBox);
-    const shown = showAll ? others : others.filter(x => fits(x) || x.cat === e.cat);
-    if (!shown.length) listBox.appendChild(el('div.empty', 'No hay ninguna entidad que encaje. Pulse \u00abVer todas\u00bb.'));
-    for (const x of shown.slice(0, 200)) {
-      const row = el('label.pairrow' + (chosen === x.key ? '.on' : ''),
-        el('input', { type: 'radio', name: 'pairpick', checked: chosen === x.key ? true : null, onchange: () => { chosen = x.key; draw(); } }),
-        el('span.tk.' + x.cat, x.art ? el('span.art', x.art) : null, x.cat + x.n),
-        el('span.pairforms', x.srcCount ? 'O: ' + Object.keys(x.srcForms).join(' \u00b7 ') : '', x.srcCount && x.tgtCount ? '  ' : '', x.tgtCount ? 'T: ' + Object.keys(x.tgtForms).join(' \u00b7 ') : ''),
-        fits(x) ? el('span.pill.ok', 'Encaja') : null);
-      listBox.appendChild(row);
-    }
-  };
-  draw();
-  const where = onlySrc ? 'solo en el original' : onlyTgt ? 'solo en la traducci\u00f3n' : 'en las dos lenguas';
-  const r = await modal({ title: 'Emparejar ' + e.cat + e.n, help: helpBtn('merge'), width: '640px', body: el('div',
-    el('p', el('span.tk.' + e.cat, e.art ? el('span.art', e.art) : null, e.cat + e.n), ' ',
-      el('b', Object.keys(e.srcForms).concat(Object.keys(e.tgtForms)).join(' \u00b7 ')), ' est\u00e1 ', where, '.'),
-    el('p.info', 'Elija la etiqueta que es la MISMA entidad en la otra lengua (por ejemplo, \u00abUNDP\u00bb en el original y \u00abPNUD\u00bb en la traducci\u00f3n). ' +
-      'Las dos pasar\u00e1n a llevar la misma etiqueta y dejar\u00e1n de salir como \u00absin pareja\u00bb. Arriba, las que encajan: est\u00e1n solo en la otra lengua.'),
-    listBox,
-    el('div', { style: { marginTop: '6px' } }, el('button.btn.link', { type: 'button', onclick: (ev) => { showAll = !showAll; ev.currentTarget.textContent = showAll ? 'Ver solo las que encajan' : 'Ver todas'; draw(); } }, 'Ver todas'))),
-    buttons: [{ label: 'Cancelar', value: null }, { label: 'Emparejar', kind: 'primary', value: 'ok', onClick: () => { if (!chosen) { toast('Elija una entidad de la lista.', 'warn'); return false; } } }] });
-  if (r !== 'ok' || !chosen) return;
+  // (UNDP in the original, PNUD in the translation).
+  const side = e.srcCount && !e.tgtCount ? 'src' : (e.tgtCount && !e.srcCount ? 'tgt' : 'tgt');
+  const forms = Object.keys(side === 'src' ? e.srcForms : e.tgtForms);
+  const units = _unitsByKey(side).get(e.key) || new Set();
+  const picker = pairPicker({ side, forms, units, cat: e.cat, excludeKey: e.key });
+  const where = e.srcCount && !e.tgtCount ? 'solo en el original' : (e.tgtCount && !e.srcCount ? 'solo en la traducci\u00f3n' : 'en las dos lenguas');
+  const r = await modal({ title: 'Emparejar ' + e.cat + e.n, help: helpBtn('merge'), width: '680px', body: el('div',
+    el('p', el('span.tk.' + e.cat, e.cat + e.n), ' ', el('b', forms.join(' \u00b7 ')), ' est\u00e1 ', where, '.'),
+    el('p.info', 'Elija la etiqueta de la otra lengua que es la MISMA entidad (por ejemplo, \u00abUNDP\u00bb y \u00abPNUD\u00bb). ' +
+      'Primero van las m\u00e1s probables: las que est\u00e1n en el mismo p\u00e1rrafo, sin pareja o con una forma parecida; la mejor viene marcada. Las dos pasar\u00e1n a ser la misma etiqueta.'),
+    picker.node),
+    buttons: [{ label: 'Cancelar', value: null }, { label: 'Emparejar', kind: 'primary', value: 'ok', onClick: () => { if (!picker.value) { toast('Elija una entidad de la lista.', 'warn'); return false; } } }] });
+  if (r !== 'ok' || !picker.value) return;
   // The entity that is paired keeps the tag of the one chosen.
-  setMask({ merges: Object.assign({}, state.project.mask.merges, { [e.key]: chosen }) });
+  setMask({ merges: Object.assign({}, state.project.mask.merges, { [e.key]: picker.value }) });
   toast('Emparejadas: ahora son la misma etiqueta.', 'ok');
 }
 
 async function saveToDict(e) {
-  const item = { cat: e.cat, art: e.art || '', en: state.project.srcLang === 'fr' ? [] : Object.keys(e.srcForms),
+  const item = { cat: e.cat, art: '', en: state.project.srcLang === 'fr' ? [] : Object.keys(e.srcForms),
     fr: state.project.srcLang === 'fr' ? Object.keys(e.srcForms) : [], es: Object.keys(e.tgtForms) };
   if (e.cat === 'NUM' || e.cat === 'FECHA') { toast('Las cifras y fechas se detectan solas: no hace falta guardarlas.', 'warn'); return; }
   await saveDictItem(item);
@@ -353,6 +473,11 @@ async function saveToDict(e) {
 }
 
 // ------------------------------------------------------------------ sheets
+
+function _inReveal(side, pid, o) {
+  const r = revealed && revealed[side];
+  return !!r && r.pid === pid && o.start >= r.start && o.end <= r.end;
+}
 
 function renderPanes() {
   if (!state.session) return;
@@ -368,52 +493,137 @@ function renderPanes() {
         if (!e) return null;
         const bad = e.status === 'nopair';
         const sel = selectedKey === o.key;
-        if (showOriginal) {
-          return { start: o.start, end: o.end, cls: 'ent-orig ' + e.cat + (bad ? ' bad' : '') + (sel ? ' sel' : ''),
-            attrs: { title: e.cat + e.n + ' \u00b7 ' + STATUS_LABELS[e.status], 'data-key': o.key, 'data-occ': side + ':' + p.id + ':' + o.start } };
+        const occ = side + ':' + p.id + ':' + o.start;
+        const shown = _inReveal(side, p.id, o);
+        if (showOriginal || shown) {
+          return { start: o.start, end: o.end, cls: 'ent-orig ' + e.cat + (bad ? ' bad' : '') + (sel ? ' sel' : '') + (shown ? ' revealed' : ''),
+            attrs: { title: e.cat + e.n, 'data-key': o.key, 'data-occ': occ } };
         }
-        const pill = el('span.tk.' + e.cat + (bad ? '.bad' : '') + (sel ? '.sel' : ''), {
-          title: o.surface + ' \u00b7 ' + STATUS_LABELS[e.status], 'data-key': o.key, 'data-occ': side + ':' + p.id + ':' + o.start },
-          side === 'tgt' && e.art ? el('span.art', e.art) : null, e.cat + e.n);
+        // The tooltip shows only what the tag hides.
+        const pill = el('span.tk.' + e.cat + (bad ? '.bad' : '') + (sel ? '.sel' : ''), { title: o.surface, 'data-key': o.key, 'data-occ': occ }, e.cat + e.n);
         return { start: o.start, end: o.end, replace: pill };
       }).filter(Boolean),
-      onParaClick: (p, ev) => {
-        const t = ev.target.closest('[data-key]');
-        nav.clickAt(side, ev);
-        if (t) selectEntity(t.dataset.key === selectedKey ? null : t.dataset.key, false);
-      }
+      onParaClick: (p, ev) => onSheetClick(side, p, ev)
     });
     panes[side].scrollTop = keep;
-    panes[side].oncontextmenu = (ev) => {
-      const t = ev.target.closest('[data-occ]');
-      // Right click on selected text: offer to mask it (keep the selection: clicking the menu clears it).
-      const sel = window.getSelection();
-      const txt = sel ? sel.toString().replace(/\s+/g, ' ').trim() : '';
-      if (!t && txt.length >= 2 && sel.anchorNode && panes[side].contains(sel.anchorNode)) {
-        ev.preventDefault();
-        openMenu({ x: ev.clientX, y: ev.clientY }, [
-          { header: '\u00ab' + (txt.length > 40 ? txt.slice(0, 37) + '\u2026' : txt) + '\u00bb' },
-          { label: 'Enmascarar la selecci\u00f3n\u2026 (Alt+E)', onClick: () => maskSelection({ text: txt, side }) },
-          { label: 'Copiar', onClick: () => copyText(txt) }
-        ]);
-        return;
-      }
-      if (!t) return;
-      ev.preventDefault();
-      occMenu(ev, t.dataset.key, t.dataset.occ);
-    };
+    panes[side].oncontextmenu = (ev) => onSheetMenu(side, ev);
   }
   nav.refresh();
 }
 
-function occMenu(ev, key, occ) {
-  const e = state.session.ent.byKey.get(key);
-  openMenu({ x: ev.clientX, y: ev.clientY }, [
-    { header: e ? e.cat + e.n : key },
-    { label: 'No enmascarar esta aparici\u00f3n', onClick: () => setMask({ removedOcc: (state.project.mask.removedOcc || []).concat([occ]) }) },
-    { label: 'No enmascarar esta entidad en todo el documento', onClick: () => setMask({ removedKeys: (state.project.mask.removedKeys || []).concat([key]) }) },
-    { label: 'Ver la entidad en la lista', onClick: () => selectEntity(key, true) }
-  ]);
+function onSheetClick(side, p, ev) {
+  const t = ev.target.closest('[data-key]');
+  const r = nav.clickAt(side, ev);
+  // A click elsewhere puts back the tags of a sentence shown unmasked.
+  if (revealed) {
+    const rv = revealed[side];
+    const inside = rv && r && r.offset !== null && rv.pid === r.pid && r.offset >= rv.start && r.offset <= rv.end;
+    if (!inside) { revealed = null; renderPanes(); }
+  }
+  if (t) {
+    // A tag: its entity is selected, glowing in red in both sentences; the other sheet follows.
+    selectedKey = t.dataset.key;
+    renderList();
+    renderPanes();
+    const u = unitOf(state.session, side, p.id);
+    if (u) nav.focusUnit(u.idx, { key: t.dataset.key, quiet: true });
+    const card = document.querySelector('#mask-entities .ent.sel');
+    if (card) card.scrollIntoView({ block: 'nearest' });
+  }
+}
+
+/** Right click: on selected text, mask it; on a tag, its own menu; on a sentence, "Desenmascarar". */
+function onSheetMenu(side, ev) {
+  const t = ev.target.closest('[data-occ]');
+  const sel = window.getSelection();
+  const txt = sel ? sel.toString().replace(/\s+/g, ' ').trim() : '';
+  if (!t && txt.length >= 2 && sel.anchorNode && panes[side].contains(sel.anchorNode)) {
+    ev.preventDefault();
+    openMenu({ x: ev.clientX, y: ev.clientY }, [
+      { header: '\u00ab' + (txt.length > 40 ? txt.slice(0, 37) + '\u2026' : txt) + '\u00bb' },
+      { label: 'Enmascarar la selecci\u00f3n\u2026 (Alt+E)', onClick: () => maskSelection({ text: txt, side }) },
+      { label: 'Copiar', onClick: () => copyText(txt) }
+    ]);
+    return;
+  }
+  const pe = ev.target.closest('.p[data-pid]');
+  if (!pe) return;
+  ev.preventDefault();
+  const pid = +pe.dataset.pid;
+  const off = offsetAt(ev, pe);
+  const index = off === null ? null : sentenceAt(sentencesOf(state.session, side, pid), off);
+  const items = [];
+  if (t) {
+    const e = state.session.ent.byKey.get(t.dataset.key);
+    items.push({ header: e ? e.cat + e.n : t.dataset.key });
+  } else items.push({ header: 'Frase' });
+  if (index !== null && index >= 0) items.push({ label: 'Desenmascarar', onClick: () => revealSentence(side, pid, index) });
+  if (t) {
+    const key = t.dataset.key, occ = t.dataset.occ;
+    items.push({ sep: true },
+      { label: 'No enmascarar esta aparici\u00f3n', onClick: () => setMask({ removedOcc: (state.project.mask.removedOcc || []).concat([occ]) }) },
+      { label: 'No enmascarar esta entidad en todo el documento', onClick: () => setMask({ removedKeys: (state.project.mask.removedKeys || []).concat([key]) }) },
+      { label: 'Ver la entidad en la lista', onClick: () => selectEntity(key, true) });
+  }
+  openMenu({ x: ev.clientX, y: ev.clientY }, items);
+}
+
+/** Shows a sentence and its counterpart with the real text, until another sentence is clicked. */
+function revealSentence(side, pid, index) {
+  const s = state.session;
+  const other = side === 'src' ? 'tgt' : 'src';
+  const sp = sentencesOf(s, side, pid)[index];
+  if (!sp) return;
+  revealed = { [side]: { pid, start: sp.start, end: sp.end } };
+  const peer = sentencePeers(s, side, pid, index);
+  if (peer) {
+    const spans = sentencesOf(s, other, peer.pid);
+    const pick = peer.list.map(i => spans[i]).filter(Boolean);
+    revealed[other] = pick.length ? { pid: peer.pid, start: Math.min(...pick.map(x => x.start)), end: Math.max(...pick.map(x => x.end)) }
+      : { pid: peer.pid, start: 0, end: paraText(s, other, peer.pid).length };
+  }
+  renderPanes();
+  nav.markSentence(side, pid, index, null);
+}
+
+/** Hovering a tag: its counterpart in the other sheet glows (in the paired sentence when known). */
+function attachTagHover() {
+  for (const side of ['src', 'tgt']) {
+    let cur = null;
+    const drop = () => {
+      for (const x of document.querySelectorAll('#mask-src .glow, #mask-tgt .glow')) x.classList.remove('glow');
+      cur = null;
+    };
+    panes[side].addEventListener('mouseover', (ev) => {
+      const t = ev.target.closest && ev.target.closest('[data-key]');
+      if (t === cur) return;
+      drop();
+      if (!t || !state.session) return;
+      cur = t;
+      const s = state.session;
+      const other = side === 'src' ? 'tgt' : 'src';
+      const pe = t.closest('.p[data-pid]');
+      if (!pe) return;
+      const pid = +pe.dataset.pid;
+      const opid = peerPid(s, side, pid);
+      const ope = opid === null ? null : panes[other].querySelector('.p[data-pid="' + opid + '"]');
+      if (!ope) return;
+      const key = t.dataset.key;
+      const all = Array.from(ope.querySelectorAll('[data-key]')).filter(x => x.dataset.key === key);
+      if (!all.length) return;
+      // Prefer the ones inside the sentence paired with the hovered one.
+      const start = +String(t.dataset.occ || '').split(':')[2];
+      const idx = sentenceAt(sentencesOf(s, side, pid), start);
+      const peer = sentencePeers(s, side, pid, idx);
+      const spans = sentencesOf(s, other, opid);
+      const inPeer = peer && peer.list.length ? all.filter(x => {
+        const o = +String(x.dataset.occ || '').split(':')[2];
+        return peer.list.some(i => spans[i] && o >= spans[i].start && o < spans[i].end);
+      }) : [];
+      for (const x of (inPeer.length ? inPeer : all)) x.classList.add('glow');
+    });
+    panes[side].addEventListener('mouseleave', drop);
+  }
 }
 
 function onSearch(e) {
@@ -448,38 +658,41 @@ async function maskSelection(preset) {
   if (/\{|\}/.test(text)) { toast('La selecci\u00f3n incluye una etiqueta: use \u00abVer original\u00bb para seleccionar el texto real.', 'warn', 6000); return; }
   const catSel = el('select.inp', CATS.map(c => el('option', { value: c }, CAT_SINGULAR[c])));
   catSel.value = 'X';
-  const artSel = el('select.inp', ARTICLES.map(a => el('option', { value: a }, a || 'Sin art\u00edculo')));
   const other = el('input.inp', { placeholder: side === 'src' ? 'Forma en la traducci\u00f3n (opcional)' : 'Forma en el original (opcional)' });
-  const pairSel = el('select.inp', el('option', { value: '' }, 'No: es una entidad nueva'),
-    state.session.ent.entities.map(x => el('option', { value: x.key }, x.cat + x.n + ' \u2014 ' + (mainForm(x.srcForms) || mainForm(x.tgtForms)))));
+  // Where the selection is (to suggest the entity of the other language in the same paragraphs).
+  const units = new Set();
+  const model = side === 'src' ? state.session.src : state.session.tgt;
+  const ft = _fold(text);
+  for (const p of model.paras) if (_fold(p.text).includes(ft)) { const u = unitOf(state.session, side, p.id); if (u) units.add(u.idx); }
+  let catTouched = false, pairTouched = false;
+  const subj = () => ({ side, forms: [text].concat(other.value.trim() ? [] : []), units, cat: catTouched ? catSel.value : null, excludeKey: null });
+  const picker = pairPicker(subj(), { allowNone: true, onChoose: (x) => { pairTouched = true; if (x && !catTouched) catSel.value = x.cat; } });
+  if (picker.best && !catTouched) catSel.value = state.session.ent.byKey.get(picker.best).cat;
+  catSel.addEventListener('change', () => { catTouched = true; if (!pairTouched) picker.setSubject(subj()); });
   // Typing the other-language form of an entity that is already masked pairs the two automatically
   // (until the user picks something in the list by hand).
-  let pairTouched = false;
-  pairSel.addEventListener('change', () => { pairTouched = true; });
   other.addEventListener('input', () => {
     if (pairTouched) return;
     const v = other.value.trim();
     const hit = v && state.session.ent.entities.find(x => Object.keys(side === 'src' ? x.tgtForms : x.srcForms).includes(v));
-    pairSel.value = hit ? hit.key : '';
+    picker.choose(hit ? hit.key : picker.best);
   });
   const dict = el('input', { type: 'checkbox' });
   const body = el('div',
     el('p', 'Enmascarar \u00ab', el('b', text), '\u00bb en ', side === 'src' ? 'el original' : 'la traducci\u00f3n', ' (todas sus apariciones).'),
-    el('div.form-grid',
-      el('div.field', el('label.lbl', 'Categor\u00eda'), catSel),
-      el('div.field', el('label.lbl', 'Art\u00edculo en espa\u00f1ol'), artSel)),
-    el('div.field', el('label.lbl', 'Es la misma entidad que'), pairSel),
+    el('div.field', el('label.lbl', 'Categor\u00eda'), catSel),
+    el('div.field', el('label.lbl', 'Es la misma entidad que (en la otra lengua)'), picker.node),
     el('div.field', el('label.lbl', side === 'src' ? 'Forma en la traducci\u00f3n' : 'Forma en el original'), other),
     el('label', dict, ' Guardar tambi\u00e9n en mi diccionario personal (para todos los documentos)'));
-  const r = await modal({ title: 'Enmascarar selecci\u00f3n', help: helpBtn('mask-selection'), body, buttons: [{ label: 'Cancelar', value: null }, { label: 'Enmascarar', kind: 'primary', value: 'ok' }] });
+  const r = await modal({ title: 'Enmascarar selecci\u00f3n', help: helpBtn('mask-selection'), width: '680px', body, buttons: [{ label: 'Cancelar', value: null }, { label: 'Enmascarar', kind: 'primary', value: 'ok' }] });
   if (r !== 'ok') return;
-  const term = { id: uid('t'), cat: catSel.value, art: artSel.value, src: [], tgt: [] };
+  const term = { id: uid('t'), cat: catSel.value, art: '', src: [], tgt: [] };
   if (side === 'src') { term.src.push(text); if (other.value.trim()) term.tgt.push(other.value.trim()); }
   else { term.tgt.push(text); if (other.value.trim()) term.src.push(other.value.trim()); }
   const mask = state.project.mask;
   const patch = { terms: (mask.terms || []).concat([term]) };
   if (!mask.cats.includes(term.cat)) patch.cats = mask.cats.concat([term.cat]);
-  if (pairSel.value) patch.merges = Object.assign({}, mask.merges, { ['t:' + term.id]: pairSel.value });
+  if (picker.value) patch.merges = Object.assign({}, mask.merges, { ['t:' + term.id]: picker.value });
   setMask(patch);
   if (dict.checked) {
     await saveDictItem({ cat: term.cat, art: term.art, en: state.project.srcLang === 'fr' ? [] : term.src, fr: state.project.srcLang === 'fr' ? term.src : [], es: term.tgt });
