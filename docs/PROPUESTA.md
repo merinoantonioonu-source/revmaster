@@ -25,6 +25,8 @@ Están hechas todas las fases, de la 0 a la 6. La fase 6 incluye:
 
 Los detalles técnicos están en `docs/ARQUITECTURA.md`, §9 y §10.
 
+**Cambio de rumbo (2026-11-05):** la revisión es solo con IA y de fondo. Se retiraron las comprobaciones sin IA, las reglas y la similitud semántica, y las etiquetas ya no llevan artículo. Véase `docs/ARQUITECTURA.md`, §12.
+
 ## 0. Decisiones tomadas (2026-11-04)
 
 | Tema | Decisión |

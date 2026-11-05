@@ -13,7 +13,6 @@
 import { resolveClient, getProvider, getApiKey } from './registry.js';
 import { recordUsage, costOf, priceFor, BATCH_SUFFIX } from './usage.js';
 import { batchKind, submitBatch, pollBatch, batchResults, cancelBatch } from './batch.js';
-import { embedApi, embeddingsSupported } from './embeddings.js';
 
 export const DEFAULT_TEMPERATURE = 0.2;
 
@@ -153,24 +152,3 @@ export async function cancelDeferred(job) {
   return cancelBatch(job, profile, key);
 }
 
-// ------------------------------------------------------------------ embeddings (semantic similarity)
-
-/**
- * embedTexts({ provider, model, texts, masked, module, project, file, signal, onProgress })
- *   -> { vectors, usage, cost }   (API engine; the local engine never comes through here)
- */
-export async function embedTexts(o) {
-  const profile = await getProvider(o.provider);
-  if (!profile) throw _err('NO_PROVIDER', 'Elija en Ajustes > M\u00f3dulos el proveedor de la similitud sem\u00e1ntica.');
-  if (!embeddingsSupported(profile)) throw _err('NO_EMBEDDINGS', (profile.name || profile.adapter) + ' no ofrece embeddings en UMBRA.');
-  if (o.masked !== true && !(o.allowUnmasked === true && profile.trust === 'local')) throw _err('UNMASKED', UNMASKED_MSG);
-  const key = await getApiKey(profile.id);
-  const r = await embedApi(profile, key, o.model, o.texts || [], { signal: o.signal, onProgress: o.onProgress });
-  let cost = null;
-  try {
-    await recordUsage({ module: o.module || 'semantic', provider: profile.id, model: r.model, usage: r.usage,
-      project: o.project || '', file: o.file || '', words: 0 });
-    cost = costOf(r.usage, await priceFor(profile.id, r.model));
-  } catch (_) {}
-  return { vectors: r.vectors, usage: r.usage, cost };
-}

@@ -135,3 +135,5 @@ export function applyAccepted(session, findings) {
 }
 
 export const STATE_LABELS = { open: 'Pendiente', accepted: 'Aceptado', rejected: 'Rechazado', ignored: 'Ignorado', discarded: 'Descartado por el verificador' };
+export const SEVERITIES = ['CRI', 'MAY', 'MEN', 'SUG'];
+export const SEV_LABELS = { CRI: 'Cr\u00edtica', MAY: 'Mayor', MEN: 'Menor', SUG: 'Sugerencia' };

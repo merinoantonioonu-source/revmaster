@@ -19,8 +19,8 @@ navegador: no se suben a GitHub ni a ningún servidor. A una IA solo llega texto
    - símbolos de documentos;
    - direcciones web y de correo.
 
-   Cada uno se sustituye por una etiqueta: `{CARGO1}` en el original y `{el CARGO1}` en la
-   traducción. El artículo de dentro de la llave indica el género y el número.
+   Cada uno se sustituye por una etiqueta, como `{CARGO1}`, que es la misma en el original y en la
+   traducción. Al pasar el ratón por una etiqueta se ve lo que oculta.
 
    La misma entidad lleva la misma etiqueta en las dos lenguas. Por eso, si una cifra no coincide,
    aparece como «Sin pareja».
@@ -29,9 +29,11 @@ navegador: no se suben a GitHub ni a ningún servidor. A una IA solo llega texto
    - el documento censurado, en el mismo formato;
    - una tabla bilingüe;
    - el texto listo para pegar en una IA externa.
-2. **Revisar.** Hay unas comprobaciones sin IA, gratis e instantáneas. Además, hay ocho módulos con IA:
+2. **Revisar.** Una revisión de fondo, del contenido, hecha por IA como la haría un revisor humano.
+   No repite lo que ya hacen el QA Checker y el Final Check de COMeT (cifras, ortografía, reglas fijas).
+   Cada módulo es un revisor especializado que solo busca lo que le compete:
    - gramática (la ortografía la corrige Word);
-   - fidelidad;
+   - fidelidad de sentido;
    - integridad (omisiones y adiciones);
    - estilo;
    - coherencia;
@@ -39,16 +41,13 @@ navegador: no se suben a GitHub ni a ningún servidor. A una IA solo llega texto
    - lectura en frío;
    - verificador.
 
-   Cada módulo tiene su propio proveedor, su modelo y sus reglas. Antes de gastar nada, UMBRA
-   muestra el plan con su coste estimado.
+   Cada módulo tiene su propio proveedor, su modelo y su **exigencia** (solo lo importante, normal o
+   exhaustiva). Antes de gastar nada, UMBRA muestra el plan con su coste estimado.
 
    Además:
    - **Navegación por oraciones, como en Final Check:** al pulsar una oración se resalta con su
      pareja en la otra hoja; al pulsar un hallazgo, las dos hojas van a su oración.
    - **Tabla de hallazgos** en una ventana aparte, y un **Excel para valorar** los hallazgos.
-   - **Similitud semántica (opcional):** compara el sentido de cada oración del original con las de
-     la traducción para encontrar omisiones y adiciones. Funciona en tu navegador, sin coste, o con un
-     proveedor, con texto enmascarado.
    - **Modo diferido:** la primera pasada va a la API de lotes del proveedor (Gemini, Anthropic,
      Mistral u OpenAI). Cuesta la mitad y responde en minutos u horas.
 3. **Exportar.** La traducción revisada sale así:

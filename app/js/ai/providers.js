@@ -198,6 +198,10 @@ class GeminiClient {
       contents: [{ role: 'user', parts: [{ text: String(prompt || '') }] }],
       generationConfig: { maxOutputTokens: options.maxTokens || DEFAULT_MAX_TOKENS }
     };
+    // Gemini 2.5 and later reason before they answer and those tokens count against maxOutputTokens:
+    // with 8192 a long batch could be cut with no answer at all. They accept up to 65536; the cap
+    // costs nothing (only tokens actually written are billed).
+    if (/^gemini-(?:2\.5|[3-9])/i.test(this.model)) payload.generationConfig.maxOutputTokens = Math.max(payload.generationConfig.maxOutputTokens, 32768);
     // Temperature only where the model takes it. 0 is a valid value.
     if (_geminiTakesTemperature(this.model)) {
       payload.generationConfig.temperature = options.temperature !== undefined ? options.temperature : 0.7;
@@ -576,7 +580,7 @@ export async function testConnection(profile, modelId, apiKey, opts) {
 // For tests: the pure rules.
 export const _internals = { _geminiTakesTemperature, _geminiThinking, _claudeVersion, _claudeTakesTemperature, _claudeEffort };
 
-// Shared low-level helpers for the batch (ai/batch.js) and embeddings (ai/embeddings.js) modules,
+// Shared low-level helpers for the batch module (ai/batch.js),
 // so they speak to each provider exactly like the clients above.
 export const _http = {
   send: _send, readError: _readError, httpError: _httpError, err: _err, base: baseUrlOf,

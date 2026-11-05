@@ -3,7 +3,7 @@
  * calls, the Verifier, the results cache and the budget.
  *
  * runPlan(plan, ctx, hooks) -> { findings:[...], spent, calls, errors:[{module, message}], stopped }
- * ctx   = { session, project: { id, name, file }, prompts, cfg, rules }
+ * ctx   = { session, project: { id, name, file }, prompts, cfg }
  * hooks = { onProgress({ done, total, label, module }), onFindings(list), signal, budget (US$, 0 = none) }
  */
 
@@ -12,7 +12,8 @@ import { idbPut } from '../store/idb.js';
 import { parseFindings, parseVerdicts } from './parse.js';
 import { anchorItem, sameFinding } from './findings.js';
 import { cacheKey, buildBatchUser } from './planner.js';
-import { CAT_MODULE, verifierPrompt } from './prompts.js';
+import { CAT_MODULE, verifierPrompt, strictnessOf, STRICT_ALLOWED } from './prompts.js';
+import { moduleById } from './module-list.js';
 import { unitSrcMasked, unitTgtMasked } from './session.js';
 import { rehydrate } from '../redact/entities.js';
 
@@ -42,10 +43,12 @@ export async function runPlan(plan, ctx, hooks) {
     return r;
   };
 
+  // "Exigencia": findings of a severity the module was not asked for are dropped.
+  const wanted = (f) => !f.module || !moduleById(f.module) || STRICT_ALLOWED[strictnessOf(ctx.cfg, f.module)].includes(f.sev);
   const push = (list) => {
     const fresh = [];
     for (const f of list) {
-      if (!f) continue;
+      if (!f || !wanted(f)) continue;
       if (out.findings.some(x => sameFinding(x, f))) continue;
       out.findings.push(f);
       fresh.push(f);
@@ -70,10 +73,6 @@ export async function runPlan(plan, ctx, hooks) {
     if (out.stopped) break;
     const flagged = new Set();
     const groupFindings = [];
-    // Units the local layer already suspects (omissions, additions, meaning) go to the deep model too.
-    if (g.deep && h.localFlags) {
-      for (const b of g.batches) for (const it of b.items) if (h.localFlags.has(it.u.n)) flagged.add(it.u.n);
-    }
     for (let bi = 0; bi < g.batches.length; bi++) {
       const b = g.batches[bi];
       if (out.stopped) break;
@@ -87,6 +86,7 @@ export async function runPlan(plan, ctx, hooks) {
       } catch (e) {
         if (e.code === 'BUDGET' || e.code === 'ABORT') break;
         out.errors.push({ module: g.modules.join('+'), message: e.message, code: e.code });
+        if (e.code === 'TRUNCATED') continue;   // one paragraph too long: the other batches still run
         break;
       }
       for (const [n, items] of res) {
@@ -96,7 +96,7 @@ export async function runPlan(plan, ctx, hooks) {
           const module = g.modules.length === 1 ? g.modules[0] : (CAT_MODULE[it.cat] && g.modules.includes(CAT_MODULE[it.cat]) ? CAT_MODULE[it.cat] : g.modules[0]);
           const f = anchorItem(it, { session, unitByN, module, source: 'ai', model: g.tri.modelId, role: 'triage' });
           if (f) groupFindings.push(f);
-          if (g.deep && DEEP_CATS[module] && DEEP_CATS[module].includes(it.cat)) flagged.add(n);
+          if (g.deep && DEEP_CATS[module] && DEEP_CATS[module].includes(it.cat) && (it.sev === 'CRI' || it.sev === 'MAY' || strictnessOf(ctx.cfg, module) !== 'grave')) flagged.add(n);
         }
       }
       // Cache per module (an empty list is a result too).
@@ -109,7 +109,7 @@ export async function runPlan(plan, ctx, hooks) {
         const chunk = unitsDeep.slice(i, i + 20);
         progress('A fondo ' + (Math.floor(i / 20) + 1), g.modules.join('+'));
         try {
-          const user = buildBatchUser(session, chunk, g.input, g.rules);
+          const user = buildBatchUser(session, chunk, g.input);
           const res = await _runBatch(chunk, g, g.deep, 'deep', user, 0, call, ctx);
           const ns = new Set(chunk.map(u => u.n));
           for (let k = groupFindings.length - 1; k >= 0; k--) {
@@ -176,30 +176,50 @@ function _thinking(cfg, moduleId) {
   return t || null;
 }
 
-/** One batch: call, parse, re-ask the second half when the answer was cut (no FIN). */
-async function _runBatch(units, g, client, role, user, est, call, ctx, preText) {
+/**
+ * One batch: call and parse. When the answer was cut (the provider stopped at its output limit, or no
+ * "FIN n"), what arrived is kept and the units not answered are asked again, split in halves when
+ * needed, so a long batch never loses its tail.
+ */
+async function _runBatch(units, g, client, role, user, est, call, ctx, preText, depth) {
   const session = ctx.session;
+  const lvl = depth || 0;
   const valid = new Set(units.map(u => u.n));
   const moduleId = g.modules[0];
   const words = units.reduce((n, u) => n + (unitTgtMasked(session, u).match(/\S+/g) || []).length, 0);
-  // A deferred batch already answered (preText): parse it; only a cut answer is completed now.
-  const r = (preText !== null && preText !== undefined) ? { text: preText }
-    : await call({ module: moduleId, usageModule: g.modules.join('+'), role, prompt: user, system: g.system, words,
-      thinking: _thinking(ctx.cfg, moduleId), maxTokens: 8192 }, est ? _estCost(est) : 0);
-  const parsed = parseFindings(r.text, valid);
+  let text, cut = false;
+  if (preText !== null && preText !== undefined) text = preText;
+  else {
+    try {
+      const r = await call({ module: moduleId, usageModule: g.modules.join('+'), role, prompt: user || buildBatchUser(session, units, g.input), system: g.system,
+        words, thinking: _thinking(ctx.cfg, moduleId), maxTokens: 8192 }, est ? _estCost(est) : 0);
+      text = r.text;
+    } catch (e) {
+      if (e.code !== 'TRUNCATED') throw e;
+      // Keep the complete lines of what was written; the last one may be cut.
+      text = String(e.partial || '').replace(/[^\n]*$/, '');
+      cut = true;
+      // A single paragraph that does not fit: nothing smaller to ask.
+      if (units.length === 1 && !parseFindings(text, valid).items.length) throw e;
+    }
+  }
+  const parsed = parseFindings(text, valid);
   const res = new Map();
   for (const n of valid) res.set(n, []);
   for (const it of parsed.items) res.get(it.unit).push(it);
-  if (parsed.fin === null && units.length > 2) {
-    // Cut answer: re-ask the units after the last one mentioned (or the second half).
+  // Incomplete: cut by the provider, or items without the closing "FIN n" (an empty answer without
+  // FIN is taken as "nothing to report": asking again would only spend).
+  if ((cut || (parsed.fin === null && parsed.items.length > 0)) && lvl < 4) {
     const lastMentioned = parsed.items.length ? Math.max(...parsed.items.map(i => i.unit)) : null;
-    const rest = units.filter(u => lastMentioned === null ? u.n >= units[Math.floor(units.length / 2)].n : u.n > lastMentioned);
-    if (rest.length && rest.length < units.length) {
-      const user2 = buildBatchUser(session, rest, g.input, g.rules);
-      const r2 = await call({ module: moduleId, usageModule: g.modules.join('+'), role, prompt: user2, system: g.system, words: 0, thinking: _thinking(ctx.cfg, moduleId), maxTokens: 8192 }, 0);
-      const p2 = parseFindings(r2.text, new Set(rest.map(u => u.n)));
-      for (const u of rest) res.set(u.n, []);
-      for (const it of p2.items) res.get(it.unit).push(it);
+    let rest = units.filter(u => lastMentioned === null || u.n > lastMentioned);
+    if (lastMentioned !== null) for (const it of parsed.items) if (it.unit === lastMentioned && cut) { rest = units.filter(u => u.n >= lastMentioned); break; }
+    if (rest.length) {
+      // Same size as before: halve it; otherwise ask the rest as it is.
+      const parts = rest.length === units.length ? (rest.length > 1 ? [rest.slice(0, Math.ceil(rest.length / 2)), rest.slice(Math.ceil(rest.length / 2))] : []) : [rest];
+      for (const part of parts) {
+        const sub = await _runBatch(part, g, client, role, null, 0, call, ctx, null, lvl + 1);
+        for (const [n, items] of sub) res.set(n, items);
+      }
     }
   }
   return res;
@@ -243,10 +263,10 @@ export async function verifyFindings(findings, ctx, call, progress) {
     chunk.forEach((f, k) => {
       const id = 'H' + (k + 1);
       ids.set(id, f);
-      lines += id + ' | ' + session.units[f.unit].n + ' | ' + f.cat + ' | ' + (f.quoteMasked || '') + ' | ' + (f.suggestionMasked || '') + ' | ' +
+      lines += id + ' | ' + session.units[f.unit].n + ' | ' + ((moduleById(f.module) || { label: f.module }).label.toUpperCase()) + ' | ' + f.cat + ' | ' + (f.quoteMasked || '') + ' | ' + (f.suggestionMasked || '') + ' | ' +
         String(f.reason || '').replace(/\|/g, '/') + '\n';
     });
-    const r = await call({ module: 'verifier', role: 'deep', prompt: ctxText + '\n' + lines + '\nRecuerda: una l\u00ednea por hallazgo y, al final, FIN ' + chunk.length + '.',
+    const r = await call({ module: 'verifier', role: 'deep', prompt: ctxText + '\n' + lines + '(FIN ' + chunk.length + ')',
       system: verifierPrompt(ctx.prompts, session.srcLang), words: 0, thinking: _thinking(ctx.cfg, 'verifier'), maxTokens: 4096 }, 0);
     const { verdicts } = parseVerdicts(r.text);
     for (const [id, v] of verdicts) {

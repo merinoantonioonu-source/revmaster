@@ -332,3 +332,59 @@ Emula la navegación de Final Check de COMeT (comportamiento copiado; código nu
   - Los hallazgos cuya propuesta es idéntica a la cita se descartan al leer la respuesta
     (`parseFindings`).
 
+## 12. Revisión solo con IA, sin artículos en las etiquetas (2026-11-05)
+
+Ahora el objetivo, en palabras del usuario, es una revisión de fondo, del contenido, hecha por IA como la haría
+un revisor humano. Las comprobaciones basadas en reglas ya las hacen el QA Checker y el Final Check de COMeT,
+y aquí solo añadían ruido.
+
+- **Retirado** (ver el historial de git):
+  - las comprobaciones sin IA (`review/local-checks.js`);
+  - la similitud semántica (`review/semantic.js`, `ai/embeddings.js`, `libs/transformers`);
+  - el sistema de reglas (`rules/*`, `ui/rules-editor.js`, `data/rules-default.json`) y los perfiles.
+
+  Lo que se describe de ellos en los §9 y §10 queda como historia.
+- **Instrucciones** (`review/prompts.js`):
+  - Son cortas, porque viajan una vez por lote.
+  - Cada tarea dice qué buscar y también qué NO es de su competencia.
+  - La Fidelidad es solo de sentido. Su prueba es: «¿el lector entendería algo distinto?».
+- **Exigencia por módulo** (`strictness`, valores `grave`, `normal` o `estricta`):
+  - Va en el prompt.
+  - El ejecutor la impone además: descarta las gravedades que no se pidieron (`STRICT_ALLOWED`).
+  - Por defecto es `grave` en Fidelidad, Integridad y Lectura en frío, y `normal` en el resto.
+- **Respuestas cortadas** (`runner._runBatch`):
+  - Ante un `TRUNCATED` del proveedor, o una respuesta sin `FIN`, se conservan las líneas completas.
+  - Después se pregunta de nuevo por el resto, partido en mitades si hace falta (hasta 4 niveles).
+  - Si un solo párrafo no cabe, se anota el error y los demás lotes siguen.
+  - Gemini 2.5 y posteriores reciben `maxOutputTokens` de al menos 32768, porque su razonamiento cuenta
+    contra ese límite.
+  - Los lotes por defecto son más pequeños: 1100 palabras en los módulos bilingües y 1800 en los de solo
+    español.
+- **Etiquetas sin artículo**: `{ORGANO2}` es la misma en las dos lenguas. `TAG_RE` sigue leyendo
+  `{la ORGANO2}` en textos antiguos.
+- **Navegación** (`ui/nav.js`):
+  - Cuando los dos párrafos no tienen el mismo número de oraciones, `alignSentences` las alinea con una
+    programación dinámica (1-1, 1-2, 2-1, 1-0, 0-1). Usa la longitud y, como anclas, las entidades comunes.
+  - Si un lado no tiene párrafo, se marca el más cercano (`nearestPara`).
+  - La entidad que se mira lleva la clase `.hot` (brillo rojo).
+- **Enmascarar** (`ui/mask-view.js`):
+  - Al pulsar una tarjeta se navega a la entidad.
+  - El tooltip de una etiqueta muestra solo la forma oculta, y su pareja recibe la clase `.glow`.
+  - El menú contextual «Desenmascarar» de una frase deja ver su texto real y el de su pareja hasta el
+    siguiente clic en otra frase.
+  - `pairPicker` y `rankCandidates` ofrecen un buscador y una sugerencia automática en «Emparejar» y en
+    Alt+E. La sugerencia se basa en:
+    - el mismo párrafo;
+    - estar sin pareja;
+    - la misma sigla en otro orden (UNDP/PNUD);
+    - una sigla y su nombre completo;
+    - la misma cifra;
+    - una forma corta;
+    - raíces comunes.
+- **Excel para valorar**: `dataValidations` se inserta antes de `ignoredErrors`. El orden del esquema
+  importa a Excel y, si no se respeta, Excel «repara» el archivo.
+- **Ajustes**:
+  - `preselectSettingsSection` evita montar dos secciones seguidas.
+  - El editor de reglas, retirado, era el que duplicaba contenido: guardaba su contenedor en una variable
+    del módulo y lo compartían dos montajes asíncronos.
+

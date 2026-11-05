@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * phase6.e2e.mjs - Deferred batches (-50 %) and semantic similarity, in Chromium with the mock
- * provider (tests/mock-ai.mjs imitates the four batch APIs and the embeddings endpoints).
+ * phase6.e2e.mjs - Deferred batches (-50 %), in Chromium with the mock provider (tests/mock-ai.mjs
+ * imitates the four batch APIs).
  */
 
 import path from 'node:path';
@@ -81,55 +81,18 @@ async function main() {
     const claudeCreate = mock.state.log.find(l => l.kind === 'batch-create' && /messages\/batches/.test(l.path));
     ok(claudeCreate && claudeCreate.headers && claudeCreate.headers['anthropic-dangerous-direct-browser-access'] === 'true', 'Anthropic batch sends the browser access header');
 
-    // ---- 2. Embeddings through the gateway: masked only
+    // ---- 2. A provider with the batch API (the mock) as the general model
     const emb = await page.evaluate(async () => {
       const reg = await import('/app/js/ai/registry.js');
       const p = await reg.saveProvider({ name: 'Simulador', adapter: 'openai-compatible', baseUrl: 'http://localhost:8790/v1', trust: 'external', batch: true,
         models: [{ id: 'mock-small', label: 'Simulado', price: { in: 1, cached: 0.5, out: 2 } }] });
       await reg.setApiKey(p.id, 'k');
       await reg.setGeneralModel({ provider: p.id, model: 'mock-small' });
-      const g = await import('/app/js/ai/gateway.js');
-      const r = await g.embedTexts({ provider: p.id, model: 'emb', texts: ['The Committee met twice.', 'La Comisi\u00f3n se reuni\u00f3 dos veces.', 'It adopted its report.'], masked: true });
-      const { cosine } = await import('/app/js/ai/embeddings.js');
-      let refused = '';
-      try { await g.embedTexts({ provider: p.id, texts: ['x'], masked: false }); } catch (e) { refused = e.code; }
-      return { pid: p.id, n: r.vectors.length, same: cosine(r.vectors[0], r.vectors[1]), diff: cosine(r.vectors[1], r.vectors[2]), refused };
+      return { pid: p.id };
     });
-    ok(emb.n === 3 && emb.same > emb.diff + 0.3, 'Embeddings: a translation is closer than an unrelated sentence (' + emb.same.toFixed(2) + ' vs ' + emb.diff.toFixed(2) + ')');
-    ok(emb.refused === 'UNMASKED', 'Embeddings of unmasked text refused');
-
-    // ---- 3. Semantic similarity in layer 0 (API mode, masked text)
     await load(page, 'e2e_en.docx', 'e2e_es.docx');
-    await page.evaluate(async (pid) => {
-      const mc = await import('/app/js/review/module-config.js');
-      await mc.saveModuleConfig('local', { semantic: 'api', semProvider: pid, semApiModel: 'emb' });
-    }, emb.pid);
     await page.click('.step[data-view="review"]');
     await page.waitForSelector('#rv-modules .mchip');
-    await page.click('#rv-modules .mchip[data-mod="local"] .run');
-    await page.waitForSelector('#rv-modules .mchip[data-mod="local"].done', { timeout: 30000 });
-    const sem = await page.evaluate(async () => {
-      const { state } = await import('/app/js/state.js');
-      return state.findings.filter(f => f.sub === 'semantic').map(f => ({ cat: f.cat, reason: f.reason, unit: state.session.units[f.unit].n }));
-    });
-    ok(sem.some(f => f.cat === 'OMI' && /adopted its report|elected its officers/.test(f.reason)), 'Semantic (API): omitted sentences found (' + sem.map(f => f.cat + ' ' + f.reason.slice(0, 60)).join(' | ') + ')');
-    const embLeak = mock.state.log.filter(l => l.kind === 'embeddings').some(l => /Secretario General|Asamblea General|Secretary-General|General Assembly/.test(l.prompt));
-    ok(!embLeak, 'Semantic (API): only masked text was sent');
-
-    // Local engine plumbing (a stand-in model: the real one is a download the test cannot make)
-    const loc = await page.evaluate(async () => {
-      const E = await import('/app/js/ai/embeddings.js');
-      E.setLocalEmbedderFactory(async () => async (texts) => {
-        const r = await fetch('http://localhost:8790/v1/embeddings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: texts }) });
-        return (await r.json()).data.map(d => d.embedding);
-      });
-      const { state } = await import('/app/js/state.js');
-      const { semanticFindings } = await import('/app/js/review/semantic.js');
-      const r = await semanticFindings(state.session, { semantic: 'local' }, {});
-      return { n: r.findings.filter(f => f.cat === 'OMI').length, engine: r.stats.engine, real: mock_has_real() };
-      function mock_has_real() { return true; }
-    });
-    ok(loc.engine === 'local' && loc.n >= 1, 'Semantic (local engine): omissions found on the real text (' + JSON.stringify(loc) + ')');
 
     // ---- 4. Deferred mode through the UI, with a reload while the batch is running
     Object.assign(mock.state, { rules: [

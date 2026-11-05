@@ -3,10 +3,15 @@
 UMBRA (*Unified Masking & Bilingual Review Assistant*) is a static web app published with GitHub
 Pages (`app/` only). It helps United Nations translators (EN/FR -> ES):
 1. **Mask** figures, organizations, organs, countries, places, persons, titles, dates, document
-   symbols and URLs in DOCX/PPTX/XLSX files exported from eLUNa, with bilingual tags
-   (`{CARGO1}` in the source, `{el CARGO1}` in the Spanish target), and export the masked files.
-2. **Review** the masked translation with eight AI modules (each with its own provider/model and
-   rules) plus a local, AI-free layer.
+   symbols and URLs in DOCX/PPTX/XLSX files exported from eLUNa, with tags (`{CARGO1}`, the same
+   tag in the source and in the Spanish target), and export the masked files.
+2. **Review** the masked translation with AI modules: each one is a specialist reviewer (its own
+   provider/model and strictness) that looks only for its kind of problem, as a human reviser would.
+
+**Purpose (the owner's words, 2026-11-05):** a substantive, content-level review by AI. NO rule-based or
+AI-free checks (figures, spelling, glossaries, fixed rules): COMeT's QA Checker and Final Check do that,
+and here they only add noise. Fidelity is about MEANING, never style or structure. Saving tokens is a
+priority: short prompts, nothing repeated, no rule lists or vocabularies in prompts.
 
 The owner is both developer and end user and **does not code**. Explain things in plain terms.
 
@@ -37,16 +42,16 @@ See `docs/ARQUITECTURA.md` (contracts between modules) and `docs/PROPUESTA.md` (
 - `app/js/formats/`: DOCX/PPTX/XLSX models (DOCX/PPTX copied from COMeT Final Check), alignment,
   writers (masked copy, corrected copy with tracked changes and Word comments).
 - `app/js/redact/`: detectors, entities, tags, masking, rehydration.
-- `app/js/review/`: module list, prompts, local checks (layer 0), planner (batches, merge, cascade,
-  cache, budget), runner, parser (`unit | CAT | SEV | quote | suggestion | reason` + `FIN n`), findings.
-- `app/js/rules/`: built-in rules (`app/data/rules-default.json`, editable and restorable) + user rules.
+- `app/js/review/`: module list, prompts (tasks, strictness), planner (batches, merge, cascade, cache,
+  budget), runner (cut answers re-asked in halves), parser (`unit | CAT | SEV | quote | suggestion |
+  reason` + `FIN n`), findings.
 - `app/js/ai/`: providers, registry (profiles, models per module), gateway, usage/cost.
 - `app/js/sync/`: sync file (`umbra-sync.json`, `meta.kind = 'umbra-sync'`), copied from COMeT.
 
 ## Recurring lessons
 - All offsets (`start`, `end`) are measured on `para.text` of the document model.
-- Masking: the tag carries the Spanish article of the ENTITY (`{la ORGANO2}`); the article or
-  contraction already in the text stays outside, so article errors remain visible.
+- Tags carry NO article any more (removed at the owner's request: it confused more than it helped):
+  the same tag on both sides. `TAG_RE` still reads `{la ORGANO2}` in old texts and external answers.
 - A shared string in XLSX can be used by several cells: the writer clones it when the edits differ.
 - Contextual help: every feature has a "?" (`helpBtn(topic)` from `app/js/ui/help.js`; in a dialog,
   `modal({ help: helpBtn(topic) })`; in a menu, `helpItem(topic, anchor)`). A NEW feature or setting
@@ -56,5 +61,7 @@ See `docs/ARQUITECTURA.md` (contracts between modules) and `docs/PROPUESTA.md` (
   offsets are those of `para.text`, stored on rendered nodes by `preview.js` (`__o`, `__e`); marks are
   CSS highlights (`um-seg`, `um-focus`). Do not re-render the sheets to show a selection; after a
   re-render call `nav.refresh()`. `tests/nav.e2e.mjs` covers it.
-- The spell checker (Hunspell) was removed on purpose: spelling is left to Word; Grammar does not
-  check it either.
+- Removed on purpose (do not bring back): the spell checker (Word does spelling), the AI-free
+  "Capa 0" checks, the rules system (editor, built-in rules, profiles) and the semantic similarity.
+- "Exigencia" (module config `strictness`: grave | normal | estricta) is in the prompt AND enforced by
+  the runner (`STRICT_ALLOWED`): findings of a severity not asked for are dropped.

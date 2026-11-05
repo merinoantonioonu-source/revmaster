@@ -10,11 +10,10 @@ import { writeReplacements, writeCorrected } from '../formats/doc-writer.js';
 import { download, esc } from '../util/dom.js';
 import { encryptJSON, decryptJSON, encryptBytes, decryptBytes } from '../util/crypto.js';
 import { unitSrc, unitTgt, unitSrcMasked, unitTgtMasked, reviewableUnits } from '../review/session.js';
-import { applyAccepted, STATE_LABELS } from '../review/findings.js';
+import { applyAccepted, STATE_LABELS, SEV_LABELS } from '../review/findings.js';
 import { CAT_LABELS } from '../review/prompts.js';
 import { mainForm, CAT_SINGULAR } from '../redact/entities.js';
 import { moduleById } from '../review/module-list.js';
-import { SEV_LABELS } from '../rules/rules.js';
 
 function _base(name) { return String(name || 'documento').replace(/\.[^.]+$/, ''); }
 function _ext(name) { const m = /\.([^.]+)$/.exec(name || ''); return m ? m[1].toLowerCase() : 'docx'; }
@@ -211,7 +210,9 @@ export async function exportFeedbackXlsx(opts) {
     const dv = '<dataValidations count="2"><dataValidation type="list" allowBlank="1" showErrorMessage="0" sqref="O2:O' + (rows.length + 200) + '">' +
       '<formula1>"' + FEEDBACK_VERDICTS.join(',') + '"</formula1></dataValidation>' +
       '<dataValidation type="list" allowBlank="1" showErrorMessage="0" sqref="P2:P' + (rows.length + 200) + '"><formula1>"Cr\u00edtica,Mayor,Menor,Sugerencia"</formula1></dataValidation></dataValidations>';
-    const at = xml.search(/<(hyperlinks|printOptions|pageMargins|pageSetup|headerFooter|drawing|legacyDrawing|tableParts|extLst)\b/);
+    // Schema order (CT_Worksheet): dataValidations goes before all of these, ignoredErrors included
+    // (SheetJS writes it; putting the list after it makes Excel "repair" the file).
+    const at = xml.search(/<(hyperlinks|printOptions|pageMargins|pageSetup|headerFooter|rowBreaks|colBreaks|customProperties|cellWatches|ignoredErrors|smartTags|drawing|legacyDrawing|legacyDrawingHF|picture|oleObjects|controls|webPublishItems|tableParts|extLst)\b/);
     xml = at >= 0 ? xml.slice(0, at) + dv + xml.slice(at) : xml.replace('</worksheet>', dv + '</worksheet>');
     zip.file(path, xml);
     out = await zip.generateAsync({ type: 'uint8array' });

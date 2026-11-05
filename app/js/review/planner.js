@@ -3,7 +3,7 @@
  * anything is spent:
  *   - only units that need it (no separators, no units with nothing but tags or figures);
  *   - identical pairs reviewed once (duplicates get a copy of the results);
- *   - results cache: a unit already reviewed with the same text, prompt, rules and model is skipped;
+ *   - results cache: a unit already reviewed with the same text, prompt and model is skipped;
  *   - fusion: modules with the same input and the same model share ONE call per batch;
  *   - batches cut by words and, when possible, at section boundaries;
  *   - cascade: the strong ("deep") model only sees what the economical one flagged (estimated here at
@@ -13,7 +13,6 @@
 import { AI_MODULES, moduleById } from './module-list.js';
 import { unitSrcMasked, unitTgtMasked, reviewableUnits } from './session.js';
 import { systemPrompt, promptVersion, TASKS } from './prompts.js';
-import { rulesFor, rulesBlock, rulesHash } from '../rules/rules.js';
 import { fnv1a } from '../util/crypto.js';
 import { idbGet } from '../store/idb.js';
 import { resolveClient } from '../ai/registry.js';
@@ -43,7 +42,7 @@ function _reviewText(session, u, input) {
 
 /**
  * makePlan(session, ctx, opts) -> plan
- * ctx = { rules (effective), prompts (store), cfg (module config), profile, lang }
+ * ctx = { prompts (store), cfg (module config) }
  * opts = { modules:[ids], unitFilter:Set(idx)|null, changedOnly:bool }
  */
 export async function makePlan(session, ctx, opts) {
@@ -95,13 +94,10 @@ export async function makePlan(session, ctx, opts) {
     const input = moduleById(mates[0]).input;
     const tri = models[mates[0]].tri;
     const deep = models[mates[0]].deep;
-    const rules = [];
-    for (const m of mates) for (const r of rulesFor(ctx.rules, m, ctx.profile)) if (!rules.includes(r)) rules.push(r);
-    const always = rulesBlock(rules.filter(r => r.kind === 'style' || r.kind === 'structure'), []);
-    const system = systemPrompt(ctx.prompts, mates, session.srcLang, always.text);
-    const rh = rulesHash(rules);
+    const system = systemPrompt(ctx.prompts, mates, session.srcLang, ctx.cfg);
+    const rh = 'v2';
     const pv = {};
-    for (const m of mates) pv[m] = promptVersion(ctx.prompts, [m]);
+    for (const m of mates) pv[m] = promptVersion(ctx.prompts, [m], ctx.cfg);
 
     // Units to send: skip cached (for every module of the group) and duplicates.
     const seen = new Map();
@@ -130,8 +126,10 @@ export async function makePlan(session, ctx, opts) {
 
     // Batches by words, cut preferably at section boundaries.
     const cfgWords = Math.max(...mates.map(m => (ctx.cfg[m] && ctx.cfg[m].batchWords) || 0));
-    const limit = cfgWords || (input === 'bilingual' ? 1600 : 2400);
-    const maxUnits = 40;
+    // Moderate batches: the answer (and the reasoning of models that think first) must fit in the
+    // output limit, and a model reviews a short batch more carefully than a long one.
+    const limit = cfgWords || (input === 'bilingual' ? 1100 : 1800);
+    const maxUnits = 30;
     const batches = [];
     let cur = [], words = 0;
     for (const it of items) {
@@ -142,10 +140,10 @@ export async function makePlan(session, ctx, opts) {
     }
     if (cur.length) batches.push(cur);
 
-    const group = { modules: mates, input, tri, deep, system, rules, rh, pv, batches: [], dupOf, cachedHits,
+    const group = { modules: mates, input, tri, deep, system, rh, pv, batches: [], dupOf, cachedHits,
       est: { inTok: 0, outTok: 0, cost: 0, calls: 0 } };
     for (const b of batches) {
-      const user = buildBatchUser(session, b.map(x => x.u), input, rules);
+      const user = buildBatchUser(session, b.map(x => x.u), input);
       const inTok = TOK(system) + TOK(user);
       const outTok = 25 + Math.ceil(b.length * 0.35) * 45 * mates.length;
       group.batches.push({ items: b, user, inTok, outTok });
@@ -178,9 +176,7 @@ export async function makePlan(session, ctx, opts) {
   for (const id of plan.skeleton) {
     const sk = buildSkeleton(session, id);
     if (!sk.text) continue;
-    const rules = rulesFor(ctx.rules, id, ctx.profile);
-    const always = rulesBlock(rules.filter(r => r.kind === 'style' || r.kind === 'structure'), []);
-    const system = systemPrompt(ctx.prompts, [id], session.srcLang, always.text);
+    const system = systemPrompt(ctx.prompts, [id], session.srcLang, ctx.cfg);
     const inTok = TOK(system) + TOK(sk.text), outTok = 30 + sk.count * 8;
     const tri = models[id].tri;
     const cost = await _cost(tri, inTok, outTok, 0);
@@ -211,10 +207,8 @@ async function _cost(client, inTok, outTok, cachedTok) {
   } catch (_) { return 0; }
 }
 
-/** The user part of a batch call: rules relevant to this batch, then the units. */
-export function buildBatchUser(session, units, input, rules) {
-  const srcTexts = input === 'bilingual' ? units.map(u => unitSrcMasked(session, u)) : units.map(u => unitSrcMasked(session, u));
-  const rb = rulesBlock((rules || []).filter(r => r.kind === 'expr'), srcTexts);
+/** The user part of a batch call: the units, nothing else (the instructions are in the system part). */
+export function buildBatchUser(session, units, input) {
   let body = '';
   if (input === 'bilingual') {
     body = 'P\u00c1RRAFOS (O = original, T = traducci\u00f3n):\n' + units.map(u =>
@@ -222,8 +216,7 @@ export function buildBatchUser(session, units, input, rules) {
   } else {
     body = 'P\u00c1RRAFOS DE LA TRADUCCI\u00d3N:\n' + units.map(u => '[' + u.n + '] ' + _flat(unitTgtMasked(session, u))).join('\n');
   }
-  return (rb.text ? rb.text.trim() + '\n\n' : '') + body +
-    '\n\nRecuerda: una l\u00ednea por problema con el formato indicado y, al final, FIN ' + units.length + '.';
+  return body + '\n(FIN ' + units.length + ')';
 }
 
 function _flat(s) { return String(s || '').replace(/[\t\r\n]+/g, ' ').replace(/ {2,}/g, ' ').trim(); }
@@ -240,7 +233,7 @@ export function serializePlan(plan) {
   return {
     v: 1,
     groups: plan.groups.map(g => ({
-      modules: g.modules, input: g.input, tri: ref(g.tri), deep: ref(g.deep), system: g.system, rules: g.rules, rh: g.rh, pv: g.pv,
+      modules: g.modules, input: g.input, tri: ref(g.tri), deep: ref(g.deep), system: g.system, rh: g.rh, pv: g.pv,
       batches: g.batches.map(b => ({ units: b.items.map(x => x.u.idx), uks: b.items.map(x => x.uk), words: b.items.map(x => x.words),
         user: b.user, inTok: b.inTok, outTok: b.outTok })),
       dupOf: Array.from(g.dupOf.entries()), est: g.est
@@ -256,7 +249,7 @@ export function restorePlan(data, session) {
   const unit = (idx) => session.units[idx];
   return {
     groups: (data.groups || []).map(g => ({
-      modules: g.modules, input: g.input, tri: g.tri, deep: g.deep, system: g.system, rules: g.rules || [], rh: g.rh, pv: g.pv || {},
+      modules: g.modules, input: g.input, tri: g.tri, deep: g.deep, system: g.system, rh: g.rh, pv: g.pv || {},
       batches: g.batches.map(b => ({ items: b.units.map((idx, k) => ({ u: unit(idx), uk: b.uks[k], words: b.words[k] })).filter(x => x.u),
         user: b.user, inTok: b.inTok, outTok: b.outTok })),
       dupOf: new Map(g.dupOf || []), cachedHits: [], est: g.est || {}
