@@ -1,163 +1,93 @@
 /**
- * review-view.js - Step 2 "Revisar": module cards (run one or several), the plan with its estimated
- * cost, progress, the findings list (filters, accept/reject/edit, keyboard) and the two sheets.
+ * review-view.js - Step 3 "Revisar": what the AI should look for. One large card per reviewer (tick,
+ * plain description, Exigencia, model and estimated cost), the privacy note and a fixed footer with
+ * "Revisar ahora". Shows the plan with its cost, runs it, follows the progress on the cards and, at
+ * the end, moves to step 4 "Corregir". Also the deferred batches and the test bench.
  */
 
 import { helpBtn, helpItem } from './help.js';
-import { el, $, clear, toast, modal, fmtInt, fmtMoney, promptDialog, confirmDialog } from '../util/dom.js';
-import { state, on, emit, addFindings, updateFinding, saveProjectSoon, openFiles } from '../state.js';
-import { renderDoc } from './preview.js';
-import { MODULES, moduleById, INPUT_ICONS, INPUT_LABELS, ROLE_LABELS } from '../review/module-list.js';
+import { el, $, clear, toast, modal, fmtInt, fmtMoney, confirmDialog } from '../util/dom.js';
+import { state, on, emit, addFindings, saveProjectSoon, openFiles } from '../state.js';
+import { MODULES, moduleById } from '../review/module-list.js';
 import { makePlan } from '../review/planner.js';
 import { deferredCapability, startDeferred, checkDeferred, cancelDeferredRecord, DEFERRED_STATUS } from '../review/deferred.js';
 import { runPlan, verifyFindings } from '../review/runner.js';
 import { loadModuleConfig, saveModuleConfig } from '../review/module-config.js';
-import { loadPrompts, CAT_LABELS } from '../review/prompts.js';
-import { STATE_LABELS, SEV_LABELS } from '../review/findings.js';
+import { loadPrompts, STRICTNESS, strictnessOf } from '../review/prompts.js';
 import { externalDialog, importDialog } from './mask-view.js';
-import { exportCorrected, exportReportHtml, exportReportXlsx, exportFindingsJson, exportFeedbackXlsx } from '../export/exports.js';
-import { createNav, findingPlace, peerSentence, sentencesOf } from './nav.js';
-import { openFindingsWindow, syncFindingsWindow, findingsWindowSelect } from './findings-window.js';
 import { openMenu } from './menu.js';
 import { loadBenchSpec, benchFiles, evaluateBench } from '../review/bench.js';
+import { icon } from './icons.js';
 
-let root, toolsHost, panes = {};
-let filt = { module: 'all', sev: 'all', state: 'open' };
-let selected = null;
+let root, toolsHost;
 let running = null;           // { abort: AbortController, modules:[] }
 let progress = {};            // moduleId -> { done, total, label, state:'run'|'done'|'err', msg }
 let estimates = {};           // moduleId -> { tok, cost } | { error }
 let selectedModules = new Set(['grammar', 'fidelity', 'integrity', 'style', 'coherence', 'conventions', 'names']);
 let estTimer = null;
-let nav = null;
+
+/** The order of the cards: meaning first, then the language, then the structure. */
+const CARD_ORDER = ['fidelity', 'integrity', 'names', 'grammar', 'style', 'coldread', 'coherence', 'conventions'];
 
 export function mountReviewView(host, tools) {
   root = host;
   toolsHost = tools;
-  root.appendChild(el('div.list',
-    el('h4', 'Hallazgos', helpBtn('findings'), el('span.grow'),
-      el('button.btn.sm', { title: 'Abrir los hallazgos en una ventana aparte, en forma de tabla', onclick: openTable }, '\u29c9 Tabla'),
-      el('button.btn.sm', { title: 'Borrar los hallazgos para empezar de cero', onclick: resetFindings }, '\ud83d\uddd1 Vaciar'),
-      el('button.btn.sm', { title: 'Opciones de la lista', onclick: (e) => listMenu(e.currentTarget) }, '\u22ef')),
-    el('div.filters#rv-bubbles'),
-    el('div.scroll#rv-findings')));
-  root.appendChild(el('div.work',
-    el('div.modstrip#rv-modules'),
-    el('div.panes',
-      el('div.pane', el('div.pane-head', el('span#rv-src-title', 'ORIGINAL')), el('div.pane-body#rv-src')),
-      el('div.pane', el('div.pane-head', el('span', 'TRADUCCI\u00d3N \u00b7 ES'), helpBtn('review-sheets'), el('span.grow'), el('span.muted#rv-unit-info')), el('div.pane-body#rv-tgt')))));
-  panes = { src: $('#rv-src'), tgt: $('#rv-tgt') };
-  nav = createNav({ panes, session: () => state.session });
-  nav.attachHover();
+  root.appendChild(el('div.page.prep',
+    el('div.page-in',
+      el('div.kicker', 'PASO 3 DE 5'),
+      el('h2.ptitle', '\u00bfQu\u00e9 quiere que revise la IA?', helpBtn('modules')),
+      el('p.lead', 'Cada revisor busca un solo tipo de problema, como lo har\u00eda un revisor humano. Marque los que necesite para este documento.'),
+      el('div.mgrid#rv-modules'),
+      el('div.privacy', icon('lock', 20),
+        el('span', 'El texto sale enmascarado: personas, cifras, fechas y s\u00edmbolos nunca salen de este equipo (Nombres oficiales env\u00eda solo la lista de nombres de organismos, \u00f3rganos, cargos, pa\u00edses y lugares). Antes de enviar ver\u00e1 cu\u00e1ntas llamadas se har\u00e1n y su coste.'))),
+    el('div.pfoot', el('div.pfoot-in',
+      el('button.btn.big', { onclick: () => emit('goto', 'mask') }, icon('back', 16), 'Atr\u00e1s'),
+      el('span.grow'),
+      el('span.psum#rv-summary'),
+      el('button.btn.primary.big#rv-run', { onclick: onRun })))));
   on('view', (v) => { if (v === 'review') { renderAll(); scheduleEstimates(); } });
-  on('findings', () => { syncFindingsWindow(); if (state.view === 'review') { renderTools(); renderModules(); renderFindings(); renderPanes(); } });
-  on('finding', () => { syncFindingsWindow(); if (state.view === 'review') { renderTools(); renderFindings(); renderPanes(); } });
-  on('masked', () => { estimates = {}; if (state.view === 'review') { renderPanes(); scheduleEstimates(); } });
+  on('findings', () => { if (state.view === 'review') { renderTools(); renderModules(); } });
+  on('masked', () => { estimates = {}; if (state.view === 'review') scheduleEstimates(); });
   on('project', () => {
-    progress = {}; estimates = {}; selected = null;
+    progress = {}; estimates = {};
+    emit('review-status', '');
     if (state.project && (state.project.deferred || []).some(r => r.status === 'running')) startDeferredPolling();
   });
-  document.addEventListener('keydown', onKey);
 }
 
 function renderAll() {
   if (!state.session) return;
   renderTools();
   renderModules();
-  renderFindings();
-  renderPanes();
+}
+
+function onRun() {
+  if (running) { running.abort.abort(); return; }
+  runModules(Array.from(selectedModules));
 }
 
 // ------------------------------------------------------------------ tools
 
-let _toolsGen = 0;
-async function renderTools() {
+function renderTools() {
   if (state.view !== 'review') return;
-  const gen = ++_toolsGen;
-  await Promise.resolve();
-  if (gen !== _toolsGen || state.view !== 'review') return;   // a newer call is drawing the bar
   clear(toolsHost);
   if (!state.project) return;
-  const open = state.findings.filter(f => f.state === 'open');
-  const n = (s) => open.filter(f => f.sev === s).length;
-  toolsHost.appendChild(el('div.summary',
-    n('CRI') ? el('span.pill.err', n('CRI') + (n('CRI') === 1 ? ' cr\u00edtico' : ' cr\u00edticos')) : null,
-    n('MAY') ? el('span.pill.warn', n('MAY') + (n('MAY') === 1 ? ' mayor' : ' mayores')) : null,
-    n('MEN') ? el('span.pill.info', n('MEN') + (n('MEN') === 1 ? ' menor' : ' menores')) : null,
-    n('SUG') ? el('span.pill.gray', n('SUG') + (n('SUG') === 1 ? ' sugerencia' : ' sugerencias')) : null,
-    !open.length ? el('span.pill.ok', 'Sin hallazgos pendientes') : null));
   toolsHost.appendChild(el('div.grow'));
-  if (running) toolsHost.appendChild(el('button.btn.danger', { onclick: () => running.abort.abort() }, '\u25a0 Detener'));
-  else toolsHost.appendChild(el('button.btn.amber', { onclick: () => runModules(Array.from(selectedModules)) }, '\u25b6 Ejecutar seleccionados'));
-  toolsHost.appendChild(el('button.btn', { onclick: (e) => moreMenu(e.currentTarget) }, 'M\u00e1s \u25be'));
-  toolsHost.appendChild(el('button.btn.violet', { onclick: (e) => exportMenu(e.currentTarget) }, 'Exportar \u25be'));
-  toolsHost.appendChild(helpBtn('review-tools'));
+  toolsHost.appendChild(el('button.btn', { onclick: (e) => moreMenu(e.currentTarget) }, 'M\u00e1s', icon('down', 14)));
 }
 
+/** "Mas" of Revisar: the test bench, the external AI and the module settings. */
 function moreMenu(anchor) {
   openMenu(anchor, [
+    { label: state.project && state.project.bench ? 'Resultado del banco de pruebas\u2026' : 'Banco de pruebas\u2026', onClick: benchDialog },
+    { sep: true },
     { label: 'Copiar para IA externa\u2026', onClick: externalDialog },
     { label: 'Importar respuesta de IA externa\u2026', onClick: importDialog },
     { sep: true },
-    { label: 'Verificar los hallazgos pendientes de la IA', onClick: reverify },
     { label: 'Configurar m\u00f3dulos y modelos', onClick: () => emit('goto-settings', 'modules') },
-    { sep: true },
-    { label: state.project && state.project.bench ? 'Resultado del banco de pruebas\u2026' : 'Banco de pruebas\u2026', onClick: benchDialog },
     { sep: true },
     helpItem('review-more', anchor)
   ]);
-}
-
-function exportMenu(anchor) {
-  const kind = state.tgt ? state.tgt.kind : 'docx';
-  openMenu(anchor, [
-    { header: 'Traducci\u00f3n corregida' },
-    kind === 'docx' ? { label: 'DOCX con control de cambios y comentarios', onClick: () => doExport({ tracked: true, comments: true }) } : null,
-    kind === 'docx' ? { label: 'DOCX con control de cambios, sin comentarios', onClick: () => doExport({ tracked: true, comments: false }) } : null,
-    { label: (kind === 'docx' ? 'DOCX' : kind.toUpperCase()) + ' con los cambios aplicados (sin control de cambios)', onClick: () => doExport({ tracked: false, comments: false }) },
-    { sep: true },
-    { header: 'Informes' },
-    { label: 'Informe HTML', onClick: () => exportReportHtml(f => f.state !== 'discarded') },
-    { label: 'Informe Excel', onClick: () => exportReportXlsx(f => f.state !== 'discarded') },
-    { label: 'Hallazgos para valorar (Excel)\u2026', onClick: feedbackDialog },
-    { label: 'Hallazgos en JSON', onClick: exportFindingsJson },
-    { sep: true },
-    helpItem('review-export', anchor)
-  ]);
-}
-
-async function doExport(opts) {
-  try {
-    const r = await exportCorrected(opts);
-    toast('Exportado: ' + r.applied + ' correcciones aplicadas' + (r.comments ? ', ' + r.comments + ' comentarios' : '') +
-      (r.skipped.length ? '; ' + r.skipped.length + ' sin aplicar' : '') + '.', 'ok', 6000);
-    for (const w of r.warnings || []) toast(String(w), 'warn', 7000);
-  } catch (e) { console.error(e); toast('No se pudo exportar: ' + e.message, 'err', 8000); }
-}
-
-function listMenu(anchor) {
-  openMenu(anchor, [
-    { label: 'Aceptar todos los visibles con sugerencia', onClick: () => bulk('accepted') },
-    { label: 'Rechazar todos los visibles', onClick: () => bulk('rejected') },
-    { label: 'Volver a poner como pendientes los visibles', onClick: () => bulk('open') },
-    { sep: true },
-    { label: 'Borrar los hallazgos pendientes de la IA', onClick: async () => {
-      if (!(await confirmDialog('Borrar hallazgos', 'Se borrar\u00e1n los hallazgos pendientes de la IA y de la IA externa (los aceptados y rechazados se conservan).', 'Borrar'))) return;
-      state.findings = state.findings.filter(f => f.state !== 'open' || f.source === 'local' || f.source === 'rule');
-      emit('findings'); saveProjectSoon();
-    } },
-    { sep: true },
-    helpItem('findings', anchor)
-  ]);
-}
-
-function bulk(newState) {
-  for (const f of visibleFindings()) {
-    if (newState === 'accepted' && !(f.suggestion || f.edited)) continue;
-    f.state = newState;
-  }
-  emit('findings');
-  saveProjectSoon();
 }
 
 // ------------------------------------------------------------------ module cards
@@ -173,78 +103,88 @@ async function modelLabel(moduleId, role) {
 
 let _modsGen = 0;
 let _modCfg = {};
-/** Estimated cost of the ticked modules (without redrawing the bar). */
+
+/** The footer: how many reviewers, how many paragraphs and the estimated cost of what is ticked. */
 function _updateTotal() {
-  let total = 0, any = false;
+  let total = 0, any = false, missing = false, n = 0;
   for (const id of selectedModules) {
-    const est = estimates[id];
     if (_modCfg[id] && _modCfg[id].enabled === false) continue;
+    n++;
+    const est = estimates[id];
     if (est && !est.error) { total += est.cost || 0; any = true; }
+    else if (est && est.error) missing = true;
   }
-  const t = document.querySelector('#rv-modules .mtotal');
-  if (t) t.textContent = any ? 'Marcados: ~' + fmtMoney(total) : '';
+  const sum = $('#rv-summary');
+  if (sum) {
+    const units = state.session ? state.session.units.length : 0;
+    sum.textContent = n + (n === 1 ? ' revisor' : ' revisores') + ' \u00b7 ' + fmtInt(units) + ' p\u00e1rrafos' +
+      (any ? ' \u00b7 ~' + fmtMoney(total) : '') + (missing ? ' \u00b7 falta la clave de alg\u00fan proveedor' : '');
+  }
+  const run = $('#rv-run');
+  if (run) {
+    run.replaceChildren(...(running ? [icon('stop', 16), 'Detener'] : ['Revisar ahora', icon('arrow', 16)]));
+    run.classList.toggle('danger', !!running);
+    run.classList.toggle('primary', !running);
+    run.disabled = !running && !n;
+  }
 }
-/** The module bar: one chip per module (tick = it runs with "Ejecutar seleccionados"; the small
- *  play button runs that module alone), the estimated cost of what is ticked and the Verifier. */
+
+/** One card per reviewer: tick (it runs with "Revisar ahora"), what it looks for, Exigencia, model,
+ *  estimated cost and, while it runs, its progress. */
 async function renderModules() {
   const host = $('#rv-modules');
   if (!host) return;
   const gen = ++_modsGen;
   const cfg = await loadModuleConfig();
-  if (gen !== _modsGen) return;   // a newer call is drawing the bar
+  if (gen !== _modsGen) return;   // a newer call is drawing the cards
+  _modCfg = cfg;
   clear(host);
   const defCard = _deferredCard();
   if (defCard) host.appendChild(defCard);
-  let total = 0, anyEst = false;
-  for (const m of MODULES) {
-    if (m.id === 'verifier') continue;
-    if (!m.ai) continue;
-    const off = cfg[m.id] && cfg[m.id].enabled === false;
-    const on = selectedModules.has(m.id) && !off;
-    const p = progress[m.id];
-    const st = p ? (p.state === 'run' ? 'run' : (p.state === 'err' ? 'err' : 'done')) : '';
-    const count = state.findings.filter(f => f.module === m.id && f.state === 'open').length;
-    const est = estimates[m.id];
-    if (on && est && !est.error) { total += est.cost || 0; anyEst = true; }
-    let stat = '';
-    if (p && p.state === 'run') stat = p.total ? Math.round(100 * (p.done || 0) / Math.max(1, p.total)) + ' %' : '\u2026';
-    else if (p && p.state === 'err') stat = '\u26a0';
-    else if (count) stat = '\u2691 ' + count;
-    else if (p && p.state === 'done') stat = '\u2713';
-    const tip = [m.desc,
-      est ? (est.error || ('Coste estimado: ~' + fmtMoney(est.cost) + ' (' + fmtInt(est.tok) + ' tokens' + (est.cached ? ', ' + est.cached + ' p\u00e1rrafos en cach\u00e9' : '') + ')')) : 'Calculando el coste\u2026',
-      off ? 'Desactivado en Ajustes \u203a M\u00f3dulos.' : '',
-      p && p.msg ? (p.state === 'err' ? 'Error: ' : '') + p.msg : '',
-      count ? count + ' hallazgos pendientes.' : ''].filter(Boolean).join('\n');
-    const chk = el('input', { type: 'checkbox', checked: on ? true : null, disabled: off ? true : null, onchange: (e) => {
-      if (e.target.checked) selectedModules.add(m.id); else selectedModules.delete(m.id);
-      e.target.closest('.mchip').classList.toggle('on', e.target.checked);
-      _updateTotal();
-    } });
-    const chip = el('label.mchip' + (on ? '.on' : '') + (off ? '.off' : '') + (st ? '.' + st : ''), { title: tip, 'data-mod': m.id },
-      chk, el('span.nm', m.label),
-      el('span.cost' + (est && est.error ? '.warn-t' : ''), est && !est.error ? fmtMoney(est.cost) : (est && est.error ? (/clave/.test(est.error) ? 'sin clave' : 'sin estimar') : '')),
-      stat ? el('span.stat', stat) : null,
-      el('button.run', { type: 'button', title: 'Ejecutar solo ' + m.label, disabled: running ? true : null,
-        onclick: (e) => { e.preventDefault(); e.stopPropagation(); runModules([m.id]); } }, '\u25b6'));
-    if (p && p.state === 'run') chip.appendChild(el('i.bar', { style: { width: (p.total ? Math.round(100 * (p.done || 0) / Math.max(1, p.total)) : 30) + '%' } }));
-    modelLabel(m.id, m.roles[0]).then(t => { chip.title = tip + '\nModelo: ' + t + (m.roles.length > 1 ? ' (cribado)' : ''); });
-    host.appendChild(chip);
+  for (const id of CARD_ORDER) {
+    const m = moduleById(id);
+    if (!m || !m.ai) continue;
+    host.appendChild(moduleCard(m, cfg));
   }
-  host.appendChild(el('span.grow'));
-  host.appendChild(el('span.mtotal', anyEst ? 'Marcados: ~' + fmtMoney(total) : ''));
-  _modCfg = cfg;
-  const vp = progress.verifier;
-  host.appendChild(el('button.btn.sm' + (vp && vp.state === 'run' ? '.amber' : ''), { title: 'Pasa los hallazgos pendientes de la IA por el Verificador, que descarta los falsos positivos' + (vp && vp.msg ? '\n' + vp.msg : ''),
-    disabled: running ? true : null, onclick: reverify }, '\u2713 Verificar hallazgos' + (vp && vp.state === 'run' ? '\u2026' : '')));
-  host.appendChild(helpBtn('modules'));
+  _updateTotal();
 }
 
-async function pickModel(anchor, moduleId, role) {
-  try {
-    const sp = await import('./settings-providers.js');
-    sp.openModelMenu(anchor, { moduleId, role, onPick: () => { estimates = {}; renderModules(); scheduleEstimates(); } });
-  } catch (e) { emit('goto-settings', 'providers'); }
+function moduleCard(m, cfg) {
+  const off = cfg[m.id] && cfg[m.id].enabled === false;
+  const on = selectedModules.has(m.id) && !off;
+  const p = progress[m.id];
+  const st = p ? (p.state === 'run' ? 'run' : (p.state === 'err' ? 'err' : 'done')) : '';
+  const count = state.findings.filter(f => f.module === m.id && f.state === 'open').length;
+  const est = estimates[m.id];
+  let stat = '';
+  if (p && p.state === 'run') stat = p.total ? Math.round(100 * (p.done || 0) / Math.max(1, p.total)) + ' %' : 'En cola';
+  else if (p && p.state === 'err') stat = 'Error';
+  else if (count) stat = count + ' por corregir';
+  else if (p && p.state === 'done') stat = 'Hecho';
+  const chk = el('input', { type: 'checkbox', checked: on ? true : null, disabled: off ? true : null, onchange: (e) => {
+    if (e.target.checked) selectedModules.add(m.id); else selectedModules.delete(m.id);
+    e.target.closest('.mchip').classList.toggle('on', e.target.checked);
+    _updateTotal();
+  } });
+  const strict = el('select.mc-strict', { 'data-strict': m.id, disabled: off ? true : null, title: 'Qu\u00e9 se le pide que se\u00f1ale',
+    onchange: async (e) => { await saveModuleConfig(m.id, { strictness: e.target.value }); delete estimates[m.id]; scheduleEstimates(); } },
+    Object.keys(STRICTNESS).map(k => el('option', { value: k }, STRICTNESS[k])));
+  strict.value = strictnessOf(cfg, m.id);
+  const cost = el('span.cost' + (est && est.error ? '.warn-t' : ''), est && !est.error ? '~' + fmtMoney(est.cost) : (est && est.error ? (/clave/.test(est.error) ? 'Sin clave' : 'Sin estimar') : 'Calculando\u2026'));
+  const model = el('span.model', '');
+  const tip = [m.desc, p && p.msg ? (p.state === 'err' ? 'Error: ' : '') + p.msg : '', off ? 'Desactivado en Ajustes \u203a M\u00f3dulos.' : ''].filter(Boolean).join('\n');
+  const card = el('div.mchip' + (on ? '.on' : '') + (off ? '.off' : '') + (st ? '.' + st : ''), { 'data-mod': m.id, title: tip },
+    el('label.mc-main', chk,
+      el('span.mc-tx',
+        el('span.mc-top', el('span.nm', m.label), stat ? el('span.stat', stat) : null),
+        el('span.mc-desc', off ? 'Desactivado en Ajustes \u203a M\u00f3dulos.' : (m.plain || m.desc)))),
+    el('div.mc-meta',
+      el('label.mc-ex', el('span', 'Exigencia'), strict),
+      el('span.grow'),
+      model, cost));
+  if (p && p.state === 'run') card.appendChild(el('i.bar', { style: { width: (p.total ? Math.round(100 * (p.done || 0) / Math.max(1, p.total)) : 15) + '%' } }));
+  modelLabel(m.id, m.roles[0]).then(t => { model.textContent = t; });
+  return card;
 }
 
 function scheduleEstimates() {
@@ -271,6 +211,13 @@ async function computeEstimates() {
 }
 
 // ------------------------------------------------------------------ running
+
+function _status() {
+  if (!running) { emit('review-status', ''); return; }
+  const ps = running.modules.map(id => progress[id]).filter(Boolean);
+  const pct = ps.length ? Math.round(100 * ps.reduce((n, p) => n + (p.state === 'run' ? (p.done || 0) / Math.max(1, p.total || 1) : 1), 0) / ps.length) : 0;
+  emit('review-status', 'Revisando\u2026 ' + pct + ' %');
+}
 
 async function runModules(ids) {
   if (!state.session || running) return;
@@ -303,8 +250,8 @@ async function runModules(ids) {
   // A new run replaces the open findings of these modules.
   state.findings = state.findings.filter(f => !(ai.includes(f.module) && f.state === 'open' && f.source === 'ai'));
   emit('findings');
-  renderTools();
   renderModules();
+  _status();
   let res;
   try {
     res = await runPlan(plan, { session: state.session, project: { name: state.project.name, file: state.project.tgtName },
@@ -314,6 +261,7 @@ async function runModules(ids) {
         const mods = p.module ? String(p.module).split('+') : ai;
         for (const id of mods) if (progress[id]) Object.assign(progress[id], { done: p.done, total: p.total, msg: p.label });
         renderModules();
+        _status();
       },
       onFindings: (list) => { addFindings(list); }
     });
@@ -331,10 +279,12 @@ async function runModules(ids) {
   estimates = {};
   emit('findings');
   saveProjectSoon();
+  _status();
   renderAll();
   scheduleEstimates();
+  const found = (res.findings || []).filter(f => f.state !== 'discarded').length;
   const discarded = (res.findings || []).filter(f => f.state === 'discarded').length;
-  toast('Revisi\u00f3n terminada: ' + (res.findings || []).filter(f => f.state !== 'discarded').length + ' hallazgos' +
+  toast('Revisi\u00f3n terminada: ' + found + ' hallazgos' +
     (discarded ? ' (' + discarded + ' descartados por el verificador)' : '') + ' \u00b7 ' + fmtMoney(res.spent || 0) +
     (res.stopped ? ' \u00b7 detenida' : '') + '.', (res.errors || []).length ? 'warn' : 'ok', 7000);
   for (const e of res.errors || []) toast((moduleById(String(e.module).split('+')[0]) || { label: e.module }).label + ': ' + e.message, 'err', 9000);
@@ -344,6 +294,7 @@ async function runModules(ids) {
       toast('Banco de pruebas: ' + r.found + ' de ' + r.expected + ' errores detectados, ' + r.noise.length + ' hallazgos de ruido. Detalle en M\u00e1s \u203a Resultado del banco de pruebas.', 'ok', 10000);
     } catch (e) { console.warn('bench', e); }
   }
+  if (state.findings.some(f => f.state === 'open') && state.view === 'review') emit('goto', 'correct');
 }
 
 function planDialog(plan, budget, cap) {
@@ -385,7 +336,8 @@ function planDialog(plan, budget, cap) {
     { label: 'Ejecutar', kind: 'amber', value: 'go' }] }).then(r => r === 'go' ? { budget: parseFloat(budgetIn.value) || 0, deferred: !!defChk.checked } : null);
 }
 
-async function reverify() {
+/** Sends the pending AI findings to the Verifier (from Corregir > Mas). */
+export async function reverify() {
   const list = state.findings.filter(f => f.state === 'open' && (f.source === 'ai' || f.source === 'external') && !f.verified);
   if (!list.length) { toast('No hay hallazgos de IA pendientes sin verificar.', 'warn'); return; }
   if (!(await confirmDialog('Verificar', 'Se enviar\u00e1n ' + list.length + ' hallazgos al Verificador (texto enmascarado).', 'Verificar'))) return;
@@ -393,9 +345,10 @@ async function reverify() {
   const { callAI } = await import('../ai/gateway.js');
   const call = (args) => callAI(Object.assign({ masked: true, project: state.project.name, file: state.project.tgtName }, args));
   progress.verifier = { state: 'run', done: 0, total: 1, msg: 'Verificando' };
-  renderModules();
+  emit('review-status', 'Verificando\u2026');
+  const t = toast('Verificando ' + list.length + ' hallazgos\u2026', '', 60000);
   try {
-    await verifyFindings(list, { session: state.session, prompts: ctx.prompts, cfg: ctx.cfg }, call, (label) => { progress.verifier.msg = label; renderModules(); });
+    await verifyFindings(list, { session: state.session, prompts: ctx.prompts, cfg: ctx.cfg }, call, (label) => { progress.verifier.msg = label; });
     const no = list.filter(f => f.verified === 'no').length;
     progress.verifier = { state: 'done', msg: no + ' descartados' };
     toast('Verificaci\u00f3n terminada: ' + no + ' descartados.', 'ok');
@@ -403,243 +356,17 @@ async function reverify() {
     progress.verifier = { state: 'err', msg: e.message };
     toast(e.message, 'err', 8000);
   }
+  if (t) t.remove();
+  emit('review-status', '');
   emit('findings');
   saveProjectSoon();
-  renderModules();
 }
 
-// ------------------------------------------------------------------ findings list
-
-function visibleFindings() {
-  return state.findings.filter(f =>
-    (filt.module === 'all' || f.module === filt.module) &&
-    (filt.sev === 'all' || f.sev === filt.sev) &&
-    (filt.state === 'all' ? true : (filt.state === 'rejected' ? (f.state === 'rejected' || f.state === 'ignored') : f.state === filt.state))
-  ).sort((a, b) => (a.unit - b.unit) || ((a.start == null ? 1e9 : a.start) - (b.start == null ? 1e9 : b.start)));
-}
-
-/** Three labelled lists instead of a cloud of bubbles: state, module and severity. */
-function renderFindings() {
-  const box = $('#rv-bubbles');
-  if (!box) return;
-  clear(box);
-  const all = state.findings;
-  const n = (pred) => all.filter(pred).length;
-  const inState = (f) => filt.state === 'all' ? true : (filt.state === 'rejected' ? (f.state === 'rejected' || f.state === 'ignored') : f.state === filt.state);
-  const base = all.filter(inState);
-  if (filt.module !== 'all' && !base.some(f => f.module === filt.module)) filt.module = 'all';
-  const baseMod = base.filter(f => filt.module === 'all' || f.module === filt.module);
-  if (filt.sev !== 'all' && !baseMod.some(f => f.sev === filt.sev)) filt.sev = 'all';
-  const sel = (key, label, options, title) => {
-    const s = el('select.fsel', { 'data-filter': key, title, onchange: (e) => { filt[key] = e.target.value; renderFindings(); renderPanes(); } },
-      options.map(([v, t]) => el('option', { value: v }, t)));
-    s.value = filt[key];
-    return el('label.ffield', el('span', label), s);
-  };
-  box.appendChild(sel('state', 'Estado', [
-    ['open', 'Pendientes (' + n(f => f.state === 'open') + ')'],
-    ['accepted', 'Aceptados (' + n(f => f.state === 'accepted') + ')'],
-    ['rejected', 'Rechazados o ignorados (' + n(f => f.state === 'rejected' || f.state === 'ignored') + ')'],
-    ['discarded', 'Descartados por el Verificador (' + n(f => f.state === 'discarded') + ')'],
-    ['all', 'Todos (' + all.length + ')']], 'Qu\u00e9 hallazgos ver seg\u00fan lo que usted ya decidi\u00f3'));
-  box.appendChild(sel('module', 'M\u00f3dulo', [['all', 'Todos (' + base.length + ')']].concat(
-    MODULES.filter(m => base.some(f => f.module === m.id)).map(m => [m.id, m.label + ' (' + base.filter(f => f.module === m.id).length + ')'])),
-    'Qu\u00e9 m\u00f3dulo encontr\u00f3 el hallazgo'));
-  box.appendChild(sel('sev', 'Gravedad', [['all', 'Todas (' + baseMod.length + ')']].concat(
-    ['CRI', 'MAY', 'MEN', 'SUG'].filter(s => baseMod.some(f => f.sev === s)).map(s => [s, SEV_LABELS[s] + ' (' + baseMod.filter(f => f.sev === s).length + ')'])),
-    'Cr\u00edtica: cambia el sentido. Mayor: error claro. Menor: detalle. Sugerencia: mejora opcional.'));
-  const host = $('#rv-findings');
-  clear(host);
-  const list = visibleFindings();
-  if (!list.length) {
-    host.appendChild(el('div.empty', all.length ? 'No hay hallazgos con estos filtros.' :
-      'Todav\u00eda no hay hallazgos. Marque los m\u00f3dulos arriba y pulse \u00abEjecutar seleccionados\u00bb.'));
-    return;
-  }
-  for (const f of list.slice(0, 600)) host.appendChild(findingCard(f));
-  if (list.length > 600) host.appendChild(el('div.empty', 'Se muestran 600 de ' + list.length + ': use los filtros o la tabla (\u29c9).'));
-}
-
-function findingCard(f) {
-  const u = state.session.units[f.unit];
-  const mod = moduleById(f.module);
-  const sel = selected === f.id;
-  const sug = (f.edited !== undefined && f.edited !== null) ? f.edited : f.suggestion;
-  const body = el('div.t');
-  if (f.quote) body.appendChild(el('del', f.quote));
-  if (f.quote && sug) body.appendChild(document.createTextNode(' \u2192 '));
-  if (sug) body.appendChild(el('ins', sug));
-  if (!f.quote && !sug) body.appendChild(el('span.muted', CAT_LABELS[f.cat] || f.cat));
-  const card = el('div.iss.' + f.sev + (sel ? '.sel' : '') + (f.state !== 'open' ? '.done' : ''), { 'data-id': f.id, onclick: (e) => { if (e.target.closest('button')) return; select(f.id); } },
-    el('div.h', el('span.sev.' + f.sev, f.sev), el('span.mod', mod ? mod.short : f.module),
-      f.verified === 'ok' ? el('span.state.accepted', '\u2713 verificado') : null,
-      f.verified === 'edit' ? el('span.state.accepted', '\u270e verificado') : null,
-      f.state !== 'open' ? el('span.state.' + f.state, STATE_LABELS[f.state]) : null,
-      el('span.seg', { title: 'P\u00e1rrafo y oraci\u00f3n' }, '\u00a7' + _placeLabel(f))),
-    body,
-    el('div.why', f.reason || ''),
-    f.verifierReason ? el('div.why', 'Verificador: ' + f.verifierReason) : null,
-    el('div.src', (f.source === 'local' || f.source === 'rule' ? 'Sin IA' : f.source === 'external' ? 'IA externa' : (f.model || 'IA') + (f.role === 'deep' ? ' \u00b7 a fondo' : f.role === 'cache' ? ' \u00b7 cach\u00e9' : '')) +
-      (f.unanchored ? ' \u00b7 cita no localizada' : '')));
-  const acts = el('div.acts');
-  if (f.state === 'open') {
-    acts.appendChild(el('button.btn.sm.primary', { disabled: !sug || (f.start == null && !(!f.quote && sug)), title: 'A', onclick: () => setState(f, 'accepted') }, 'Aceptar'));
-    acts.appendChild(el('button.btn.sm', { title: 'E', onclick: () => edit(f) }, 'Editar'));
-    acts.appendChild(el('button.btn.sm', { title: 'R', onclick: () => reject(f) }, 'Rechazar'));
-    acts.appendChild(el('button.btn.sm', { onclick: () => setState(f, 'ignored') }, 'Ignorar'));
-  } else {
-    acts.appendChild(el('button.btn.sm', { onclick: () => setState(f, 'open') }, 'Deshacer'));
-  }
-  card.appendChild(acts);
-  return card;
-}
-
-function setState(f, s) {
-  updateFinding(f.id, { state: s });
-  if (s !== 'open') moveNext(f.id);
-}
-
-async function edit(f) {
-  const v = await promptDialog('Editar la correcci\u00f3n', 'Texto que sustituir\u00e1 a \u00ab' + (f.quote || '') + '\u00bb', (f.edited != null ? f.edited : f.suggestion) || '');
-  if (v === null) return;
-  updateFinding(f.id, { edited: v, state: 'accepted' });
-  moveNext(f.id);
-}
-
-async function reject(f) {
-  updateFinding(f.id, { state: 'rejected' });
-  moveNext(f.id);
-}
-
-function moveNext(id) {
-  const list = visibleFindings();
-  const i = list.findIndex(f => f.id === id);
-  const next = list[i + 1] || list[i - 1] || list.find(f => f.id !== id);
-  if (next) select(next.id); else { selected = null; renderPanes(); }
-}
-
-function _placeLabel(f) {
-  const pl = state.session ? findingPlace(state.session, f) : null;
-  return pl ? pl.label : '';
-}
-
-/** Selects a finding: card, mark and, unless the click came from a sheet, both sheets centred on its
- *  sentence (the exact text in stronger yellow). */
-function select(id, opts) {
-  const o = opts || {};
-  selected = id;
-  for (const c of document.querySelectorAll('#rv-findings .iss')) c.classList.toggle('sel', c.dataset.id === id);
-  const card = document.querySelector('#rv-findings .iss[data-id="' + id + '"]');
-  if (card) card.scrollIntoView({ block: o.fromPane ? 'center' : 'nearest' });
-  for (const m of panes.tgt.querySelectorAll('mark.cur')) m.classList.remove('cur');
-  for (const m of panes.tgt.querySelectorAll('mark[data-fids]')) if (m.dataset.fids.split(',').includes(id)) m.classList.add('cur');
-  const f = state.findings.find(x => x.id === id);
-  if (f) focusFinding(f, !!o.fromPane);
-  findingsWindowSelect(id);
-}
-
-function focusFinding(f, quiet) {
-  const s = state.session;
-  const u = s && s.units[f.unit];
-  if (!u) return;
-  if (u.tgtPara !== null && f.start !== null && f.start !== undefined && f.end > f.start) nav.focusSpan('tgt', u.tgtPara, f.start, f.end, { quiet });
-  else if (u.srcPara !== null && f.srcStart !== null && f.srcStart !== undefined) nav.focusSpan('src', u.srcPara, f.srcStart, f.srcEnd, { quiet });
-  else if (!quiet) nav.focusParas(u.idx);
-  const pl = findingPlace(s, f);
-  $('#rv-unit-info').textContent = pl ? '\u00a7' + pl.label : '';
-}
-
-/** Findings of one sentence of the translation (to reveal them when it is clicked). */
-function _findingsInSentence(pid, index) {
-  const s = state.session;
-  const sp = sentencesOf(s, 'tgt', pid)[index];
-  const list = visibleFindings().filter(f => { const u = s.units[f.unit]; return u && u.tgtPara === pid; });
-  if (!sp) return list;
-  return list.filter(f => f.start === null || f.start === undefined ? false : (f.start < sp.end && (f.end || f.start) >= sp.start));
-}
-
-/** A click in a sheet: the sentence and its pair are marked (the other sheet follows) and, as in
- *  Final Check, a finding of that sentence is shown in the list (repeated clicks go through them). */
-function onSheetClick(side, p, ev) {
-  const m = side === 'tgt' && ev.target.closest('mark[data-fids]');
-  const r = nav.clickAt(side, ev);
-  let ids = [];
-  if (m) ids = m.dataset.fids.split(',');
-  else if (r && r.index !== null) {
-    let pid = r.pid, index = r.index;
-    if (side === 'src') { const peer = peerSentence(state.session, 'src', r.pid, r.index); pid = peer ? peer.pid : null; index = peer ? peer.index : null; }
-    if (pid !== null) ids = (index === null ? visibleFindings().filter(f => { const u = state.session.units[f.unit]; return u && u.tgtPara === pid; }) : _findingsInSentence(pid, index)).map(f => f.id);
-  }
-  if (!ids.length) return;
-  const i = ids.indexOf(selected);
-  select(ids[(i + 1) % ids.length], { fromPane: true });
-}
-
-function onKey(e) {
-  if (state.view !== 'review' || e.ctrlKey || e.altKey || e.metaKey) return;
-  if (e.target.closest && e.target.closest('input, textarea, select, .modal')) return;
-  const list = visibleFindings();
-  if (!list.length) return;
-  const i = list.findIndex(f => f.id === selected);
-  const f = list[i];
-  if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.shiftKey) { e.preventDefault(); nav.step(e.key === 'ArrowRight' ? 1 : -1); return; }
-  const k = e.key.toLowerCase();
-  if (k === 'j') { e.preventDefault(); select((list[i + 1] || list[0]).id); }
-  else if (k === 'k') { e.preventDefault(); select((list[i - 1] || list[list.length - 1]).id); }
-  else if (f && k === 'a' && f.state === 'open' && (f.edited || f.suggestion)) { e.preventDefault(); setState(f, 'accepted'); }
-  else if (f && k === 'r' && f.state === 'open') { e.preventDefault(); reject(f); }
-  else if (f && k === 'e' && f.state === 'open') { e.preventDefault(); edit(f); }
-}
-
-// ------------------------------------------------------------------ sheets
-
-function renderPanes() {
-  if (!state.session || state.view !== 'review') return;
-  const s = state.session;
-  $('#rv-src-title').textContent = 'ORIGINAL \u00b7 ' + (s.srcLang === 'fr' ? 'FR' : 'EN');
-  const shown = visibleFindings();
-  const byPara = new Map();
-  const gaps = new Map();
-  for (const f of shown) {
-    const u = s.units[f.unit];
-    if (!u || u.tgtPara === null) continue;
-    if (f.start !== null && f.start !== undefined && f.end > f.start) {
-      if (!byPara.has(u.tgtPara)) byPara.set(u.tgtPara, []);
-      byPara.get(u.tgtPara).push(f);
-    } else if (f.cat === 'OMI' || !f.quote) {
-      if (!gaps.has(u.tgtPara)) gaps.set(u.tgtPara, []);
-      gaps.get(u.tgtPara).push(f);
-    }
-  }
-  const keep = { src: panes.src.scrollTop, tgt: panes.tgt.scrollTop };
-  renderDoc(panes.tgt, s.tgt, {
-    decorate: (p) => _flatten(byPara.get(p.id) || [], selected),
-    gaps: (p) => (gaps.get(p.id) || []).map(f => ({ at: p.text.length, label: '+ ' + (CAT_LABELS[f.cat] || f.cat).toLowerCase(), title: f.reason })),
-    onParaClick: (p, ev) => onSheetClick('tgt', p, ev)
-  });
-  renderDoc(panes.src, s.src, { onParaClick: (p, ev) => onSheetClick('src', p, ev) });
-  panes.src.scrollTop = keep.src;
-  panes.tgt.scrollTop = keep.tgt;
-  nav.refresh();
-}
-
-function _flatten(list, selectedId) {
-  if (!list.length) return [];
-  const cuts = new Set();
-  for (const f of list) { cuts.add(f.start); cuts.add(f.end); }
-  const pts = Array.from(cuts).sort((a, b) => a - b);
-  const order = { CRI: 0, MAY: 1, MEN: 2, SUG: 3 };
-  const out = [];
-  for (let i = 0; i < pts.length - 1; i++) {
-    const a = pts[i], b = pts[i + 1];
-    const cover = list.filter(f => f.start <= a && f.end >= b);
-    if (!cover.length) continue;
-    cover.sort((x, y) => order[x.sev] - order[y.sev]);
-    const cur = cover.some(f => f.id === selectedId);
-    out.push({ start: a, end: b, cls: 'f ' + cover[0].sev + (cur ? ' cur' : ''),
-      attrs: { 'data-fids': cover.map(f => f.id).join(','), title: cover.map(f => (f.reason || '')).join(' \u2022 ') } });
-  }
-  return out;
+/** Clears what this screen knows of past runs (after "Vaciar" in Corregir). */
+export function resetReviewState() {
+  progress = {};
+  estimates = {};
+  emit('review-status', '');
 }
 
 // ------------------------------------------------------------------ deferred batches
@@ -651,8 +378,8 @@ function _deferredCard() {
   const recs = (state.project && state.project.deferred) || [];
   const shown = recs.filter(r => r.status === 'running' || (r.finishedAt && Date.now() - r.finishedAt < 7 * 86400000 && !r.dismissed) || (!r.finishedAt && !r.dismissed));
   if (!shown.length) return null;
-  const card = el('div.mcard' + (shown.some(r => r.status === 'running') ? '.run' : '.done'), { style: { minWidth: '230px', maxWidth: '260px' } },
-    el('div.nm', '\u23f3 Lotes diferidos', helpBtn('deferred')));
+  const card = el('div.mcard.wide' + (shown.some(r => r.status === 'running') ? '.run' : '.done'),
+    el('div.nm', 'Lotes diferidos', helpBtn('deferred')));
   for (const r of shown.slice(-3)) {
     const done = r.jobs.reduce((n, j) => n + (j.done || 0), 0), total = r.jobs.reduce((n, j) => n + (j.total || 0), 0);
     card.appendChild(el('div.est', new Date(r.createdAt).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' }) + ' \u00b7 ' +
@@ -724,85 +451,12 @@ async function pollDeferredNow(manual) {
   }
 }
 
-// ------------------------------------------------------------------ table window and feedback
-
-/** The findings as a table in a window of their own (as the Transformations window of Final Check). */
-function openTable() {
-  if (!state.session) return;
-  const ok = openFindingsWindow({
-    filt: Object.assign({}, filt),
-    select: (id) => select(id),
-    setState: (f, st) => updateFinding(f.id, { state: st }),
-    edit: (f, text) => updateFinding(f.id, { edited: text, state: 'accepted' }),
-    exportFeedback: () => feedbackDialog(),
-    selected: () => selected
-  });
-  if (!ok) toast('El navegador ha bloqueado la ventana: permita las ventanas emergentes de esta p\u00e1gina.', 'warn', 8000);
-}
-
-/** "Hallazgos para valorar (Excel)": real or masked text, all findings or the ones shown. */
-async function feedbackDialog() {
-  if (!state.session) return;
-  const masked = el('input', { type: 'radio', name: 'fbtext', value: 'masked', checked: true });
-  const real = el('input', { type: 'radio', name: 'fbtext', value: 'real' });
-  const allF = el('input', { type: 'radio', name: 'fbwhich', value: 'all', checked: true });
-  const vis = el('input', { type: 'radio', name: 'fbwhich', value: 'visible' });
-  const r = await modal({ title: 'Hallazgos para valorar (Excel)', help: helpBtn('feedback'), width: '600px', body: el('div',
-    el('p', 'Un Excel con una fila por hallazgo, su contexto y tres columnas vac\u00edas para usted: ', el('b', 'Su valoraci\u00f3n'), ' (lista desplegable), ',
-      el('b', 'Gravedad correcta'), ' y ', el('b', 'Comentario'), '. Rell\u00e9nelo y env\u00edelo para ajustar las reglas y las comprobaciones.'),
-    el('label.lbl', 'Texto'),
-    el('div', el('label.row', masked, ' Enmascarado (recomendado si va a compartir el archivo: sin datos reales)')),
-    el('div', el('label.row', real, ' Real')),
-    el('label.lbl', 'Hallazgos'),
-    el('div', el('label.row', allF, ' Todos (' + state.findings.length + ')')),
-    el('div', el('label.row', vis, ' Solo los que se ven con los filtros actuales (' + visibleFindings().length + ')'))),
-    buttons: [{ label: 'Cancelar', value: null }, { label: 'Descargar Excel', kind: 'primary', value: 'ok' }] });
-  if (r !== 'ok') return;
-  const ids = vis.checked ? new Set(visibleFindings().map(f => f.id)) : null;
-  try {
-    const n = await exportFeedbackXlsx({ masked: masked.checked, filter: ids ? (f) => ids.has(f.id) : null, 
-      segText: (f, isMasked) => {
-        if (isMasked) return null;   // the masked texts are whole paragraphs (tags keep their positions there)
-        const pl = findingPlace(state.session, f);
-        return pl ? { label: pl.label, src: pl.src, tgt: pl.tgt } : null;
-      } });
-    toast(n + ' hallazgos exportados para valorar.', 'ok');
-  } catch (e) { console.error(e); toast('No se pudo exportar: ' + e.message, 'err', 8000); }
-}
-
-/** "Vaciar": delete findings (all or the pending ones) and, if wanted, the stored AI answers too, so
- *  the next run really reviews again instead of repeating what is in the cache. */
-async function resetFindings() {
-  if (!state.project) return;
-  const all = el('input', { type: 'radio', name: 'rsWhich', value: 'all', checked: true });
-  const open = el('input', { type: 'radio', name: 'rsWhich', value: 'open' });
-  const cache = el('input', { type: 'checkbox', checked: true });
-  const nOpen = state.findings.filter(f => f.state === 'open').length;
-  const r = await modal({ title: 'Vaciar los hallazgos', help: helpBtn('findings-reset'), width: '560px', body: el('div',
-    el('div', el('label.row', all, ' Todos (' + state.findings.length + '), tambi\u00e9n los aceptados y rechazados')),
-    el('div', el('label.row', open, ' Solo los pendientes (' + nOpen + ')')),
-    el('div', { style: { marginTop: '10px' } }, el('label.row', cache, ' Olvidar tambi\u00e9n las respuestas guardadas de la IA (si no, al volver a ejecutar un m\u00f3dulo saldr\u00edan los mismos hallazgos sin preguntar de nuevo)')),
-    el('p.info', { style: { marginTop: '8px' } }, 'Los documentos y las entidades no se tocan.')),
-    buttons: [{ label: 'Cancelar', value: null }, { label: 'Vaciar', kind: 'danger', value: 'ok' }] });
-  if (r !== 'ok') return;
-  state.findings = open.checked ? state.findings.filter(f => f.state !== 'open') : [];
-  if (cache.checked) { try { const { idbClear } = await import('../store/idb.js'); await idbClear('cache'); } catch (e) { console.warn('cache', e); } }
-  selected = null;
-  progress = {};
-  estimates = {};
-  emit('findings');
-  saveProjectSoon();
-  nav.clear();
-  scheduleEstimates();
-  toast('Hallazgos borrados' + (cache.checked ? ' y respuestas guardadas olvidadas' : '') + '.', 'ok');
-}
-
 // ------------------------------------------------------------------ test bench
 
 const _MOD = (id) => (moduleById(id) || { label: id }).label;
 
 /** Loads the test bench (a project of its own) or, when it is open, shows how the modules did. */
-async function benchDialog() {
+export async function benchDialog() {
   if (state.project && state.project.bench) return benchResults();
   let spec;
   try { spec = await loadBenchSpec(); } catch (e) { toast(e.message, 'err', 8000); return; }
@@ -813,9 +467,9 @@ async function benchDialog() {
       ' (de sentido, omisiones, adiciones, nombres oficiales y gram\u00e1tica) y ', el('b', clean + ' p\u00e1rrafos correctos'), '.'),
     el('ol',
       el('li', 'Pulse \u00abCargar\u00bb: se abre como un proyecto aparte (el que tiene abierto queda guardado).'),
-      el('li', 'Ejecute los m\u00f3dulos que quiera, con los modelos y la exigencia que quiera probar.'),
+      el('li', 'En Revisar, marque los revisores que quiera, con los modelos y la exigencia que quiera probar, y pulse \u00abRevisar ahora\u00bb.'),
       el('li', 'Al terminar, M\u00e1s \u203a Resultado del banco de pruebas: cu\u00e1ntos errores detecta cada m\u00f3dulo y cu\u00e1nto ruido mete.')),
-    el('p.info', 'Sirve para comparar modelos, exigencias e instrucciones con datos y no a ojo. Antes de repetir una prueba, use \ud83d\uddd1 Vaciar con \u00abOlvidar las respuestas guardadas\u00bb.')),
+    el('p.info', 'Sirve para comparar modelos, exigencias e instrucciones con datos y no a ojo. Antes de repetir una prueba, use Vaciar (en Corregir) con \u00abOlvidar las respuestas guardadas\u00bb.')),
     buttons: [{ label: 'Cancelar', value: null }, { label: 'Cargar el banco de pruebas', kind: 'primary', value: 'ok' }] });
   if (r !== 'ok') return;
   try {
@@ -826,7 +480,7 @@ async function benchDialog() {
     saveProjectSoon();
     emit('project');
     emit('goto', 'review');
-    toast('Banco de pruebas cargado: ejecute los m\u00f3dulos.', 'ok', 6000);
+    toast('Banco de pruebas cargado: elija los revisores y pulse \u00abRevisar ahora\u00bb.', 'ok', 6000);
   } catch (e) { console.error(e); toast('No se pudo cargar el banco de pruebas: ' + e.message, 'err', 8000); }
 }
 

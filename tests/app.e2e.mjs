@@ -2,8 +2,8 @@
 /**
  * app.e2e.mjs - End-to-end test of the whole app in Chromium (Playwright), with a mock
  * OpenAI-compatible provider:
- *   DOCX: load -> entities -> masked export -> provider set-up -> layer 0 -> AI modules (fusion,
- *         cascade, verifier) -> accept -> export with tracked changes + comments -> report.
+ *   DOCX: load -> entities -> masked export -> provider set-up -> Revisar: AI modules (fusion,
+ *         cascade, verifier) -> Corregir: accept -> Exportar: tracked changes + comments, report.
  *   PPTX and XLSX: load -> masked export (verified with python-pptx / openpyxl).
  * Screenshots go to tests/out/e2e/. Exit code 1 on failure.
  */
@@ -130,11 +130,12 @@ async function main() {
       def: 'FIN 0'
     });
 
-    // Review: layer 0 + AI modules through the UI
+    // Revisar: the AI modules through the UI
     await page.click('.step[data-view="review"]');
     await page.waitForSelector('#rv-modules .mchip');
     await page.waitForTimeout(800);
-    await page.click('#tools button:has-text("Ejecutar seleccionados")');
+    ok(/^\d+ revisores? \u00b7 \d+ p\u00e1rrafos/.test(await page.textContent('#rv-summary')), 'Revisar: the footer counts the ticked reviewers (' + (await page.textContent('#rv-summary')).trim() + ')');
+    await page.click('#rv-run');
     await page.waitForSelector('.modal:has-text("Plan de ejecuci")', { timeout: 15000 });
     const planText = await page.textContent('.modal');
     ok(/fusionados/.test(planText), 'Plan fuses modules with the same input and model');
@@ -168,15 +169,19 @@ async function main() {
     ok(bil.length >= 1 && /FIDELIDAD DE SENTIDO/.test(bil[0].system) && bil[0].system.length < 4500, 'Fidelity prompt is about meaning and compact (' + (bil[0] ? bil[0].system.length : 0) + ' characters)');
     await page.screenshot({ path: path.join(OUT, '3-review.png') });
 
-    // Accept the grammar finding through the UI, then export with tracked changes and comments
+    // After the run UMBRA moves to Corregir; accept the grammar finding there, then export with
+    // tracked changes and comments from step 5.
+    await page.waitForSelector('#view-correct.on #rv-findings .cx-row', { timeout: 10000 });
+    ok(/por revisar/.test(await page.textContent('#st-correct')), 'The run ends in Corregir and the step says what is left (' + (await page.textContent('#st-correct')).trim() + ')');
     await page.selectOption('select[data-filter="state"]', 'open');
     await page.waitForTimeout(300);
-    const card = page.locator('#rv-findings .iss', { hasText: 'fueron desplegado' }).first();
-    await card.locator('button:has-text("Aceptar")').click();
+    await page.click('#rv-findings .cx-badge[data-id="' + gram.id + '"]');
+    ok(/fueron desplegado/.test(await page.textContent('#cx-insp .ci-quote')), 'The inspector shows the chosen finding');
+    await page.click('#cx-accept');
     const st = await page.evaluate(async (id) => { const { state } = await import('/app/js/state.js'); return state.findings.find(f => f.id === id).state; }, gram.id);
-    ok(st === 'accepted', 'Finding accepted from the card');
-    await page.click('#tools button:has-text("Exportar")');
-    const outDocx = await download(page, () => page.click('.menu .mi:has-text("DOCX con control de cambios y comentarios")'), 'corrected_es.docx');
+    ok(st === 'accepted', 'Finding accepted from the inspector');
+    await page.click('.step[data-view="export"]');
+    const outDocx = await download(page, () => page.click('#view-export button:has-text("DOCX con control de cambios y comentarios")'), 'corrected_es.docx');
     const chk = py([
       'import zipfile,sys,docx',
       'z=zipfile.ZipFile(sys.argv[1]); x=z.read("word/document.xml").decode("utf-8")',
@@ -185,7 +190,7 @@ async function main() {
       'print("ins" if "<w:ins " in x else "noins", "del" if "<w:del " in x else "nodel", "desplegados" if "desplegados" in x else "-", c.count("<w:comment "), "UMBRA" if "UMBRA" in c else "-")'
     ].join('\n'), outDocx).trim();
     ok(/^ins (?:no)?del desplegados \d+ UMBRA$/.test(chk) && !/ 0 UMBRA/.test(chk), 'Corrected DOCX: tracked change + Word comments (' + chk + ')');
-    const rep = await download(page, async () => { await page.click('#tools button:has-text("Exportar")'); await page.click('.menu .mi:has-text("Informe HTML")'); }, 'report.html');
+    const rep = await download(page, () => page.click('#view-export button:has-text("Informe HTML")'), 'report.html');
     ok(/Informe de revisi/.test(fs.readFileSync(rep, 'utf-8')), 'HTML report written');
 
     // Manual masking with Alt+E on a selection of the target
@@ -246,7 +251,7 @@ async function main() {
 
     // Settings screens render
     await page.click('.step[data-view="settings"]');
-    for (const sec of ['providers', 'modules', 'lists', 'sync', 'usage', 'privacy', 'export']) {
+    for (const sec of ['providers', 'modules', 'lists', 'sync', 'usage', 'privacy']) {
       await page.click('.settings-nav button[data-sec="' + sec + '"]');
       await page.waitForTimeout(300);
       const err = await page.$('.settings-body .note.err');
@@ -256,8 +261,8 @@ async function main() {
     const usage = await page.evaluate(async () => { const u = await import('/app/js/ai/usage.js'); return (await u.readUsageRows()).length; });
     ok(usage > 0, 'Usage recorded (' + usage + ' rows)');
     // Project file round trip (.umbra) and dark mode
-    await page.click('.settings-nav button[data-sec="export"]');
-    const umbraPath = await download(page, () => page.click('.settings-body button:has-text("Guardar proyecto (.umbra)")'), 'project.umbra');
+    await page.click('.step[data-view="export"]');
+    const umbraPath = await download(page, () => page.click('#view-export button:has-text("Guardar proyecto (.umbra)")'), 'project.umbra');
     const nFind = await page.evaluate(async () => { const { state } = await import('/app/js/state.js'); return state.findings.length; });
     await page.click('#btn-dark');
     await page.waitForTimeout(200);
@@ -265,9 +270,7 @@ async function main() {
     await page.click('#btn-dark');
     {
       const { ctx: c4, page: p4 } = await newApp(browser, base);
-      await p4.click('.step[data-view="settings"]');
-      await p4.click('.settings-nav button[data-sec="export"]');
-      const [chooser] = await Promise.all([p4.waitForEvent('filechooser'), p4.click('.settings-body button:has-text("Abrir proyecto (.umbra)")')]);
+      const [chooser] = await Promise.all([p4.waitForEvent('filechooser'), p4.click('#view-files button:has-text("Abrir proyecto (.umbra)")')]);
       await chooser.setFiles(umbraPath);
       await p4.waitForSelector('#view-mask.on .ent', { timeout: 20000 });
       const n2 = await p4.evaluate(async () => { const { state } = await import('/app/js/state.js'); return state.findings.length; });

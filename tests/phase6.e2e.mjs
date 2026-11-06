@@ -102,7 +102,7 @@ async function main() {
     // Only grammar+style (fused) to keep it short.
     await page.evaluate(() => { document.querySelectorAll('#rv-modules .mchip input[type=checkbox]').forEach(c => { if (c.checked) c.click(); }); });
     for (const name of ['Gram\u00e1tica', 'Estilo']) await page.click('#rv-modules .mchip:has-text("' + name + '") input[type=checkbox]');
-    await page.click('#tools button:has-text("Ejecutar seleccionados")');
+    await page.click('#rv-run');
     await page.waitForSelector('.modal:has-text("Plan de ejecuci")', { timeout: 15000 });
     const defText = await page.textContent('.modal');
     ok(/Modo diferido/.test(defText) && !(await page.$('.modal input[type=checkbox][disabled]')), 'Plan offers the deferred mode');

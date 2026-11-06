@@ -11,25 +11,27 @@ import { showGuide } from './guide.js';
 
 const T = {
   // ------------------------------------------------------------------ files and start
-  files: { t: 'Cargar los documentos', b: [
+  files: { t: 'Paso 1 \u00b7 Archivos', b: [
     'Pulse una casilla o arrastre a ella el archivo: a la izquierda el **original** (ingl\u00e9s o franc\u00e9s) y a la derecha la **traducci\u00f3n** (espa\u00f1ol).',
     ['Formatos: DOCX, PPTX y XLSX exportados de eLUNa.',
-      'UMBRA empareja los p\u00e1rrafos de los dos documentos y enmascara al momento.',
+      'UMBRA empareja los p\u00e1rrafos de los dos documentos, enmascara al momento y pasa al paso 2.',
       'Para cambiar un archivo, vuelva a pulsar su casilla.',
-      'El proyecto se guarda solo en este navegador; para volver a \u00e9l, pulse \ud83d\uddc2 (Proyectos guardados) en la cabecera.',
+      '**Nuevo proyecto** empieza otro documento; **Abrir proyecto (.umbra)** carga uno guardado en un archivo; **Banco de pruebas** abre el documento de prueba.',
+      'El proyecto se guarda solo en este navegador: est\u00e1 en **Proyectos recientes** y en **Proyectos**, al pie de la barra de pasos.',
       'Los archivos no salen de su ordenador: a una IA solo llega texto enmascarado (y, con Nombres oficiales, la lista de nombres de organismos, \u00f3rganos, cargos, pa\u00edses y lugares).'] ] },
 
-  // ------------------------------------------------------------------ step 1: mask
-  'mask-tools': { t: 'Barra de enmascarado', b: [
-    ['**Categor\u00edas** (Cifras, Fechas, Organismos\u2026): pulse una para dejar de enmascararla o para volver a hacerlo. Las apagadas salen en gris.',
-      'El resumen dice cu\u00e1ntas entidades hay, cu\u00e1ntas tienen **problemas** y cu\u00e1ntas **cifras sin pareja** (una cifra que no est\u00e1 igual en las dos lenguas: posible error).',
-      '**Original: ingl\u00e9s / franc\u00e9s**: la lengua del original.',
-      '**Opciones**: n\u00fameros en letra, siglas desconocidas y deshacer lo hecho a mano.',
-      '**\ud83d\udc41 Ver original / Ver etiquetas**: alterna entre las etiquetas y el texto real.',
-      '**+ Enmascarar selecci\u00f3n** ([[Alt+E]]): enmascara lo que haya seleccionado en una hoja.',
-      '**Exportar enmascarado**: documentos censurados, tabla biling\u00fce, texto para una IA externa y mapa de claves.'] ] },
+  // ------------------------------------------------------------------ step 2: mask
+  'mask-tools': { t: 'Paso 2 \u00b7 Enmascarar', b: [
+    ['Si hay **cifras sin pareja** (una cifra que no est\u00e1 igual en las dos lenguas: posible error), un aviso rojo dice cu\u00e1ntas. Cu\u00e1ntas entidades hay y cu\u00e1ntas tienen problemas se ve en la lista de la izquierda y en el paso 2 de la barra.',
+      '**Qu\u00e9 enmascarar**: las categor\u00edas (Cifras, Fechas, Organismos\u2026); pulse una para dejar de enmascararla o para volver a hacerlo. El men\u00fa sigue abierto para cambiar varias.',
+      '**Opciones**: la lengua del original (ingl\u00e9s o franc\u00e9s), n\u00fameros en letra, siglas desconocidas y deshacer lo hecho a mano.',
+      '**Ver original / Ver etiquetas**: alterna entre las etiquetas y el texto real.',
+      '**Enmascarar selecci\u00f3n** ([[Alt+E]]): enmascara lo que haya seleccionado en una hoja.',
+      '**Exportar enmascarado**: documentos censurados, tabla biling\u00fce, texto para una IA externa y mapa de claves.',
+      '**Siguiente: revisar**: el paso 3, elegir qu\u00e9 revisa la IA.'] ] },
   'mask-options': { t: 'Opciones de enmascarado', b: [
-    ['**N\u00fameros escritos en letra** (\u00abdoscientos\u00bb, \u00abthree\u00bb\u2026): se enmascaran como cifras.',
+    ['**Lengua del original**: ingl\u00e9s o franc\u00e9s (cambia c\u00f3mo se reconocen las entidades y se cortan las oraciones).',
+      '**N\u00fameros escritos en letra** (\u00abdoscientos\u00bb, \u00abthree\u00bb\u2026): se enmascaran como cifras.',
       '**Siglas desconocidas presentes en ambos textos**: una sigla que no est\u00e1 en las listas pero aparece igual en el original y en la traducci\u00f3n se enmascara.',
       '**Volver a enmascarar todo lo que se quit\u00f3 a mano**: anula los \u00abNo enmascarar\u00bb.',
       '**Deshacer todos los emparejamientos**: separa las entidades que se emparejaron a mano.',
@@ -77,43 +79,45 @@ const T = {
     '**C\u00f3mo se usa**: pulse **Emparejar\u2026** en la tarjeta de una de ellas y elija la otra. La lista tiene buscador y empieza por las m\u00e1s probables (mismo p\u00e1rrafo, sin pareja, misma sigla o forma parecida); la mejor viene marcada como **Sugerida**. Desde ese momento llevan la misma etiqueta y dejan de salir como problema.',
     'Para deshacerlo: Opciones \u203a Deshacer todos los emparejamientos.'] },
 
-  // ------------------------------------------------------------------ step 2: review
-  'review-tools': { t: 'Barra de revisi\u00f3n', b: [
+  // ------------------------------------------------------------------ steps 3 and 4: review and correct
+  'review-tools': { t: 'Paso 4 \u00b7 Corregir', b: [
+    'Una fila por segmento con hallazgos: n\u00famero de p\u00e1rrafo, el **original**, la **traducci\u00f3n** con lo se\u00f1alado subrayado y, a la derecha, cada hallazgo con su gravedad y su m\u00f3dulo. A la derecha de la pantalla, el hallazgo elegido.',
     ['El resumen cuenta los hallazgos pendientes por gravedad: cr\u00edticos, mayores, menores y sugerencias.',
-      '**\u25b6 Ejecutar seleccionados**: ejecuta los m\u00f3dulos marcados en la barra de m\u00f3dulos. Antes de gastar, ense\u00f1a el plan con el coste estimado. **\u25a0 Detener** para a mitad.',
-      '**M\u00e1s**: IA externa, verificar hallazgos y configurar los m\u00f3dulos.',
-      '**Exportar**: la traducci\u00f3n corregida (DOCX con control de cambios y comentarios), los informes y el Excel para valorar los hallazgos.'] ] },
-  modules: { t: 'M\u00f3dulos de revisi\u00f3n', b: [
-    'Cada m\u00f3dulo es un revisor especializado con IA que se ci\u00f1e a su tarea, como lo har\u00eda un revisor humano. Cada pastilla: **casilla** = entra en \u00ab\u25b6 Ejecutar seleccionados\u00bb; **\u25b6** peque\u00f1o = ejecuta solo ese m\u00f3dulo; al lado, el coste estimado y, despu\u00e9s, \u2691 n hallazgos pendientes (o \u2713). Deje el rat\u00f3n encima para ver qu\u00e9 hace y con qu\u00e9 modelo.',
-    ['**Gram\u00e1tica**: concordancia, r\u00e9gimen, tiempos y puntuaci\u00f3n (la ortograf\u00eda la corrige Word).',
-      '**Fidelidad**: solo errores de SENTIDO: lo que hace que la traducci\u00f3n diga algo distinto del original.',
-      '**Integridad**: contenido que falta o sobra respecto del original.',
+      '**Segmentos / Documento**: filas alineadas o las dos hojas completas, como en Final Check.',
+      '**Tabla**: los hallazgos en una ventana aparte (como la de Transformations de Final Check).',
+      '**Vaciar**: borra los hallazgos para empezar de cero.',
+      '**M\u00e1s**: el Verificador, decisiones en bloque, la IA externa y el banco de pruebas.',
+      '**Exportar**: pasa al paso 5.'],
+    'Teclas: [[J]] / [[K]] siguiente y anterior, [[A]] aceptar, [[R]] rechazar, [[E]] editar la propuesta.'] },
+  modules: { t: 'Paso 3 \u00b7 Revisar', b: [
+    'Cada tarjeta es un revisor con IA que se ci\u00f1e a su tarea, como lo har\u00eda un revisor humano. Marque los que necesite y pulse **Revisar ahora**: antes de gastar nada, UMBRA ense\u00f1a el plan con el coste estimado.',
+    ['**Fidelidad**: solo errores de SENTIDO: lo que hace que la traducci\u00f3n diga algo distinto del original.',
+      '**Integridad**: contenido que falta o sobra respecto del original, aunque sea una palabra.',
+      '**Nombres oficiales**: denominaci\u00f3n oficial y coherencia de organismos, \u00f3rganos, cargos, pa\u00edses y lugares; solo env\u00eda la lista de esos nombres, sin el texto.',
+      '**Gram\u00e1tica**: concordancia, r\u00e9gimen, tiempos y puntuaci\u00f3n (la ortograf\u00eda la corrige Word).',
       '**Estilo**: calcos, pasivas, gerundios, registro institucional.',
-      '**Coherencia** y **Convenciones ONU**: miran el documento entero de una vez (listas, t\u00edtulos, f\u00f3rmulas de resoluci\u00f3n); son baratos.',
       '**Lectura en fr\u00edo**: lee la traducci\u00f3n sin el original, como un lector nuevo.',
-      '**Nombres oficiales**: comprueba la denominaci\u00f3n oficial y la coherencia de organismos, \u00f3rganos, cargos, pa\u00edses y lugares; solo env\u00eda la lista de esos nombres, sin el texto.',
-      '**\u2713 Verificar hallazgos**: otro modelo revisa los hallazgos pendientes y descarta los falsos positivos.'],
-    'Qu\u00e9 m\u00f3dulos est\u00e1n activos, con qu\u00e9 modelo y con qu\u00e9 **exigencia** se elige en Ajustes \u203a M\u00f3dulos.'] },
+      '**Coherencia** y **Convenciones ONU**: miran el documento entero de una vez (listas, t\u00edtulos, f\u00f3rmulas de resoluci\u00f3n); son baratos.'],
+    '**Exigencia** de cada tarjeta: **Solo lo importante** (lo que cambia lo que se entiende, aunque sea una palabra), **Normal** (tambi\u00e9n lo menor) o **Exhaustiva** (tambi\u00e9n las mejoras opcionales). Debajo, el modelo y el coste estimado; mientras revisa, el avance. El modelo se cambia en Ajustes \u203a M\u00f3dulos.'] },
   'review-more': { t: 'Men\u00fa M\u00e1s', b: [
-    ['**Copiar para IA externa / Importar respuesta**: revisar con una IA de chat sin clave.',
-      '**Verificar los hallazgos pendientes de la IA**: los manda al Verificador, que descarta los falsos positivos. Cuesta poco: solo env\u00eda los hallazgos con su contexto.',
-      '**Configurar m\u00f3dulos y modelos**: atajo a Ajustes \u203a M\u00f3dulos.'] ] },
-  'review-export': { t: 'Exportar la revisi\u00f3n', b: [
+    ['**Banco de pruebas** (o su **Resultado**, si est\u00e1 abierto): medir lo que detecta cada m\u00f3dulo.',
+      '**Copiar para IA externa / Importar respuesta**: revisar con una IA de chat sin clave.',
+      '**Verificar los hallazgos pendientes de la IA** (en Corregir): los manda al Verificador, que descarta los falsos positivos. Cuesta poco: solo env\u00eda los hallazgos con su contexto.',
+      '**Los hallazgos que se ven** (en Corregir): aceptar, rechazar o volver a pendientes todos los que pasan los filtros.',
+      '**Configurar m\u00f3dulos y modelos** (en Revisar): atajo a Ajustes \u203a M\u00f3dulos.'] ] },
+  'review-export': { t: 'Paso 5 \u00b7 Exportar', b: [
     ['**DOCX con control de cambios y comentarios**: los hallazgos ACEPTADOS entran como cambios controlados (que acepta o rechaza en Word) y los dem\u00e1s, como comentarios de Word.',
       '**Sin comentarios**: solo los cambios.',
       '**Con los cambios aplicados**: documento limpio. Es la opci\u00f3n de PPTX y XLSX, que no tienen control de cambios.',
       '**Informe HTML o Excel**: todos los hallazgos, salvo los descartados por el Verificador.',
       '**Hallazgos para valorar (Excel)**: una fila por hallazgo con columnas para su opini\u00f3n; v\u00e9ase su propia ayuda.',
-      '**JSON**: los datos en bruto.'] ] },
-  findings: { t: 'Hallazgos', b: [
-    'Tres listas filtran lo que se ve: **Estado** (lo que usted ya decidi\u00f3), **M\u00f3dulo** (qui\u00e9n lo encontr\u00f3) y **Gravedad**. Cada opci\u00f3n dice cu\u00e1ntos hay.',
-    'Cada tarjeta muestra la gravedad (**CRI** cr\u00edtica, **MAY** mayor, **MEN** menor, **SUG** sugerencia), el m\u00f3dulo, el lugar (\u00a7 p\u00e1rrafo.oraci\u00f3n), la cita tachada \u2192 la propuesta, el motivo y el modelo.',
-    ['**Pulse una tarjeta**: las dos hojas van a esa oraci\u00f3n; el texto exacto sale en amarillo intenso.',
-      '**Aceptar** [[A]]: se aplicar\u00e1 al exportar. **Editar** [[E]]: corrija la propuesta (queda aceptada). **Rechazar** [[R]] e **Ignorar**: lo apartan.',
-      '[[J]] / [[K]]: siguiente y anterior. **Deshacer** devuelve un hallazgo decidido a pendientes.',
-      '**\u29c9 Tabla**: los hallazgos en una ventana aparte, en forma de tabla (como la de Transformations de Final Check).',
-      '**\ud83d\uddd1 Vaciar**: borra los hallazgos para empezar de cero.',
-      '**\u22ef**: aceptar o rechazar en bloque los visibles.'],
+      '**Documentos enmascarados** y **Proyecto (.umbra)**: lo mismo que en Enmascarar y para seguir otro d\u00eda.'],
+    'Si quedan hallazgos por revisar, **Volver a Corregir** le lleva a ellos.'] },
+  findings: { t: 'Filtros de Corregir', b: [
+    'Qu\u00e9 hallazgos se ven: por **m\u00f3dulo** (botones con su n\u00famero), por **estado** (lo que usted ya decidi\u00f3) y por **gravedad**, y el cuadro **Buscar en el texto** (busca en la cita, la propuesta, el motivo y los dos p\u00e1rrafos).',
+    ['Gravedad: **Cr\u00edtica** cambia el sentido, **Mayor** es un error claro, **Menor** un detalle y **Sugerencia** una mejora opcional.',
+      '**Pulse una fila**: elige el hallazgo de la oraci\u00f3n pulsada (o el primero de la fila); la oraci\u00f3n y su pareja del original se marcan en amarillo y el texto exacto, en amarillo intenso. Pulse otra vez para pasar al siguiente de la fila.',
+      '**Segmentos**: una fila por segmento con hallazgos. **Documento**: las dos hojas completas, con la navegaci\u00f3n por oraciones de Final Check.'],
     'Solo lo ACEPTADO se aplica al exportar.'] },
   'findings-reset': { t: 'Vaciar los hallazgos', b: [
     ['**Todos** o **solo los pendientes**: los aceptados y rechazados se pueden conservar.',
@@ -128,18 +132,25 @@ const T = {
     'No cambie las columnas ID ni \u00a7: sirven para encontrar cada hallazgo.'] },
   bench: { t: 'Banco de pruebas', b: [
     'Un documento de prueba hecho con su informe de revisi\u00f3n: p\u00e1rrafos con errores conocidos (de sentido, omisiones, adiciones, nombres oficiales y gram\u00e1tica) y p\u00e1rrafos correctos.',
-    ['**Cargar**: se abre como un proyecto aparte; el que ten\u00eda abierto queda guardado (\u1f5c2).',
-      'Ejecute los m\u00f3dulos con los modelos y la exigencia que quiera probar.',
+    ['**Cargar**: se abre como un proyecto aparte; el que ten\u00eda abierto queda guardado (en Proyectos).',
+      'En Revisar, marque los revisores con los modelos y la exigencia que quiera probar y pulse **Revisar ahora**.',
       '**Resultado**: cu\u00e1ntos errores detecta cada m\u00f3dulo, cu\u00e1les se le escapan, cu\u00e1les descart\u00f3 el Verificador y cu\u00e1nto **ruido** mete (hallazgos que no corresponden a ning\u00fan error).',
       '**Copiar el resumen**: p\u00e9guelo en el chat para ajustar las instrucciones de los m\u00f3dulos.',
-      'Antes de repetir una prueba, use \u1f5d1 Vaciar con \u00abOlvidar las respuestas guardadas\u00bb.'],
+      'Antes de repetir una prueba, use **Vaciar** (en Corregir) con \u00abOlvidar las respuestas guardadas\u00bb.'],
     'Sirve para comparar modelos, exigencias e instrucciones con datos, y no a ojo.'] },
-  'review-sheets': { t: 'Hojas de revisi\u00f3n', b: [
+  'review-sheets': { t: 'Vista Documento', b: [
     ['La traducci\u00f3n lleva subrayados los hallazgos visibles, con el color de su gravedad.',
-      '**Clic en una oraci\u00f3n**: se resalta con su pareja en el original y, si tiene hallazgos, se muestra el primero en la lista (pulse otra vez para ver el siguiente).',
+      '**Clic en una oraci\u00f3n**: se resalta con su pareja en el original y, si tiene hallazgos, se elige el primero (pulse otra vez para ver el siguiente).',
       'Una marca \u00ab+ omisi\u00f3n\u00bb al final de un p\u00e1rrafo indica algo que falta.',
       '[[\u2190]] / [[\u2192]]: oraci\u00f3n anterior y siguiente. Al pasar el rat\u00f3n por un p\u00e1rrafo, su pareja se recuadra.',
-      'Solo se marcan los hallazgos que pasan los filtros de la lista.'] ] },
+      'Solo se marcan los hallazgos que pasan los filtros.'] ] },
+  inspector: { t: 'El hallazgo elegido', b: [
+    'A la derecha de Corregir, el hallazgo elegido: gravedad, m\u00f3dulo y lugar (\u00a7 p\u00e1rrafo.oraci\u00f3n).',
+    ['**Dice**: el texto se\u00f1alado en la traducci\u00f3n (o \u00abFalta algo\u00bb, si es una omisi\u00f3n).',
+      '**Propuesta**: la correcci\u00f3n que se aplicar\u00e1. Puede cambiarla antes de aceptar ([[E]] la abre; [[Ctrl+Intro]] acepta desde ella).',
+      '**Aceptar** [[A]]: se aplicar\u00e1 al exportar (si la propuesta est\u00e1 vac\u00eda en una adici\u00f3n, **Suprimir**). **Rechazar** [[R]] e **Ignorar** lo apartan; **Deshacer** lo devuelve a pendiente.',
+      'Despu\u00e9s de decidir, pasa solo al siguiente. Las flechas de arriba, o [[J]] / [[K]], van al siguiente y al anterior.'],
+    'Si la cita no se encontr\u00f3 en el texto, Aceptar no puede aplicarla: corr\u00edjalo en Word.'] },
   plan: { t: 'Plan de ejecuci\u00f3n', b: [
     'Lo que se va a enviar, antes de gastar nada:',
     ['Lotes por m\u00f3dulo (dos m\u00f3dulos \u00abfusionados\u00bb comparten llamada), el modelo del cribado y el de la pasada a fondo.',
@@ -155,9 +166,9 @@ const T = {
       'Cuando llegan las respuestas, UMBRA termina sola la revisi\u00f3n (la pasada a fondo y el Verificador, al precio normal) y a\u00f1ade los hallazgos.'],
     'Puede cerrar la p\u00e1gina mientras tanto.'] },
 
-  // ------------------------------------------------------------------ step 3: export
+  // ------------------------------------------------------------------ step 5: export
   'export-corrected': { t: 'Traducci\u00f3n revisada', b: [
-    ['Aplica los hallazgos **ACEPTADOS** en Revisar.',
+    ['Aplica los hallazgos **ACEPTADOS** en Corregir.',
       '**DOCX con control de cambios y comentarios**: cada correcci\u00f3n es un cambio controlado de Word (puede aceptarlo o rechazarlo en Word) y los hallazgos sin aplicar van como comentarios.',
       '**Con los cambios aplicados**: documento limpio, sin marcas. Es lo que se obtiene en PPTX y XLSX.'],
     'El archivo original no se modifica: se descarga una copia.'] },
@@ -165,14 +176,14 @@ const T = {
     ['**Informe HTML**: para leer o imprimir, con cada hallazgo, su estado y su contexto.',
       '**Informe Excel**: una fila por hallazgo, para filtrar u ordenar.',
       '**Hallazgos en JSON**: los datos en bruto, para guardarlos o procesarlos.'],
-    'No incluyen los hallazgos descartados por el Verificador. Para valorar los hallazgos, use Revisar \u203a Exportar \u203a Hallazgos para valorar (Excel).'] },
+    'No incluyen los hallazgos descartados por el Verificador. Para valorar los hallazgos, use Hallazgos para valorar (Excel), en este mismo paso.'] },
   'export-masked': { t: 'Exportar enmascarado', b: [
-    'El documento con etiquetas en lugar de los datos (mismo formato) o la tabla biling\u00fce enmascarada. Las mismas opciones est\u00e1n en el paso 1, en **Exportar enmascarado**.'] },
+    'El documento con etiquetas en lugar de los datos (mismo formato) o la tabla biling\u00fce enmascarada. Las mismas opciones est\u00e1n en el paso 2, Enmascarar, en **Exportar enmascarado**.'] },
   'project-file': { t: 'Proyecto (.umbra)', b: [
     ['Un archivo **.umbra** guarda los dos documentos, las entidades y los hallazgos, para seguir otro d\u00eda o en otro equipo.',
       'Contiene el texto REAL: use **Guardar proyecto cifrado** si va a salir de su ordenador (la contrase\u00f1a no se puede recuperar).',
-      '**Abrir proyecto** lo carga y lo deja como estaba.'],
-    'Los proyectos tambi\u00e9n se guardan solos en este navegador (\ud83d\uddc2 en la cabecera).'] },
+      'Se abre en el paso 1, Archivos, con **Abrir proyecto (.umbra)**, y queda como estaba.'],
+    'Los proyectos tambi\u00e9n se guardan solos en este navegador (**Proyectos**, al pie de la barra de pasos).'] },
 
   // ------------------------------------------------------------------ settings: modules
   'module-settings': { t: 'M\u00f3dulos de revisi\u00f3n', b: [

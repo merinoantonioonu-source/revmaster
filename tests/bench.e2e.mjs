@@ -65,9 +65,9 @@ async function main() {
 
     // Load the bench from the menu.
     await page.goto(base + '/app/index.html');
-    await page.waitForSelector('#view-welcome.on');
-    await page.click('.step[data-view="review"]');
-    // No project yet: the menu lives in the review bar once a project is open, so open it through the module.
+    await page.waitForSelector('#view-files.on');
+    ok(await page.locator('#view-files button:has-text("Banco de pruebas")').count() === 1, 'Archivos offers the test bench');
+    // Open it through the module (the dialog would ask first).
     await page.evaluate(async () => {
       const { benchFiles } = await import('/app/js/review/bench.js');
       const { openFiles, state, emit, saveProjectSoon } = await import('/app/js/state.js');
@@ -94,11 +94,12 @@ async function main() {
     ], def: 'FIN 0' });
     await page.evaluate(() => { document.querySelectorAll('#rv-modules .mchip input[type=checkbox]').forEach(c => { if (c.checked) c.click(); }); });
     for (const id of ['fidelity', 'integrity', 'names']) await page.click('#rv-modules .mchip[data-mod="' + id + '"] input[type=checkbox]');
-    await page.click('#tools button:has-text("Ejecutar seleccionados")');
+    await page.click('#rv-run');
     await page.waitForSelector('.modal:has-text("Plan de ejecuci")', { timeout: 15000 });
     ok(/Nombres oficiales: 1 llamada con \d+ nombres \(solo la lista de nombres/.test(await page.textContent('.modal')), 'The plan shows the names call and says only the list travels');
     await page.click('.modal-foot .btn.amber');
     await page.waitForSelector('.toast:has-text("Banco de pruebas:")', { timeout: 60000 });
+    await page.waitForSelector('#view-correct.on', { timeout: 10000 });
     const toastText = await page.textContent('.toast:has-text("Banco de pruebas:")');
     ok(/3 de 31 errores detectados, 1 hallazgos de ruido/.test(toastText), 'After the run the bench counts hits and noise (' + toastText.trim() + ')');
 

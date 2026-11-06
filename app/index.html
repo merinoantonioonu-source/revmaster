@@ -12,45 +12,45 @@
 </head>
 <body>
 
-<header class="hd">
-  <div class="logo" title="Unified Masking &amp; Bilingual Review Assistant">
-    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="#fff" fill-opacity=".85"/></svg>
-    UMBRA
-  </div>
-  <nav class="steps">
-    <button class="step on" data-view="mask"><span class="n">1</span>Enmascarar</button>
-    <button class="step" data-view="review"><span class="n">2</span>Revisar</button>
-    <button class="step" data-view="settings"><span class="n">3</span>Exportar y ajustes</button>
-  </nav>
-  <div class="spacer"></div>
-  <button class="meter" id="sync-chip" title="Archivo de sincronizaci&#xF3;n"><span class="dot"></span><span class="txt">Sin sincronizar</span></button>
-  <div class="meter" id="cost-chip" title="Gasto de IA en esta sesi&#xF3;n">Sesi&#xF3;n: 0 tokens &#xB7; 0,000 US$</div>
-  <button class="icon-btn" id="btn-projects" title="Proyectos guardados">&#x1F5C2;</button>
-  <button class="icon-btn" id="btn-dark" title="Modo oscuro">&#x25D0;</button>
-  <button class="icon-btn" id="btn-help" title="Gu&#xED;a">?</button>
-</header>
+<div class="app" id="app">
+  <aside class="side" id="side" aria-label="Pasos">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" fill-opacity=".85"/></svg>
+      <div class="bt"><b title="Unified Masking &amp; Bilingual Review Assistant">UMBRA</b><small id="side-proj">Sin proyecto</small></div>
+      <button class="side-toggle" id="btn-side" aria-label="Plegar o desplegar la barra de pasos" title="Plegar o desplegar la barra de pasos"></button>
+    </div>
+    <nav class="steps" id="steps">
+      <button class="step" data-view="files"><span class="n">1</span><span class="tx"><b>Archivos</b><small id="st-files">Cargue los dos documentos</small></span></button>
+      <button class="step" data-view="mask"><span class="n">2</span><span class="tx"><b>Enmascarar</b><small id="st-mask">Proteger los datos</small></span></button>
+      <button class="step" data-view="review"><span class="n">3</span><span class="tx"><b>Revisar</b><small id="st-review">Elegir qu&#xE9; buscar</small></span></button>
+      <button class="step" data-view="correct"><span class="n">4</span><span class="tx"><b>Corregir</b><small id="st-correct">Aceptar o descartar</small></span></button>
+      <button class="step" data-view="export"><span class="n">5</span><span class="tx"><b>Exportar</b><small id="st-export">Word con control de cambios</small></span></button>
+    </nav>
+    <div class="side-foot">
+      <button class="step link" data-view="settings" title="Ajustes y proveedores"><span class="sic" data-icon="settings"></span><span class="tx">Ajustes y proveedores</span></button>
+      <button class="side-btn" id="btn-projects" title="Proyectos guardados"><span class="sic" data-icon="folder"></span><span class="tx">Proyectos</span></button>
+      <button class="side-btn" id="btn-help" title="Gu&#xED;a r&#xE1;pida"><span class="sic" data-icon="help"></span><span class="tx">Gu&#xED;a</span></button>
+      <button class="side-btn" id="btn-dark" title="Modo oscuro"><span class="sic" data-icon="moon"></span><span class="tx">Modo oscuro</span></button>
+      <button class="meter" id="sync-chip" title="Archivo de sincronizaci&#xF3;n"><span class="dot"></span><span class="txt">Sin sincronizar</span></button>
+      <div class="meter" id="cost-chip" title="Gasto de IA en esta sesi&#xF3;n">Sesi&#xF3;n: 0 tokens &#xB7; 0,000 US$</div>
+    </div>
+  </aside>
 
-<div class="top" id="topbar">
-  <div class="drop" id="drop-src" title="Pulse o arrastre aqu&#xED; el original (DOCX, PPTX o XLSX)">
-    <div class="lbl">1 &#xB7; ORIGINAL (EN/FR) &#xB7; DOCX, PPTX, XLSX</div>
-    <div class="fn">Pulse o arrastre el archivo</div>
-    <div class="mt">&nbsp;</div>
+  <div class="content">
+    <div class="vbar" id="topbar">
+      <h1 class="vtitle" id="vtitle"></h1>
+      <div class="tools" id="tools"></div>
+    </div>
+    <main class="main">
+      <section class="view" id="view-files"></section>
+      <section class="view" id="view-mask"></section>
+      <section class="view" id="view-review"></section>
+      <section class="view" id="view-correct"></section>
+      <section class="view" id="view-export"></section>
+      <section class="view" id="view-settings"></section>
+    </main>
   </div>
-  <div class="drop" id="drop-tgt" title="Pulse o arrastre aqu&#xED; la traducci&#xF3;n (DOCX, PPTX o XLSX)">
-    <div class="lbl">2 &#xB7; TRADUCCI&#xD3;N (ES) &#xB7; DOCX, PPTX, XLSX</div>
-    <div class="fn">Pulse o arrastre el archivo</div>
-    <div class="mt">&nbsp;</div>
-  </div>
-  <div class="tools" id="tools"></div>
 </div>
-
-<main class="main">
-  <nav class="rail" id="rail"></nav>
-  <section class="view" id="view-welcome"></section>
-  <section class="view" id="view-mask"></section>
-  <section class="view" id="view-review"></section>
-  <section class="view" id="view-settings"></section>
-</main>
 
 <script type="module" src="js/main.js"></script>
 </body>

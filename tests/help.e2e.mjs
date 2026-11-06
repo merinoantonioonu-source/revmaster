@@ -102,7 +102,7 @@ async function main() {
       return seen;
     };
 
-    // Welcome: the "?" of a drop zone explains, without opening the file chooser.
+    // Archivos: the "?" of a drop zone explains, without opening the file chooser.
     let chooser = false;
     page.on('filechooser', () => { chooser = true; });
     await page.click('#drop-src .help-btn');
@@ -112,7 +112,7 @@ async function main() {
     await closePop();
     ok(await page.locator('.help-pop').count() === 0, 'Escape closes the help');
     await page.keyboard.press('F1');
-    await checkPop('F1 on the welcome screen', 'files');
+    await checkPop('F1 in Archivos', 'files');
     await closePop();
 
     // Load a document pair.
@@ -123,17 +123,17 @@ async function main() {
     }
     await page.waitForSelector('#view-mask.on .ent', { timeout: 20000 });
 
-    // Step 1
+    // Step 2: Enmascarar
     const maskSeen = await sweep('#topbar', 'Mask bar');
     maskSeen.push(...await sweep('#view-mask', 'Mask view'));
-    ok(['mask-tools', 'entities', 'sheets'].every(t => maskSeen.includes(t)), 'Step 1 has its "?" (' + maskSeen.join(', ') + ')');
+    ok(['mask-tools', 'entities', 'sheets'].every(t => maskSeen.includes(t)), 'Step 2 has its "?" (' + maskSeen.join(', ') + ')');
     await page.click('#tools button:has-text("Exportar enmascarado")');
     await page.click('.menu .mi.help');
     await checkPop('Menu "Exportar enmascarado"', 'mask-export');
     await page.screenshot({ path: path.join(OUT, '2-menu.png') });
     await closePop();
     await page.keyboard.press('F1');
-    await checkPop('F1 in step 1', 'mask-tools');
+    await checkPop('F1 in step 2', 'mask-tools');
     await closePop();
     // Help inside a dialog: above it, and Escape closes only the help.
     await page.evaluate(() => {
@@ -158,24 +158,53 @@ async function main() {
     await closePop();
     await page.click('.modal-foot .btn:has-text("Cancelar")');
 
-    // Step 2
+    // Step 3: Revisar
     await page.click('.step[data-view="review"]');
     await page.waitForSelector('#rv-modules .mchip');
     await page.waitForTimeout(400);
     const revSeen = await sweep('#topbar', 'Review bar');
     revSeen.push(...await sweep('#view-review', 'Review view'));
-    ok(['review-tools', 'findings', 'review-sheets', 'modules'].every(t => revSeen.includes(t)), 'Step 2 has its "?" (' + revSeen.join(', ') + ')');
-    await page.locator('#rv-modules .help-btn[data-help="modules"]').click();
+    ok(revSeen.includes('modules'), 'Step 3 has its "?" (' + revSeen.join(', ') + ')');
+    await page.locator('#view-review .help-btn[data-help="modules"]').click();
     await page.screenshot({ path: path.join(OUT, '4-module.png') });
     await closePop();
-    for (const [btn, topic] of [['M\u00e1s', 'review-more'], ['Exportar', 'review-export']]) {
-      await page.click('#tools button:has-text("' + btn + '")');
-      await page.click('.menu .mi.help');
-      await checkPop('Menu "' + btn + '"', topic);
-      await closePop();
-    }
+    await page.click('#tools button:has-text("M\u00e1s")');
+    await page.click('.menu .mi.help');
+    await checkPop('Menu "Mas" of Revisar', 'review-more');
+    await closePop();
+    await page.keyboard.press('F1');
+    await checkPop('F1 in step 3', 'modules');
+    await closePop();
 
-    // Step 3: every section
+    // Step 4: Corregir (rows, then "Documento")
+    await page.click('.step[data-view="correct"]');
+    await page.waitForSelector('#view-correct.on #cx-insp');
+    const corSeen = await sweep('#topbar', 'Correct bar');
+    corSeen.push(...await sweep('#view-correct', 'Correct view'));
+    await page.click('#cx-mode button[data-mode="doc"]');
+    await page.waitForTimeout(300);
+    corSeen.push(...await sweep('#view-correct .cx-doc', 'Correct, Documento'));
+    ok(['review-tools', 'findings', 'inspector', 'review-sheets'].every(t => corSeen.includes(t)), 'Step 4 has its "?" (' + corSeen.join(', ') + ')');
+    await page.click('#tools button:has-text("M\u00e1s")');
+    await page.click('.menu .mi.help');
+    await checkPop('Menu "Mas" of Corregir', 'review-more');
+    await closePop();
+    await page.keyboard.press('F1');
+    await checkPop('F1 in step 4', 'review-tools');
+    await closePop();
+    await page.click('#cx-mode button[data-mode="rows"]');
+
+    // Step 5: Exportar
+    await page.click('.step[data-view="export"]');
+    await page.waitForSelector('#view-export .opt');
+    const expSeen = await sweep('#topbar', 'Export bar');
+    expSeen.push(...await sweep('#view-export', 'Export view'));
+    ok(['review-export', 'export-corrected', 'export-reports', 'export-masked', 'project-file'].every(t => expSeen.includes(t)), 'Step 5 has its "?" (' + expSeen.join(', ') + ')');
+    await page.keyboard.press('F1');
+    await checkPop('F1 in step 5', 'review-export');
+    await closePop();
+
+    // Ajustes: every section
     await page.click('.step[data-view="settings"]');
     const secs = await page.$$eval('.settings-nav button', bs => bs.map(b => b.dataset.sec));
     for (const sec of secs) {

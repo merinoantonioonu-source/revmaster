@@ -7,8 +7,9 @@
  *     the entity), also for an entity found on one side only; "Emparejar" with a search box and a
  *     suggestion chosen in advance; hovering a tag shows only the hidden text and lights its
  *     counterpart; right click > "Desenmascarar" until another sentence is clicked; no articles;
- *   - Review: a finding card marks its exact text and both sentences; labelled filters; "Vaciar";
- *     the table window; the "Hallazgos para valorar" Excel (drop-down list in the right XML order);
+ *   - Corregir: a finding marks its exact text and both sentences, in its row and in "Documento";
+ *     filters; the inspector (an edited proposal is what gets accepted); "Vaciar"; the table window;
+ *     the "Hallazgos para valorar" Excel (drop-down list in the right XML order);
  *   - Settings: no Rules section, the Modules table with "Exigencia", no duplicated content, the fixed
  *     type of a built-in provider.
  * Builds its own small DOCX pair. Screenshots go to tests/out/nav/. Exit code 1 on failure.
@@ -198,20 +199,36 @@ async function main() {
       addFindings([a, b]);
       return a.id;
     });
-    await page.waitForSelector('#rv-findings .iss');
+    await page.click('.step[data-view="correct"]');
+    await page.waitForSelector('#rv-findings .cx-row');
     const labels = await page.$$eval('#rv-bubbles .ffield > span', s => s.map(x => x.textContent));
-    ok(labels.join(',') === 'Estado,M\u00f3dulo,Gravedad', 'Findings are filtered with three labelled lists (' + labels.join(', ') + ')');
-    const card = page.locator('#rv-findings .iss[data-id="' + fid + '"]');
-    ok(/\u00a75\.2/.test(await card.textContent()), 'The card shows paragraph and sentence (\u00a75.2)');
-    await card.click();
+    const modBtns = await page.$$eval('#cx-mods button', bs => bs.map(b => b.dataset.mod));
+    ok(labels.join(',') === 'Estado,Gravedad' && modBtns.join(',') === 'all,fidelity,style', 'Findings are filtered by module (buttons), state and severity (' + labels.join(', ') + ' | ' + modBtns.join(', ') + ')');
+    ok(await page.locator('#rv-findings .cx-row').count() === 1 && await page.locator('#rv-findings .cx-badge').count() === 2, 'Corregir: one row per segment, one badge per finding');
+    await page.click('#rv-findings .cx-badge[data-id="' + fid + '"]');
+    await page.waitForTimeout(400);
+    ok(/\u00a75\.2/.test(await page.textContent('#cx-insp .ci-meta')), 'The inspector shows paragraph and sentence (\u00a75.2)');
+    h = await highlights(page);
+    ok(h.focus.includes('en base a') && h.seg.includes('Decidi\u00f3 actuar en base a la propuesta.') && h.seg.includes('It decided to act on the basis of the proposal.'),
+      'In its row, a finding marks its exact text and the sentence pair (' + JSON.stringify(h) + ')');
+    await page.screenshot({ path: path.join(OUT, '5-finding.png') });
+    await page.click('#cx-mode button[data-mode="doc"]');
     await page.waitForTimeout(500);
     h = await highlights(page);
     ok(h.focus.includes('en base a') && h.seg.includes('Decidi\u00f3 actuar en base a la propuesta.') && h.seg.includes('It decided to act on the basis of the proposal.'),
-      'A finding marks its exact text and the sentence pair (' + JSON.stringify(h) + ')');
-    await page.screenshot({ path: path.join(OUT, '5-finding.png') });
+      'In "Documento", both sheets go to the sentence of the finding (' + JSON.stringify(h) + ')');
+    await page.screenshot({ path: path.join(OUT, '5b-document.png') });
+    await page.click('#cx-mode button[data-mode="rows"]');
+    await page.waitForTimeout(300);
+    await page.fill('#cx-q', 'zzz');
+    await page.waitForTimeout(400);
+    ok(await page.locator('#rv-findings .cx-row').count() === 0, 'The search box filters the rows');
+    await page.fill('#cx-q', '');
+    await page.waitForTimeout(400);
+    await page.click('#rv-findings .cx-badge[data-id="' + fid + '"]');
 
     // The table window.
-    const [popup] = await Promise.all([page.waitForEvent('popup'), page.click('#view-review button:has-text("Tabla")')]);
+    const [popup] = await Promise.all([page.waitForEvent('popup'), page.click('#tools button:has-text("Tabla")')]);
     await popup.waitForSelector('tr[data-id]');
     ok(await popup.locator('tr[data-id]').count() === 2, 'The table window lists the pending findings');
     const row = popup.locator('tr[data-id="' + fid + '"]');
@@ -219,7 +236,7 @@ async function main() {
       'A row shows the original and the translation at sentence level');
     await row.locator('td.txt').nth(1).click();
     await page.waitForTimeout(400);
-    ok(await page.getAttribute('#rv-findings .iss.sel', 'data-id') === fid, 'Clicking a row selects that finding in the main window');
+    ok(await page.getAttribute('#rv-findings .cx-badge.cur', 'data-id') === fid, 'Clicking a row selects that finding in the main window');
     await row.locator('button.ok').click();
     await page.waitForTimeout(400);
     const st = await page.evaluate(async (id) => (await import('/app/js/state.js')).state.findings.find(f => f.id === id).state, fid);
@@ -227,9 +244,21 @@ async function main() {
     await popup.screenshot({ path: path.join(OUT, '6-table.png') });
     await popup.close();
 
+    // The inspector: the proposal can be edited before accepting, and then it moves to the next one.
+    const other = await page.evaluate(async (id) => (await import('/app/js/state.js')).state.findings.find(f => f.id !== id).id, fid);
+    await page.click('#rv-findings .cx-badge[data-id="' + other + '"]');
+    await page.waitForSelector('#cx-insp #cx-sug');
+    ok(/propuesta/.test(await page.textContent('#cx-insp .ci-quote')), 'The inspector shows the other finding');
+    await page.fill('#cx-sug', 'planteamiento');
+    await page.keyboard.press('Control+Enter');
+    await page.waitForTimeout(300);
+    const ed = await page.evaluate(async (id) => { const f = (await import('/app/js/state.js')).state.findings.find(x => x.id === id); return f.state + ':' + f.edited; }, other);
+    ok(ed === 'accepted:planteamiento', 'An edited proposal is what gets accepted (' + ed + ')');
+    ok(/Todo decidido/.test(await page.textContent('#st-correct')), 'Step 4 says when everything has been decided');
+
     // The Excel to judge the findings: opens in Excel (drop-down list before ignoredErrors).
-    await page.click('#tools button:has-text("Exportar")');
-    await page.click('.menu .mi:has-text("Hallazgos para valorar")');
+    await page.click('.step[data-view="export"]');
+    await page.click('#view-export button:has-text("Hallazgos para valorar")');
     await page.waitForSelector('.modal:has-text("Hallazgos para valorar")');
     await page.check('.modal input[value="real"]');
     const [dl] = await Promise.all([page.waitForEvent('download'), page.click('.modal-foot .btn.primary')]);
@@ -252,14 +281,16 @@ async function main() {
     ok(chk[5] === 'order-ok', 'Excel to judge: the XML elements are in the order Excel requires (no "repair" message)');
 
     // Vaciar.
-    await page.click('#view-review button:has-text("Vaciar")');
+    await page.click('.step[data-view="correct"]');
+    await page.click('#tools button:has-text("Vaciar")');
     await page.waitForSelector('.modal:has-text("Vaciar los hallazgos")');
     await page.click('.modal-foot .btn.danger');
     await page.waitForTimeout(300);
     ok(await page.evaluate(async () => (await import('/app/js/state.js')).state.findings.length) === 0, '"Vaciar" deletes the findings to start again');
 
     // 4) Settings: no Rules, the Modules table with Exigencia, no duplicated content.
-    await page.click('#rail button[title="M\u00f3dulos y modelos"]');
+    await page.click('.step[data-view="settings"]');
+    await page.click('.settings-nav button[data-sec="modules"]');
     await page.waitForSelector('.modtable');
     const secs = await page.$$eval('.settings-nav button', bs => bs.map(b => b.dataset.sec));
     ok(!secs.includes('rules'), 'No Rules section any more (' + secs.join(', ') + ')');
