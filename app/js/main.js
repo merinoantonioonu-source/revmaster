@@ -1,20 +1,30 @@
 /**
- * main.js - Boot and shell of UMBRA: header (steps, sync chip, cost meter), drop zones, rail, views,
- * projects dialog, dark mode, guide and Ctrl+wheel zoom.
+ * main.js - Boot and shell of UMBRA: the side bar of steps (Archivos, Enmascarar, Revisar, Corregir,
+ * Exportar) with the state of each, the view bar (title + tools of the screen), the Archivos screen
+ * (drop zones, recent projects), projects dialog, sync chip, cost meter, dark mode, guide, F1 and
+ * Ctrl+wheel zoom.
  */
 
-import { el, $, $$, toast, modal, pickFiles, confirmDialog, fmtInt, fmtMoney } from './util/dom.js';
+import { el, $, $$, toast, modal, pickFiles, confirmDialog, fmtInt, fmtMoney, promptDialog } from './util/dom.js';
 import { getValue, setValue } from './store/storage.js';
 import { state, on, emit, loadData, openFiles, replaceFile, restoreLastProject, listProjects, openProject,
   deleteProject, closeProject, refreshLists, remaskNow } from './state.js';
 import { mountMaskView } from './ui/mask-view.js';
-import { mountReviewView } from './ui/review-view.js';
+import { mountReviewView, benchDialog } from './ui/review-view.js';
+import { mountCorrectView } from './ui/correct-view.js';
+import { mountExportView } from './ui/export-view.js';
 import { mountSettingsView, showSettingsSection, preselectSettingsSection } from './ui/settings-view.js';
 import { showGuide } from './ui/guide.js';
 import { helpBtn, showHelp } from './ui/help.js';
+import { icon } from './ui/icons.js';
 
-const VIEWS = ['welcome', 'mask', 'review', 'settings'];
+const VIEWS = ['files', 'mask', 'review', 'correct', 'export', 'settings'];
+const TITLES = { files: 'Documentos', mask: 'Enmascarar', review: 'Revisar', correct: 'Corregir', export: 'Exportar', settings: 'Ajustes' };
+const NEEDS_PROJECT = ['mask', 'review', 'correct', 'export'];
+const WORK_VIEWS = ['mask', 'correct'];     // the side bar folds there to leave room for the sheets
 let pending = { src: null, tgt: null };
+let sidePref = null;                        // null = automatic; 'open' | 'closed' = chosen by the user
+let reviewStatus = '';
 
 /** Opens Settings at a section, mounting it once (not the previous section first). */
 function goSettings(sec) {
@@ -24,37 +34,73 @@ function goSettings(sec) {
 }
 
 function setView(v) {
-  if (!state.project && (v === 'mask' || v === 'review')) v = 'welcome';
+  if (!VIEWS.includes(v)) v = 'files';
+  if (!state.project && NEEDS_PROJECT.includes(v)) v = 'files';
   state.view = v;
   for (const id of VIEWS) $('#view-' + id).classList.toggle('on', id === v);
-  for (const b of $$('.step')) b.classList.toggle('on', b.dataset.view === v || (v === 'welcome' && b.dataset.view === 'mask'));
+  $('#vtitle').textContent = TITLES[v] || '';
+  if (v === 'files' || v === 'settings') $('#tools').replaceChildren();
   emit('view', v);
-  renderRail();
+  renderSteps();
+  applySide();
 }
 
-// ------------------------------------------------------------------ rail
+// ------------------------------------------------------------------ side bar
 
-function renderRail() {
-  const rail = $('#rail');
-  rail.innerHTML = '';
+function applySide() {
+  const compact = sidePref ? sidePref === 'closed' : WORK_VIEWS.includes(state.view);
+  $('#app').classList.toggle('compact', compact);
+  const b = $('#btn-side');
+  b.replaceChildren(icon(compact ? 'expand' : 'collapse', 16));
+  b.title = compact ? 'Desplegar la barra de pasos' : 'Plegar la barra de pasos';
+}
+
+function _sub(id, text) { const n = $('#st-' + id); if (n) n.textContent = text; }
+
+/** The steps with what each one has: files loaded, entities, review, pending findings. */
+function renderSteps() {
+  const p = state.project, s = state.session;
   const open = state.findings.filter(f => f.state === 'open').length;
-  const items = [
-    { id: 'mask', icon: '\u29c9', label: 'Entid.', title: 'Entidades', go: () => setView('mask') },
-    { id: 'review', icon: '\u2691', label: 'Hallaz.', title: 'Hallazgos', go: () => setView('review'), badge: open },
-    { id: 'modules', icon: '\u25a6', label: 'M\u00f3dul.', title: 'M\u00f3dulos y modelos', go: () => goSettings('modules') },
-    { id: 'usage', icon: '$', label: 'Uso IA', title: 'Uso de IA', go: () => goSettings('usage') }
-  ];
-  for (const it of items) {
-    const on = (it.id === state.view);
-    rail.appendChild(el('button' + (on ? '.on' : ''), { title: it.title, onclick: it.go },
-      it.icon, it.badge ? el('span.badge', String(it.badge)) : null, el('small', it.label)));
+  const done = {
+    files: !!p,
+    mask: false,
+    review: !!p && state.findings.length > 0,
+    correct: !!p && state.findings.length > 0 && !open,
+    export: false
+  };
+  _sub('files', p ? (p.srcName + ' \u00b7 ' + p.tgtName) : 'Cargue los dos documentos');
+  if (s) {
+    const ents = s.ent.entities;
+    const bad = ents.filter(e => e.status !== 'ok').length;
+    _sub('mask', fmtInt(ents.length) + ' entidades' + (bad ? ' \u00b7 ' + bad + ' por revisar' : ''));
+  } else _sub('mask', 'Proteger los datos');
+  _sub('review', reviewStatus || (state.findings.length ? 'Hecho: puede repetirlo' : 'Elegir qu\u00e9 buscar'));
+  _sub('correct', !p ? 'Aceptar o descartar' : (open ? open + ' por revisar' : (state.findings.length ? 'Todo decidido' : 'Sin hallazgos todav\u00eda')));
+  $('#side-proj').textContent = p ? p.name : 'Sin proyecto';
+  for (const b of $$('.step')) {
+    const v = b.dataset.view;
+    b.classList.toggle('on', v === state.view);
+    b.classList.toggle('done', !!done[v] && v !== state.view);
+    b.disabled = !p && NEEDS_PROJECT.includes(v);
+    const tx = b.querySelector('.tx');
+    if (tx) b.title = tx.textContent.replace(/\s+/g, ' ').trim();
+    const n = b.querySelector('.n');
+    if (n) {
+      const num = String(['files', 'mask', 'review', 'correct', 'export'].indexOf(v) + 1);
+      if (done[v] && v !== state.view) n.replaceChildren(icon('check', 14)); else n.textContent = num;
+    }
   }
 }
 
-// ------------------------------------------------------------------ drop zones
+// ------------------------------------------------------------------ Archivos: drop zones
 
-function setupDrop(side) {
-  const box = $('#drop-' + side);
+function makeDrop(side) {
+  const box = el('div.drop#drop-' + side, { title: 'Pulse o arrastre aqu\u00ed ' + (side === 'src' ? 'el original' : 'la traducci\u00f3n') + ' (DOCX, PPTX o XLSX)' },
+    el('div.dic', icon(side === 'src' ? 'file' : 'pencil', 26)),
+    el('div.dtx',
+      el('div.lbl', side === 'src' ? 'ORIGINAL \u00b7 INGL\u00c9S O FRANC\u00c9S' : 'TRADUCCI\u00d3N \u00b7 ESPA\u00d1OL', helpBtn('files')),
+      el('div.fn', 'Pulse o arrastre el archivo'),
+      el('div.mt', 'DOCX, PPTX o XLSX exportado de eLUNa')));
   const choose = async () => {
     const files = await pickFiles('.docx,.pptx,.xlsx', false);
     if (files[0]) handleFile(side, files[0]);
@@ -68,6 +114,7 @@ function setupDrop(side) {
     const f = e.dataTransfer.files && e.dataTransfer.files[0];
     if (f) handleFile(side, f);
   });
+  return box;
 }
 
 async function handleFile(side, file) {
@@ -100,7 +147,8 @@ async function handleFile(side, file) {
 function updateDrops() {
   for (const side of ['src', 'tgt']) {
     const box = $('#drop-' + side);
-    let name = '', meta = '\u00a0';
+    if (!box) continue;
+    let name = '', meta = 'DOCX, PPTX o XLSX exportado de eLUNa';
     if (state.project) {
       const model = side === 'src' ? state.src : state.tgt;
       name = side === 'src' ? state.project.srcName : state.project.tgtName;
@@ -108,7 +156,7 @@ function updateDrops() {
         const n = model.paras.filter(p => p.text.trim() && !p.isSlideSep).length;
         const words = model.paras.reduce((k, p) => k + (p.text.match(/\S+/g) || []).length, 0);
         meta = model.kind.toUpperCase() + ' \u00b7 ' + fmtInt(n) + ' p\u00e1rrafos \u00b7 ' + fmtInt(words) + ' palabras' +
-          (side === 'src' ? ' \u00b7 ' + (state.project.srcLang === 'fr' ? 'franc\u00e9s' : 'ingl\u00e9s') : '');
+          (side === 'src' ? ' \u00b7 ' + (state.project.srcLang === 'fr' ? 'franc\u00e9s' : 'ingl\u00e9s') : '') + ' \u00b7 pulse para cambiarlo';
       }
     } else if (pending[side]) {
       name = pending[side].name;
@@ -118,35 +166,68 @@ function updateDrops() {
     box.querySelector('.fn').textContent = name || 'Pulse o arrastre el archivo';
     box.querySelector('.mt').textContent = meta;
   }
+  const next = $('#files-next');
+  if (next) next.classList.toggle('hidden', !state.project);
 }
 
-// ------------------------------------------------------------------ welcome and projects
+// ------------------------------------------------------------------ Archivos: the screen
 
-async function renderWelcome() {
-  const host = $('#view-welcome');
-  host.innerHTML = '';
+function mountFiles() {
+  const host = $('#view-files');
+  const open = el('button.btn', { onclick: openUmbra }, icon('upload', 16), 'Abrir proyecto (.umbra)');
+  host.appendChild(el('div.page',
+    el('div.page-in',
+      el('div.kicker', 'PASO 1 DE 5'),
+      el('h2.ptitle', 'Los dos documentos'),
+      el('p.lead', 'Todo se procesa en este navegador: los documentos no se suben a ning\u00fan servidor. A la IA solo llega texto enmascarado.'),
+      el('div.drops', makeDrop('src'), makeDrop('tgt')),
+      el('div.page-acts',
+        el('button.btn.primary.big#files-next.hidden', { onclick: () => setView('mask') }, 'Siguiente: enmascarar', icon('arrow', 16)),
+        el('span.grow'),
+        el('button.btn', { onclick: newProject }, icon('plus', 16), 'Nuevo proyecto'),
+        open,
+        el('button.btn', { onclick: () => benchDialog() }, icon('bench', 16), 'Banco de pruebas')),
+      el('p.info', 'Antes de usar la IA, configure al menos un proveedor con su clave en ',
+        el('a', { href: '#', onclick: (e) => { e.preventDefault(); goSettings('providers'); } }, 'Ajustes \u203a Proveedores y modelos'),
+        '. Junto a cada funci\u00f3n hay un bot\u00f3n ', el('b', '?'), ' que explica c\u00f3mo se usa; F1 abre la ayuda de la pantalla.'),
+      el('div#files-recent'))));
+}
+
+async function renderRecent() {
+  const host = $('#files-recent');
+  if (!host) return;
   const recent = await listProjects();
-  const box = el('div.box',
-    el('h2', 'UMBRA \u00b7 Enmascaramiento y revisi\u00f3n de traducciones'),
-    el('p.muted', 'Todo se procesa en este navegador: los documentos no se suben a ning\u00fan servidor. Solo el texto enmascarado puede ir a una IA.'),
-    el('ol',
-      el('li', 'Cargue arriba el ', el('b', 'original'), ' (ingl\u00e9s o franc\u00e9s) y la ', el('b', 'traducci\u00f3n'), ' (espa\u00f1ol): DOCX, PPTX o XLSX exportados de eLUNa.'),
-      el('li', 'Paso 1: revise las ', el('b', 'entidades enmascaradas'), ' y exporte el documento censurado si quiere usarlo en una IA externa.'),
-      el('li', 'Paso 2: ejecute los ', el('b', 'm\u00f3dulos de revisi\u00f3n'), ' y acepte o rechace los hallazgos.'),
-      el('li', 'Paso 3: exporte la traducci\u00f3n con control de cambios y comentarios, o un informe.')),
-    el('p.info', 'Junto a cada funci\u00f3n hay un bot\u00f3n ', el('b', '?'), ' que explica al momento c\u00f3mo se usa; F1 abre la ayuda de la pantalla en la que est\u00e9.'),
-    el('p.info', 'Antes de usar la IA, configure al menos un proveedor con su clave en ', el('a', { href: '#', onclick: (e) => { e.preventDefault(); goSettings('providers'); } }, 'Exportar y ajustes \u203a Proveedores'), '.'));
-  if (recent.length) {
-    box.appendChild(el('h3', { style: { margin: '14px 0 6px', fontSize: '13px' } }, 'Proyectos recientes'));
-    const t = el('table.grid');
-    for (const p of recent.slice(0, 8)) {
-      t.appendChild(el('tr', el('td', el('b', p.name)), el('td.muted', new Date(p.updatedAt).toLocaleString('es')),
-        el('td', p.findings + ' hallazgos'),
-        el('td', { style: { textAlign: 'right' } }, el('button.btn.sm.primary', { onclick: () => doOpen(p.id) }, 'Abrir'))));
-    }
-    box.appendChild(t);
+  host.replaceChildren();
+  if (!recent.length) return;
+  host.appendChild(el('h3.sec', 'Proyectos recientes'));
+  const t = el('table.grid.recent');
+  for (const p of recent.slice(0, 8)) {
+    const cur = state.project && state.project.id === p.id;
+    t.appendChild(el('tr',
+      el('td', el('b', p.name), el('div.muted', p.srcName + ' \u2192 ' + p.tgtName)),
+      el('td.muted', new Date(p.updatedAt).toLocaleString('es')),
+      el('td.muted', p.findings + ' hallazgos'),
+      el('td', { style: { textAlign: 'right' } }, cur ? el('span.pill.ok', 'Abierto') : el('button.btn.sm', { onclick: () => doOpen(p.id) }, 'Abrir'))));
   }
-  host.appendChild(el('div.welcome', box));
+  host.appendChild(t);
+}
+
+async function openUmbra() {
+  const files = await pickFiles('.umbra', false);
+  if (!files[0]) return;
+  try {
+    const { importProjectFile } = await import('./export/exports.js');
+    const p = await importProjectFile(files[0], () => promptDialog('Proyecto cifrado', 'Contrase\u00f1a', '', { type: 'password' }));
+    if (p) { toast('Proyecto abierto.', 'ok'); setView('mask'); }
+  } catch (e) { toast('No se pudo abrir: ' + e.message, 'err', 8000); }
+}
+
+function newProject() {
+  closeProject();
+  pending = { src: null, tgt: null };
+  updateDrops();
+  setView('files');
+  renderRecent();
 }
 
 async function doOpen(id) {
@@ -166,16 +247,16 @@ async function projectsDialog() {
         el('button.btn.sm.primary', { onclick: async () => { document.querySelector('.modal-back').remove(); await doOpen(p.id); } }, 'Abrir'), ' ',
         el('button.btn.sm.danger', { onclick: async (e) => {
           if (!(await confirmDialog('Borrar proyecto', 'Se borrar\u00e1 \u00ab' + p.name + '\u00bb de este navegador (documentos, entidades y hallazgos).', 'Borrar'))) return;
-          await deleteProject(p.id); e.target.closest('tr').remove(); if (!state.project) { setView('welcome'); renderWelcome(); }
+          await deleteProject(p.id); e.target.closest('tr').remove(); if (!state.project) setView('files'); renderRecent();
         } }, 'Borrar'))));
   }
   body.appendChild(t);
   await modal({ title: 'Proyectos', body, width: '720px', buttons: [
-    { label: 'Nuevo proyecto', kind: 'primary', value: 'new', onClick: () => { closeProject(); pending = { src: null, tgt: null }; updateDrops(); setView('welcome'); renderWelcome(); } },
+    { label: 'Nuevo proyecto', kind: 'primary', value: 'new', onClick: newProject },
     { label: 'Cerrar', value: null }] });
 }
 
-// ------------------------------------------------------------------ header chips
+// ------------------------------------------------------------------ sync chip and cost meter
 
 async function initServices() {
   // Cost meter (ai/usage.js) and sync chip (sync/*), loaded defensively so a failure there never
@@ -221,7 +302,7 @@ async function initServices() {
       try { if (sync.startupSyncCheck) await sync.startupSyncCheck(); } catch (e) { console.warn('sync check', e); }
       try { if (auto && auto.initAutosave) auto.initAutosave(); } catch (e) { console.warn('autosave', e); }
     }, 600);
-    // After bringing data from the file (or undoing it), the lists, rules and models may have changed.
+    // After bringing data from the file (or undoing it), the lists and models may have changed.
     window.addEventListener('umbra:sync-pulled', async () => {
       try { await refreshLists(); if (state.session) remaskNow(); } catch (_) {}
       emit('synced');
@@ -254,7 +335,7 @@ async function initDark() {
 }
 
 async function initZoom() {
-  // Two areas, as COMeT: the controls (header, bars, lists) and the document sheets.
+  // Two areas, as COMeT: the controls (bars, lists, cards) and the document text (sheets and rows).
   let ui = parseFloat(await getValue('zoom_ui', 1)) || 1;
   let sheet = parseFloat(await getValue('zoom_sheet', 1)) || 1;
   const apply = () => {
@@ -266,7 +347,7 @@ async function initZoom() {
     if (!e.ctrlKey) return;
     e.preventDefault();
     const step = e.deltaY < 0 ? 0.1 : -0.1;
-    if (e.target.closest && e.target.closest('.pane-body')) {
+    if (e.target.closest && e.target.closest('.pane-body, .cx-rows')) {
       sheet = Math.max(0.5, Math.min(2.5, Math.round((sheet + step) * 10) / 10));
       setValue('zoom_sheet', sheet);
     } else {
@@ -278,6 +359,8 @@ async function initZoom() {
 }
 
 // ------------------------------------------------------------------ F1: help of the current screen
+
+const F1_TOPIC = { files: 'files', mask: 'mask-tools', review: 'modules', correct: 'review-tools', export: 'review-export' };
 
 function initF1() {
   document.addEventListener('keydown', (e) => {
@@ -291,7 +374,7 @@ function initF1() {
       const first = $('#view-settings .settings-body .help-btn');
       if (first) { first.click(); return; }
     }
-    showHelp(state.view === 'mask' ? 'mask-tools' : state.view === 'review' ? 'review-tools' : 'files', null);
+    showHelp(F1_TOPIC[state.view] || 'files', null);
   });
 }
 
@@ -299,31 +382,40 @@ function initF1() {
 
 async function boot() {
   for (const b of $$('.step')) b.addEventListener('click', () => setView(b.dataset.view));
-  setupDrop('src');
-  setupDrop('tgt');
+  for (const s of $$('.sic[data-icon]')) s.replaceWith(icon(s.dataset.icon, 18));
+  $('#btn-side').addEventListener('click', () => {
+    const compact = $('#app').classList.contains('compact');
+    sidePref = compact ? 'open' : 'closed';
+    applySide();
+  });
+  mountFiles();
   $('#btn-projects').addEventListener('click', projectsDialog);
   $('#btn-help').addEventListener('click', showGuide);
   $('#btn-help').title = 'Gu\u00eda r\u00e1pida (F1: ayuda de la pantalla en la que est\u00e1)';
-  for (const side of ['src', 'tgt']) $('#drop-' + side + ' .lbl').appendChild(helpBtn('files'));
   initF1();
   initDark();
   initZoom();
   let busyToast = null;
   on('busy', (msg) => { if (busyToast) { busyToast.remove(); busyToast = null; } if (msg) busyToast = toast(msg, '', 60000); });
-  on('project', () => { updateDrops(); renderRail(); if (!state.project) renderWelcome(); });
-  on('findings', renderRail);
-  on('finding', renderRail);
+  on('project', () => { updateDrops(); renderSteps(); renderRecent(); if (!state.project && NEEDS_PROJECT.includes(state.view)) setView('files'); });
+  on('findings', renderSteps);
+  on('finding', renderSteps);
+  on('masked', renderSteps);
+  on('review-status', (t) => { reviewStatus = t || ''; renderSteps(); });
   on('goto', (v) => setView(v));
   on('goto-settings', (sec) => goSettings(sec));
+  on('view', (v) => { if (v === 'files') renderRecent(); });
   await loadData();
   mountMaskView($('#view-mask'), $('#tools'));
   mountReviewView($('#view-review'), $('#tools'));
+  mountCorrectView($('#view-correct'), $('#tools'));
+  mountExportView($('#view-export'), $('#tools'));
   mountSettingsView($('#view-settings'), $('#tools'));
   initServices();
   let restored = false;
   try { restored = await restoreLastProject(); } catch (e) { console.warn('restore', e); toast('No se pudo reabrir el \u00faltimo proyecto: ' + e.message, 'warn'); }
   updateDrops();
-  if (restored) setView('mask'); else { await renderWelcome(); setView('welcome'); }
+  setView(restored ? 'mask' : 'files');
   if (!(await getValue('guide_seen', false))) { setValue('guide_seen', true); showGuide(); }
 }
 

@@ -11,6 +11,7 @@ import { CATS, CAT_LABELS, CAT_SINGULAR, STATUS_LABELS, mainForm } from '../reda
 import { exportMasked, exportBilingualXlsx, exportBilingualHtml, exportKeyMap } from '../export/exports.js';
 import { buildExternalText, importExternal } from '../review/external.js';
 import { openMenu } from './menu.js';
+import { icon } from './icons.js';
 import { createNav, sentencesOf, sentenceAt, sentencePeers, unitOf, peerPid, offsetAt, paraText } from './nav.js';
 
 let root, toolsHost;
@@ -61,41 +62,43 @@ function renderTools() {
   if (state.view !== 'mask') return;
   clear(toolsHost);
   if (!state.project) return;
-  const mask = state.project.mask;
-  for (const c of CATS) {
-    const onCat = mask.cats.includes(c) || (c === 'X' && (mask.terms || []).some(t => (t.cat || 'X') === 'X'));
-    toolsHost.appendChild(el('span.cat' + (onCat ? '' : '.off'), {
-      title: onCat ? 'Pulse para no enmascarar ' + CAT_LABELS[c].toLowerCase() : 'Pulse para enmascarar ' + CAT_LABELS[c].toLowerCase(),
-      onclick: () => {
-        const cats = mask.cats.includes(c) ? mask.cats.filter(x => x !== c) : mask.cats.concat([c]);
-        setMask({ cats });
-        renderTools();
-      }
-    }, el('i', { style: { background: 'var(--c-' + c.toLowerCase() + ')' } }), CAT_LABELS[c]));
-  }
-  toolsHost.appendChild(el('div.grow'));
   const ents = state.session ? state.session.ent.entities : [];
-  const bad = ents.filter(e => e.status !== 'ok').length;
   const numBad = ents.filter(e => e.cat === 'NUM' && e.status === 'nopair').length;
-  toolsHost.appendChild(el('div.summary',
-    el('span.pill.ok', ents.length + ' entidades'),
-    bad ? el('span.pill.warn', bad + ' con problemas') : null,
-    numBad ? el('span.pill.err', numBad + ' cifras sin pareja') : null));
-  const lang = el('select', { title: 'Lengua del original', onchange: (e) => { state.project.srcLang = e.target.value; state.session.srcLang = e.target.value; remaskNow(); } },
-    el('option', { value: 'en' }, 'Original: ingl\u00e9s'), el('option', { value: 'fr' }, 'Original: franc\u00e9s'));
-  lang.value = state.project.srcLang || 'en';
-  toolsHost.appendChild(lang);
-  toolsHost.appendChild(el('button.btn', { onclick: (e) => optionsMenu(e.currentTarget) }, 'Opciones \u25be'));
+  if (numBad) toolsHost.appendChild(el('span.pill.err', { title: 'Cifras que no est\u00e1n igual en las dos lenguas: posible error' }, numBad + (numBad === 1 ? ' cifra sin pareja' : ' cifras sin pareja')));
+  toolsHost.appendChild(el('div.grow'));
+  toolsHost.appendChild(el('button.btn', { 'data-cats': '1', title: 'Qu\u00e9 categor\u00edas se enmascaran', onclick: (e) => catsMenu(e.currentTarget) }, 'Qu\u00e9 enmascarar', icon('down', 14)));
+  toolsHost.appendChild(el('button.btn', { onclick: (e) => optionsMenu(e.currentTarget) }, 'Opciones', icon('down', 14)));
   toolsHost.appendChild(el('button.btn', { title: 'Alternar entre etiquetas y texto real', onclick: () => { showOriginal = !showOriginal; renderTools(); renderPanes(); } },
-    '\ud83d\udc41 ' + (showOriginal ? 'Ver etiquetas' : 'Ver original')));
-  toolsHost.appendChild(el('button.btn', { title: 'Enmascarar el texto seleccionado (Alt+E)', onclick: maskSelection }, '+ Enmascarar selecci\u00f3n'));
-  toolsHost.appendChild(el('button.btn.violet', { onclick: (e) => exportMenu(e.currentTarget) }, 'Exportar enmascarado \u25be'));
+    icon('mask', 16), showOriginal ? 'Ver etiquetas' : 'Ver original'));
+  toolsHost.appendChild(el('button.btn', { title: 'Enmascarar el texto seleccionado (Alt+E)', onclick: maskSelection }, icon('plus', 16), 'Enmascarar selecci\u00f3n'));
+  toolsHost.appendChild(el('button.btn', { onclick: (e) => exportMenu(e.currentTarget) }, 'Exportar enmascarado', icon('down', 14)));
+  toolsHost.appendChild(el('button.btn.primary', { title: 'Paso 3: elegir qu\u00e9 revisa la IA', onclick: () => emit('goto', 'review') }, 'Siguiente: revisar', icon('arrow', 16)));
   toolsHost.appendChild(helpBtn('mask-tools'));
+}
+
+/** The categories to mask, as a menu that stays open while they are switched on and off. */
+function catsMenu(anchor) {
+  const mask = state.project.mask;
+  openMenu(anchor, CATS.map(c => {
+    const onCat = mask.cats.includes(c) || (c === 'X' && (mask.terms || []).some(t => (t.cat || 'X') === 'X'));
+    return { label: (onCat ? '\u2713 ' : '\u2003 ') + CAT_LABELS[c], onClick: () => {
+      const cats = mask.cats.includes(c) ? mask.cats.filter(x => x !== c) : mask.cats.concat([c]);
+      setMask({ cats });
+      renderTools();
+      setTimeout(() => { const b = toolsHost.querySelector('[data-cats]'); if (b) catsMenu(b); }, 0);
+    } };
+  }).concat([{ sep: true }, helpItem('mask-tools', anchor)]));
 }
 
 function optionsMenu(anchor) {
   const mask = state.project.mask;
+  const fr = state.project.srcLang === 'fr';
+  const setLang = (l) => { state.project.srcLang = l; state.session.srcLang = l; remaskNow(); };
   openMenu(anchor, [
+    { header: 'Lengua del original' },
+    { label: (!fr ? '\u2713 ' : '\u2003 ') + 'Ingl\u00e9s', onClick: () => { if (fr) setLang('en'); } },
+    { label: (fr ? '\u2713 ' : '\u2003 ') + 'Franc\u00e9s', onClick: () => { if (!fr) setLang('fr'); } },
+    { sep: true },
     { label: (mask.spelled !== false ? '\u2713 ' : '') + 'Enmascarar n\u00fameros escritos en letra', onClick: () => { setMask({ spelled: mask.spelled === false }); renderTools(); } },
     { label: (mask.acronyms !== false ? '\u2713 ' : '') + 'Enmascarar siglas desconocidas presentes en ambos textos', onClick: () => { setMask({ acronyms: mask.acronyms === false }); renderTools(); } },
     { sep: true },
@@ -166,7 +169,7 @@ export async function importDialog() {
   if (!res.findings.length) { toast('No se reconoci\u00f3 ning\u00fan hallazgo en el texto pegado.', 'warn', 6000); return; }
   addFindings(res.findings);
   toast(res.findings.length + ' hallazgos importados' + (res.ignored ? ' (' + res.ignored + ' l\u00edneas no reconocidas)' : '') + '.', 'ok');
-  emit('goto', 'review');
+  emit('goto', 'correct');
 }
 
 // ------------------------------------------------------------------ entities list

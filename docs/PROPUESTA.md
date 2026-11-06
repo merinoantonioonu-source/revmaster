@@ -768,6 +768,8 @@ La **maqueta** está en [`docs/maqueta.html`](maqueta.html). Ya refleja estas de
 - **Cabecera en añil** (#3949AB) para distinguir UMBRA de COMeT de un vistazo. Es fácil volver al
   azul de COMeT si lo prefieres.
 - **Tres pasos siempre visibles:** `1 Enmascarar` → `2 Revisar` → `3 Exportar y ajustes`.
+  *(Sustituido el 2026-11-06 por una barra lateral con cinco pasos: Archivos, Enmascarar, Revisar,
+  Corregir y Exportar. Véase ARQUITECTURA §14.)*
 - **Carril de iconos:** Entidades, Hallazgos, Módulos, Reglas y Uso de IA.
 - **Tarjetas de módulo** con:
   - tipo de entrada;

@@ -22,8 +22,8 @@ funcional está en `docs/PROPUESTA.md`.
 ## Mapa de carpetas (`app/` es lo único publicado)
 
 ```
-app/index.html            Shell: cabecera, pasos, barra superior, carril, lista, hojas, vistas
-app/css/umbra.css         Estilos (tokens de Final Check, cabecera añil #3949AB)
+app/index.html            Shell: barra lateral de pasos, barra de la vista (título y herramientas), vistas
+app/css/umbra.css         Estilos (gris claro y añil #3949AB; hojas y marcas como Final Check)
 app/libs/                 jszip.min.js, xlsx.mini.min.js (copiados de COMeT)
 app/data/                 gazetteer.json, conventions.json, rules-default.json
 app/js/main.js            Orquestador (estado del proyecto, vistas, eventos)
@@ -431,8 +431,45 @@ y aquí solo añadían ruido.
   - Un hallazgo acierta si está en el párrafo y su cita, su propuesta o su motivo contienen una de las
     claves del error.
   - Todo lo demás es ruido.
-  - Desde Revisar › Más:
+  - Desde Archivos (o Más, en Revisar y Corregir):
     - se carga como un proyecto aparte;
     - muestra el resultado por módulo;
     - copia un resumen para el chat.
 
+## 14. Interfaz en cinco pasos (2026-11-06)
+
+El usuario eligió entre seis diseños (lienzo «UMBRA · Alternativas de interfaz») la combinación
+**Foco** para preparar y **Consola** para corregir.
+
+- **Armazón** (`index.html`, `main.js`):
+  - barra lateral con los pasos `files`, `mask`, `review`, `correct` y `export` (botones
+    `.step[data-view]`), cada uno con una línea de estado (`#st-<paso>`) y una marca cuando está hecho;
+  - al pie: Ajustes y proveedores (`.step[data-view="settings"]`), Proyectos, Guía, modo oscuro,
+    sincronización y gasto de la sesión;
+  - la barra se pliega sola en Enmascarar y Corregir (`.app.compact`); el botón de arriba la fija;
+  - encima de cada vista, `#topbar`: el título (`#vtitle`) y las herramientas de la vista (`#tools`).
+- **Archivos** (`main.js`): las dos casillas (`#drop-src`, `#drop-tgt`), Nuevo proyecto, Abrir
+  proyecto (.umbra), Banco de pruebas y Proyectos recientes.
+- **Revisar** (`ui/review-view.js`): una tarjeta por revisor (`#rv-modules .mchip[data-mod]`) con
+  casilla, descripción sencilla (`plain` en `module-list.js`), exigencia, modelo y coste estimado;
+  aviso de privacidad; pie fijo con Atrás, el resumen (`#rv-summary`) y **Revisar ahora** (`#rv-run`,
+  **Detener** mientras revisa). Al terminar pasa a Corregir. El avance se publica con el evento
+  `review-status` para la línea del paso.
+- **Corregir** (`ui/correct-view.js`):
+  - filtros: módulo (botones `#cx-mods`), estado y gravedad (`select[data-filter]`), búsqueda
+    (`#cx-q`);
+  - **Segmentos**: una fila por unidad con hallazgos visibles (`#rv-findings .cx-row`: N.º, original,
+    traducción con las marcas, una etiqueta `.cx-badge[data-id]` por hallazgo). Al elegir un hallazgo
+    se pintan en la fila la oración y su pareja (`um-seg`) y el texto exacto (`um-focus`), con los
+    mismos `sentencePeers` y `rangeOf` de `nav.js`;
+  - **Documento**: las dos hojas y la navegación por oraciones de siempre (`createNav`);
+  - inspector (`#cx-insp`): gravedad, módulo y lugar, «Dice», la propuesta editable (`#cx-sug`; lo
+    que se acepta es lo escrito: `edited` si difiere de la sugerencia), el motivo, Aceptar
+    (`#cx-accept`; «Suprimir» si una adición queda vacía), Rechazar, Ignorar y Deshacer. Tras
+    decidir pasa al siguiente de la lista tal como estaba;
+  - teclas J, K, A, R, E (y ← → en Documento); Ctrl+Intro acepta desde la propuesta.
+- **Exportar** (`ui/export-view.js`): opciones grandes agrupadas (traducción corregida, informes,
+  documentos enmascarados, proyecto). Ajustes ya no tiene sección Exportar.
+- **Enmascarar**: las categorías pasan al menú «Qué enmascarar» (sigue abierto mientras se cambian) y
+  la lengua del original al menú Opciones.
+- Iconos: `ui/icons.js` (trazos SVG; sin emojis).

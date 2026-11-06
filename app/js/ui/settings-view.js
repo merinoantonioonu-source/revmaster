@@ -1,22 +1,19 @@
 /**
- * settings-view.js - Step 3 "Exportar y ajustes": a left navigation with the sections and a body
- * where each section is mounted on demand.
+ * settings-view.js - "Ajustes" (at the foot of the side bar): a left navigation with the sections and
+ * a body where each section is mounted on demand. Exporting is step 5 (ui/export-view.js).
  */
 
 import { helpBtn, helpItem } from './help.js';
-import { el, $, clear, toast, modal, pickFiles, promptDialog, confirmDialog } from '../util/dom.js';
+import { el, clear, toast, confirmDialog } from '../util/dom.js';
 import { state, on, emit } from '../state.js';
 import { MODULES, moduleById, INPUT_LABELS, ROLE_LABELS } from '../review/module-list.js';
 import { loadModuleConfig, saveModuleConfig, THINKING_LABELS } from '../review/module-config.js';
 import { loadPrompts, savePrompt, defaultPrompt, promptOf, STRICTNESS, strictnessOf } from '../review/prompts.js';
 import { idbClear } from '../store/idb.js';
 import { storage } from '../store/storage.js';
-import { exportCorrected, exportReportHtml, exportReportXlsx, exportFindingsJson, exportProject, importProjectFile,
-  exportMasked, exportBilingualXlsx } from '../export/exports.js';
 import { mountListsEditor } from './lists-editor.js';
 
 const SECTIONS = [
-  { id: 'export', label: 'Exportar' },
   { id: 'providers', label: 'Proveedores y modelos' },
   { id: 'modules', label: 'M\u00f3dulos' },
   { id: 'lists', label: 'Listas de entidades' },
@@ -25,7 +22,7 @@ const SECTIONS = [
   { id: 'privacy', label: 'Privacidad y datos' }
 ];
 
-let nav, body, current = 'export';
+let nav, body, current = 'providers';
 
 /** The section to show the next time Settings opens (so it is mounted once, not twice). */
 export function preselectSettingsSection(id) { current = id; }
@@ -47,8 +44,7 @@ export async function showSettingsSection(id) {
   const host = el('div');
   body.appendChild(host);
   try {
-    if (id === 'export') mountExport(host);
-    else if (id === 'providers') (await import('./settings-providers.js')).mount(host);
+    if (id === 'providers') (await import('./settings-providers.js')).mount(host);
     else if (id === 'modules') await mountModules(host);
     else if (id === 'lists') await mountListsEditor(host);
     else if (id === 'sync') (await import('./settings-sync.js')).mount(host);
@@ -60,48 +56,6 @@ export async function showSettingsSection(id) {
   }
   // Another section was chosen while this one was loading: keep only the newest.
   if (gen !== _secGen && host.parentNode) host.remove();
-}
-
-// ------------------------------------------------------------------ export
-
-function mountExport(host) {
-  const has = !!state.project;
-  const kind = state.tgt ? state.tgt.kind : 'docx';
-  const act = (label, fn, cls) => el('button.btn' + (cls ? '.' + cls : ''), { disabled: !has, onclick: async () => {
-    try { const r = await fn(); if (r && r.applied !== undefined) toast(r.applied + ' correcciones aplicadas, ' + r.comments + ' comentarios.', 'ok'); else toast('Exportado.', 'ok'); }
-    catch (e) { console.error(e); toast('No se pudo exportar: ' + e.message, 'err', 8000); }
-  } }, label);
-  host.appendChild(el('div.card', el('h3', 'Traducci\u00f3n revisada', helpBtn('export-corrected')), el('div.body',
-    el('p.info', 'Aplica los hallazgos ACEPTADOS. En DOCX van como control de cambios, y los pendientes (o los que no se pueden aplicar) como comentarios de Word. PPTX y XLSX no tienen control de cambios: se aplican directamente.'),
-    el('div.row',
-      kind === 'docx' ? act('DOCX con control de cambios y comentarios', () => exportCorrected({ tracked: true, comments: true }), 'violet') : null,
-      kind === 'docx' ? act('DOCX con control de cambios', () => exportCorrected({ tracked: true, comments: false })) : null,
-      act((kind || 'docx').toUpperCase() + ' con los cambios aplicados', () => exportCorrected({ tracked: false, comments: false }))))));
-  host.appendChild(el('div.card', el('h3', 'Informes', helpBtn('export-reports')), el('div.body', el('div.row',
-    act('Informe HTML', () => exportReportHtml(f => f.state !== 'discarded')),
-    act('Informe Excel', () => exportReportXlsx(f => f.state !== 'discarded')),
-    act('Hallazgos en JSON', exportFindingsJson)))));
-  host.appendChild(el('div.card', el('h3', 'Enmascarado', helpBtn('export-masked')), el('div.body', el('div.row',
-    act('Original enmascarado', () => exportMasked('src')),
-    act('Traducci\u00f3n enmascarada', () => exportMasked('tgt')),
-    act('Tabla biling\u00fce enmascarada (XLSX)', exportBilingualXlsx)))));
-  host.appendChild(el('div.card', el('h3', 'Proyecto', helpBtn('project-file')), el('div.body',
-    el('p.info', 'Un archivo .umbra guarda los dos documentos, las entidades y los hallazgos para seguir otro d\u00eda o en otro equipo. Contiene el texto REAL: c\u00edfrelo si va a salir de su ordenador.'),
-    el('div.row',
-      act('Guardar proyecto (.umbra)', () => exportProject(null)),
-      act('Guardar proyecto cifrado', async () => {
-        const p = await promptDialog('Cifrar proyecto', 'Contrase\u00f1a (no se puede recuperar si la olvida)', '', { type: 'password' });
-        if (!p) return null;
-        return exportProject(p);
-      }),
-      el('button.btn', { onclick: async () => {
-        const files = await pickFiles('.umbra', false);
-        if (!files[0]) return;
-        try {
-          const p = await importProjectFile(files[0], () => promptDialog('Proyecto cifrado', 'Contrase\u00f1a', '', { type: 'password' }));
-          if (p) { toast('Proyecto abierto.', 'ok'); emit('goto', 'mask'); }
-        } catch (e) { toast('No se pudo abrir: ' + e.message, 'err', 8000); }
-      } }, 'Abrir proyecto (.umbra)')))));
 }
 
 // ------------------------------------------------------------------ modules

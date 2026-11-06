@@ -51,7 +51,7 @@ navegador: no se suben a GitHub ni a ningún servidor. A una IA solo llega texto
      pareja en la otra hoja; al pulsar un hallazgo, las dos hojas van a su oración.
    - **Tabla de hallazgos** en una ventana aparte, y un **Excel para valorar** los hallazgos.
    - **Banco de pruebas:** un documento hecho con un informe de revisión real para medir cuántos
-     errores detecta cada módulo y cuánto ruido mete (Revisar › Más).
+     errores detecta cada módulo y cuánto ruido mete (en Archivos, o en Más de Revisar y Corregir).
    - **Modo diferido:** la primera pasada va a la API de lotes del proveedor (Gemini, Anthropic,
      Mistral u OpenAI). Cuesta la mitad y responde en minutos u horas.
 3. **Exportar.** La traducción revisada sale así:
@@ -63,19 +63,27 @@ navegador: no se suben a GitHub ni a ningún servidor. A una IA solo llega texto
 ## Primeros pasos
 
 1. Abre la dirección de arriba.
-2. Ve a **Exportar y ajustes → Proveedores y modelos** y pega la clave de API de un proveedor
-   (Gemini, Mistral, Azure OpenAI, Anthropic, o cualquiera compatible con OpenAI que añadas).
-   Pulsa **Probar conexión**.
-3. Arrastra el original y la traducción a las dos cajas de arriba.
-4. **Paso 1 (Enmascarar):** revisa las entidades. Para enmascarar algo más, selecciona el texto y
-   pulsa **Alt+E** (o clic derecho › Enmascarar la selección). Para quitar una etiqueta, haz clic derecho sobre ella.
-5. **Paso 2 (Revisar):** elige los módulos y pulsa **Ejecutar seleccionados**. Revisa los hallazgos
-   con los atajos de teclado:
+2. Ve a **Ajustes y proveedores** (al pie de la barra de la izquierda) › **Proveedores y modelos** y
+   pega la clave de API de un proveedor (Gemini, Mistral, Azure OpenAI, Anthropic, o cualquiera
+   compatible con OpenAI que añadas). Pulsa **Probar conexión**.
+
+La barra de la izquierda tiene los cinco pasos y dice en qué punto está cada uno:
+
+1. **Archivos:** arrastra el original y la traducción a sus dos casillas.
+2. **Enmascarar:** revisa las entidades. Para enmascarar algo más, selecciona el texto y pulsa
+   **Alt+E** (o clic derecho › Enmascarar la selección). Para quitar una etiqueta, haz clic derecho
+   sobre ella.
+3. **Revisar:** marca los revisores (cada uno en su tarjeta, con su exigencia) y pulsa
+   **Revisar ahora**.
+4. **Corregir:** una fila por segmento con hallazgos (original y traducción lado a lado) y, a la
+   derecha, el hallazgo elegido con su propuesta, que puedes cambiar. Atajos:
    - **A** acepta;
    - **R** rechaza;
-   - **E** edita;
+   - **E** edita la propuesta;
    - **J** y **K** pasan al siguiente y al anterior.
-6. **Paso 3 (Exportar y ajustes):** descarga la traducción revisada o un informe.
+
+   **Documento** muestra las dos hojas completas, con la navegación por oraciones de Final Check.
+5. **Exportar:** descarga la traducción revisada, un informe o el proyecto (.umbra).
 
 ¿Dudas sobre algo? Junto a cada función hay un botón **?** que explica al momento cómo se usa, y
 **F1** abre la ayuda de la pantalla (o del diálogo) en la que estés.

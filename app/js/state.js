@@ -23,7 +23,7 @@ export const state = {
   project: null, src: null, tgt: null, session: null, findings: [],
   data: { gazetteer: [], conventions: {}, gazBase: [] },
   dict: [],
-  view: 'welcome'
+  view: 'files'
 };
 
 const _listeners = {};

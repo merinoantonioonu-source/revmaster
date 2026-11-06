@@ -60,6 +60,11 @@ See `docs/ARQUITECTURA.md` (contracts between modules) and `docs/PROPUESTA.md` (
   `modal({ help: helpBtn(topic) })`; in a menu, `helpItem(topic, anchor)`). A NEW feature or setting
   gets its topic in `help.js` and its button; update the text when behaviour changes.
   `tests/help.e2e.mjs` fails on a missing or unused topic.
+- The UI (2026-11-06, the owner's choice among six designs): a side bar of five steps (`main.js`:
+  Archivos, Enmascarar, Revisar, Corregir, Exportar; Ajustes at its foot), each with its state.
+  Revisar = large cards (`review-view.js`), Corregir = aligned rows + inspector (`correct-view.js`,
+  "Documento" = the two sheets), Exportar = large options (`export-view.js`). Icons from
+  `ui/icons.js` (stroke SVG, no emoji). Palette tokens on `:root` in `umbra.css`.
 - Navigation between the sheets is by SENTENCE (`app/js/ui/nav.js`, emulating COMeT Final Check):
   offsets are those of `para.text`, stored on rendered nodes by `preview.js` (`__o`, `__e`); marks are
   CSS highlights (`um-seg`, `um-focus`). Do not re-render the sheets to show a selection; after a
@@ -70,6 +75,6 @@ See `docs/ARQUITECTURA.md` (contracts between modules) and `docs/PROPUESTA.md` (
   the runner (`STRICT_ALLOWED`): findings of a severity not asked for are dropped. Severity is about
   the effect on what is understood, not the size of the change (one word can be MAY).
 - The prompts are calibrated on the owner's review report (2026-11-05): its cases are the test bench
-  (`tools/make_bench.py` -> `app/data/calibration/`; Revisar > Mas > Banco de pruebas). When tuning a
+  (`tools/make_bench.py` -> `app/data/calibration/`; Archivos > Banco de pruebas, result in Mas). When tuning a
   module, ask the owner for the bench result ("Copiar el resumen") before and after; add new report
   cases to `make_bench.py` and rebuild. `tests/bench.e2e.mjs` checks the scoring and the names call.
