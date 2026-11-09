@@ -17,7 +17,7 @@ export function showGuide() {
       el('li', 'Si una cifra no coincide en las dos lenguas, aparece \u00abSin pareja\u00bb. Seleccione texto y pulse ', el('b', 'Alt+E'), ' para enmascararlo; clic derecho en una etiqueta para quitarla.')),
     el('h4', '3 \u00b7 Revisar'),
     el('ul',
-      el('li', 'Cada tarjeta es un revisor con IA que se ci\u00f1e a su tarea: fidelidad de sentido, integridad (omisiones y adiciones), nombres oficiales, gram\u00e1tica, estilo, lectura en fr\u00edo, coherencia y convenciones de la ONU. Elija los que quiera y su exigencia, y pulse \u00abRevisar ahora\u00bb: antes de gastar, UMBRA muestra el plan con su coste.')),
+      el('li', 'Cada tarjeta es un revisor con IA que se ci\u00f1e a su tarea: Sentido (lo que la traducci\u00f3n dice distinto, omite o a\u00f1ade), Redacci\u00f3n (el espa\u00f1ol: gram\u00e1tica y estilo institucional), Nombres oficiales y el Verificador, que descarta los falsos positivos. Elija los que quiera y su exigencia, y pulse \u00abRevisar ahora\u00bb: antes de gastar, UMBRA muestra el plan con su coste.')),
     el('h4', '4 \u00b7 Corregir'),
     el('ul',
       el('li', 'Una fila por segmento con hallazgos, con el original y la traducci\u00f3n lado a lado; a la derecha, el hallazgo elegido con su propuesta, que puede cambiar.'),
