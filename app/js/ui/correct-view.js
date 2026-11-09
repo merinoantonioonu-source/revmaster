@@ -626,22 +626,19 @@ async function resetFindings() {
   if (!state.project) return;
   const all = el('input', { type: 'radio', name: 'rsWhich', value: 'all', checked: true });
   const open = el('input', { type: 'radio', name: 'rsWhich', value: 'open' });
-  const cache = el('input', { type: 'checkbox', checked: true });
   const nOpen = state.findings.filter(f => f.state === 'open').length;
   const r = await modal({ title: 'Vaciar los hallazgos', help: helpBtn('findings-reset'), width: '560px', body: el('div',
     el('div', el('label.row', all, ' Todos (' + state.findings.length + '), tambi\u00e9n los aceptados y rechazados')),
     el('div', el('label.row', open, ' Solo los pendientes (' + nOpen + ')')),
-    el('div', { style: { marginTop: '10px' } }, el('label.row', cache, ' Olvidar tambi\u00e9n las respuestas guardadas de la IA (si no, al volver a revisar saldr\u00edan los mismos hallazgos sin preguntar de nuevo)')),
-    el('p.info', { style: { marginTop: '8px' } }, 'Los documentos y las entidades no se tocan.')),
+    el('p.info', { style: { marginTop: '8px' } }, 'Solo los hallazgos de este proyecto: los documentos y las entidades no se tocan. Las respuestas guardadas de la IA tampoco: al revisar de nuevo, el plan dice cu\u00e1ntos p\u00e1rrafos ya estaban revisados y deja pedir que la IA los lea otra vez.')),
     buttons: [{ label: 'Cancelar', value: null }, { label: 'Vaciar', kind: 'danger', value: 'ok' }] });
   if (r !== 'ok') return;
   state.findings = open.checked ? state.findings.filter(f => f.state !== 'open') : [];
-  if (cache.checked) { try { const { idbClear } = await import('../store/idb.js'); await idbClear('cache'); } catch (e) { console.warn('cache', e); } }
   selected = null;
   resetReviewState();
   emit('findings');
   saveProjectSoon();
   nav.clear();
   clearPaint();
-  toast('Hallazgos borrados' + (cache.checked ? ' y respuestas guardadas olvidadas' : '') + '.', 'ok');
+  toast('Hallazgos borrados.', 'ok');
 }

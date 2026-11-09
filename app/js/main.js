@@ -15,8 +15,9 @@ import { mountCorrectView } from './ui/correct-view.js';
 import { mountExportView } from './ui/export-view.js';
 import { mountSettingsView, showSettingsSection, preselectSettingsSection } from './ui/settings-view.js';
 import { showGuide } from './ui/guide.js';
-import { helpBtn, showHelp } from './ui/help.js';
+import { helpBtn, helpItem, showHelp } from './ui/help.js';
 import { icon } from './ui/icons.js';
+import { openMenu } from './ui/menu.js';
 import { docTypeRow } from './ui/doc-type.js';
 
 const VIEWS = ['files', 'mask', 'review', 'correct', 'export', 'settings'];
@@ -82,6 +83,7 @@ function renderSteps() {
   _sub('correct', !p ? 'Aceptar o descartar' : (open ? open + ' por revisar' : (state.findings.length ? 'Todo decidido' : 'Sin hallazgos todav\u00eda')));
   // A project "Sin enmascarar" says so on every screen.
   $('#side-proj').textContent = p ? p.name : 'Sin proyecto';
+  renderProjChip();
   let badge = $('#side-unmask');
   if (!badge) {
     badge = el('span.unmask-badge#side-unmask', { title: 'Este proyecto se revisa sin enmascarar: a la IA llega el texto real (se cambia en Archivos)' }, 'Sin enmascarar');
@@ -101,6 +103,46 @@ function renderSteps() {
       if (done[v] && v !== state.view) n.replaceChildren(icon('check', 14)); else n.textContent = num;
     }
   }
+}
+
+// ------------------------------------------------------------------ the open project, in the header
+
+/** Which project is open and its two files, on every screen, with what can be done with it. */
+function renderProjChip() {
+  const chip = $('#projchip');
+  if (!chip) return;
+  const p = state.project;
+  chip.classList.toggle('hidden', !p);
+  if (!p) return;
+  chip.title = 'Proyecto abierto: ' + p.name + '\nOriginal: ' + p.srcName + '\nTraducci\u00f3n: ' + p.tgtName + '\nPulse para cerrarlo, borrarlo o empezar otro';
+  chip.replaceChildren(icon('folder', 15),
+    el('span.pc-tx', el('b', p.name), el('small', p.srcName + ' \u2192 ' + p.tgtName)),
+    icon('down', 14));
+}
+
+function projMenu(anchor) {
+  const p = state.project;
+  if (!p) return;
+  openMenu(anchor, [
+    { label: 'Nuevo proyecto', onClick: newProject },
+    { label: 'Abrir otro proyecto\u2026', onClick: projectsDialog },
+    { sep: true },
+    { label: 'Cerrar este proyecto', onClick: () => { closeProject(); setView('files'); renderRecent(); toast('Proyecto cerrado: sigue guardado en Proyectos recientes.', 'ok'); } },
+    { label: 'Borrar este proyecto\u2026', onClick: () => deleteWithConfirm(p) },
+    { sep: true },
+    helpItem('project', anchor)
+  ]);
+}
+
+/** Deletes a project from this browser (its documents, entities and findings), after asking. */
+async function deleteWithConfirm(p) {
+  if (!(await confirmDialog('Borrar proyecto', 'Se borrar\u00e1 \u00ab' + p.name + '\u00bb de este navegador: sus documentos, entidades y hallazgos. ' +
+    'Las respuestas guardadas de la IA y el registro de uso y gasto no se borran.', 'Borrar'))) return false;
+  await deleteProject(p.id);
+  if (!state.project) setView('files');
+  renderRecent();
+  toast('Proyecto borrado.', 'ok');
+  return true;
 }
 
 // ------------------------------------------------------------------ Archivos: drop zones
@@ -250,7 +292,8 @@ async function renderRecent() {
       el('td', el('b', p.name), el('div.muted', p.srcName + ' \u2192 ' + p.tgtName)),
       el('td.muted', new Date(p.updatedAt).toLocaleString('es')),
       el('td.muted', p.findings + ' hallazgos'),
-      el('td', { style: { textAlign: 'right' } }, cur ? el('span.pill.ok', 'Abierto') : el('button.btn.sm', { onclick: () => doOpen(p.id) }, 'Abrir'))));
+      el('td', { style: { textAlign: 'right', whiteSpace: 'nowrap' } }, cur ? el('span.pill.ok', 'Abierto') : el('button.btn.sm', { onclick: () => doOpen(p.id) }, 'Abrir'), ' ',
+        el('button.icon-btn.recent-del', { title: 'Borrar este proyecto', 'aria-label': 'Borrar ' + p.name, onclick: () => deleteWithConfirm(p) }, icon('trash', 15)))));
   }
   host.appendChild(t);
 }
@@ -289,10 +332,7 @@ async function projectsDialog() {
       el('td.muted', new Date(p.updatedAt).toLocaleString('es')),
       el('td', { style: { whiteSpace: 'nowrap', textAlign: 'right' } },
         el('button.btn.sm.primary', { onclick: async () => { document.querySelector('.modal-back').remove(); await doOpen(p.id); } }, 'Abrir'), ' ',
-        el('button.btn.sm.danger', { onclick: async (e) => {
-          if (!(await confirmDialog('Borrar proyecto', 'Se borrar\u00e1 \u00ab' + p.name + '\u00bb de este navegador (documentos, entidades y hallazgos).', 'Borrar'))) return;
-          await deleteProject(p.id); e.target.closest('tr').remove(); if (!state.project) setView('files'); renderRecent();
-        } }, 'Borrar'))));
+        el('button.btn.sm.danger', { onclick: async (e) => { if (await deleteWithConfirm(p)) e.target.closest('tr').remove(); } }, 'Borrar'))));
   }
   body.appendChild(t);
   await modal({ title: 'Proyectos', body, width: '720px', buttons: [
@@ -426,6 +466,7 @@ function initF1() {
 
 async function boot() {
   for (const b of $$('.step')) b.addEventListener('click', () => setView(b.dataset.view));
+  $('#projchip').addEventListener('click', (e) => projMenu(e.currentTarget));
   for (const s of $$('.sic[data-icon]')) s.replaceWith(icon(s.dataset.icon, 18));
   $('#btn-side').addEventListener('click', () => {
     const compact = $('#app').classList.contains('compact');

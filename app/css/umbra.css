@@ -494,3 +494,13 @@ textarea.inp.ci-sug:disabled { border-color: var(--border); background: var(--bg
 .doctype { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 0 14px; color: var(--text-soft); }
 .doctype b { color: var(--text); font-weight: 600; }
 .doctype select { min-width: 240px; }
+/* The open project in the header: its name and two files, a menu to close, delete or start another */
+.projchip { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 360px; padding: 4px 10px; border: 1px solid var(--border);
+  border-radius: 10px; background: #fff; color: var(--text-soft); cursor: pointer; text-align: left; }
+.projchip:hover { background: #f4f6f9; }
+.projchip .pc-tx { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.projchip .pc-tx b, .projchip .pc-tx small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.projchip .pc-tx b { color: var(--text); font-size: 13px; font-weight: 600; }
+.projchip .pc-tx small { font-size: 11px; }
+.recent-del { color: var(--text-muted); vertical-align: middle; }
+.recent-del:hover { color: #b42318; }

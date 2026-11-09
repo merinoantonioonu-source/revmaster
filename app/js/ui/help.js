@@ -19,6 +19,13 @@ const T = {
       '**Nuevo proyecto** empieza otro documento; **Abrir proyecto (.umbra)** carga uno guardado en un archivo; **Banco de pruebas** abre el documento de prueba.',
       'El proyecto se guarda solo en este navegador: est\u00e1 en **Proyectos recientes** y en **Proyectos**, al pie de la barra de pasos.',
       'Los archivos no salen de su ordenador: a una IA solo llega texto enmascarado (y, con Nombres oficiales, la lista de nombres de organismos, \u00f3rganos, cargos, pa\u00edses y lugares), salvo que marque **Sin enmascarar**.'] ] },
+  project: { t: 'El proyecto abierto', b: [
+    'Arriba, junto al t\u00edtulo de cada paso: el proyecto abierto y sus dos archivos. Al pulsarlo:',
+    ['**Nuevo proyecto**: cierra este (queda guardado) y vuelve a Archivos para cargar otros documentos.',
+      '**Abrir otro proyecto**: la lista de los guardados en este navegador.',
+      '**Cerrar este proyecto**: lo cierra sin borrarlo; sigue en Proyectos recientes.',
+      '**Borrar este proyecto**: borra sus documentos, entidades y hallazgos de este navegador. La papelera de Proyectos recientes hace lo mismo.'],
+    'Qu\u00e9 no se borra con un proyecto: las **respuestas guardadas** de la IA (se reutilizan en cualquier proyecto con el mismo texto; el plan de ejecuci\u00f3n deja preguntar de nuevo) ni el **registro de uso y gasto** (Ajustes \u203a Uso de IA).'] },
   'review-done': { t: 'Revisi\u00f3n terminada', b: [
     'Al acabar una revisi\u00f3n (tambi\u00e9n una diferida, aunque est\u00e9 en otro paso) UMBRA lo dice en esta ventana: los hallazgos nuevos, los que descart\u00f3 el Verificador, lo que queda pendiente, el coste y los errores, si los hubo.',
     ['Mientras una revisi\u00f3n diferida sigue en curso, la barra de pasos dice cu\u00e1ntas respuestas han llegado y Corregir lo avisa: espere a que termine antes de exportar, porque faltan hallazgos y lo que descarte el Verificador.',
@@ -139,8 +146,8 @@ const T = {
     'Solo lo ACEPTADO se aplica al exportar.'] },
   'findings-reset': { t: 'Vaciar los hallazgos', b: [
     ['**Todos** o **solo los pendientes**: los aceptados y rechazados se pueden conservar.',
-      '**Olvidar las respuestas guardadas**: UMBRA guarda lo que contest\u00f3 la IA para no pagar dos veces por el mismo p\u00e1rrafo. Si cambia de modelo o de exigencia, o los hallazgos no le sirven, m\u00e1rquelo: la pr\u00f3xima revisi\u00f3n preguntar\u00e1 de nuevo.'],
-    'Los documentos y las entidades no se tocan.'] },
+      'Solo borra hallazgos de este proyecto: los documentos y las entidades no se tocan.'],
+    'Las **respuestas guardadas** de la IA no se borran aqu\u00ed. UMBRA guarda lo que contest\u00f3 para no pagar dos veces por el mismo p\u00e1rrafo (con el mismo modelo y las mismas instrucciones, en cualquier proyecto). Al revisar, el plan dice cu\u00e1ntos p\u00e1rrafos se reutilizan y su bot\u00f3n **Preguntar de nuevo a la IA** hace que los lea otra vez.'] },
   feedback: { t: 'Hallazgos para valorar', b: [
     'Un Excel para decir qu\u00e9 hallazgos son buenos y cu\u00e1les no, y as\u00ed ajustar las reglas y las instrucciones de los m\u00f3dulos.',
     ['Una fila por hallazgo: lugar, m\u00f3dulo, gravedad, cita, propuesta, motivo, origen y la oraci\u00f3n del original y de la traducci\u00f3n.',
@@ -173,7 +180,7 @@ const T = {
   plan: { t: 'Plan de ejecuci\u00f3n', b: [
     'Lo que se va a enviar, antes de gastar nada:',
     ['Lotes por m\u00f3dulo (dos m\u00f3dulos \u00abfusionados\u00bb comparten llamada), el modelo del cribado y el de la pasada a fondo.',
-      'P\u00e1rrafos **en cach\u00e9**: ya revisados con el mismo texto y las mismas reglas; no se pagan otra vez. **Repetidos**: se revisan una vez.',
+      'P\u00e1rrafos **en cach\u00e9** (respuestas guardadas): ya revisados con el mismo texto, el mismo modelo y las mismas instrucciones, en este u otro proyecto; no se pagan otra vez. **Preguntar de nuevo a la IA** rehace el plan sin ellos (con su coste) para que la IA los lea otra vez. **Repetidos**: se revisan una vez.',
       'Total aproximado de llamadas, tokens y coste (precios de lista). El gasto real queda en Uso de IA.',
       '**Presupuesto m\u00e1ximo**: UMBRA deja de enviar al llegar a esa cifra (vac\u00edo = sin l\u00edmite).',
       '**Modo diferido (lotes)**: la primera pasada cuesta la mitad, pero tarda de minutos a horas.'],

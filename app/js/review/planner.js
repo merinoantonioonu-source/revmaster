@@ -45,7 +45,8 @@ function _reviewText(session, u, input) {
 /**
  * makePlan(session, ctx, opts) -> plan
  * ctx = { prompts (store), cfg (module config) }
- * opts = { modules:[ids], unitFilter:Set(idx)|null, changedOnly:bool }
+ * opts = { modules:[ids], unitFilter:Set(idx)|null, changedOnly:bool, noCache:bool (ask the AI again:
+ *          the saved answers are not reused, and the new ones replace them) }
  */
 export async function makePlan(session, ctx, opts) {
   // An old reviewer's id (an old project, a saved selection) asks for the module that covers it now.
@@ -101,9 +102,9 @@ export async function makePlan(session, ctx, opts) {
       const uk = unitKey(session, u, input);
       if (seen.has(uk)) { dupOf.set(u.idx, seen.get(uk)); plan.totals.dups++; continue; }
       seen.set(uk, u.idx);
-      let allCached = true;
+      let allCached = !opts.noCache;
       const hits = {};
-      for (const m of mates) {
+      if (allCached) for (const m of mates) {
         const ck = cacheKey(m, pv[m], rh, tri.modelId, uk);
         let hit = null;
         try { hit = await idbGet('cache', ck); } catch (_) { hit = null; }
