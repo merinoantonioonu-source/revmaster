@@ -123,6 +123,31 @@ async function main() {
     await page.waitForSelector('#view-files.on');
     await page.waitForTimeout(300);
     ok(!(await page.isVisible('#projchip')) && await page.evaluate(async () => (await (await import('/app/js/state.js')).listProjects()).length) === 0, 'Deleting the open project closes it and removes it');
+    // Prices looked up by themselves: a Gemini model with no price gets LiteLLM's (the list is served
+    // by the test); the local test server is left out.
+    await page.route('https://raw.githubusercontent.com/BerriAI/litellm/**', r => r.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ 'gemini/gemini-3.6-flash': { input_cost_per_token: 7.5e-7, output_cost_per_token: 3.75e-6, litellm_provider: 'gemini' } }) }));
+    const gem = await page.evaluate(async () => {
+      const reg = await import('/app/js/ai/registry.js');
+      const p = (await reg.listProviders()).find(x => x.adapter === 'gemini');
+      await reg.addModel(p.id, { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash' });
+      await reg.setApiKey(p.id, 'k');
+      await reg.setModuleModel('writing', 'triage', { provider: p.id, model: 'gemini-3.6-flash' });
+      const u = await import('/app/js/ai/usage.js');
+      return { id: p.id, before: await u.priceFor(p.id, 'gemini-3.6-flash') };
+    });
+    ok(gem.before === null, 'The Gemini model starts with no price');
+    await load();
+    await page.click('.step[data-view="review"]');
+    await page.waitForFunction(() => { const c = document.querySelector('#rv-modules .mchip[data-mod="writing"] .cost'); return c && /^~/.test(c.textContent); }, null, { timeout: 15000 });
+    const after = await page.evaluate(async (id) => {
+      const u = await import('/app/js/ai/usage.js');
+      const st = await import('/app/js/store/storage.js');
+      return { price: await u.priceFor(id, 'gemini-3.6-flash'), tried: Object.keys((await st.getValue('ai_prices_tried', null)) || {}) };
+    }, gem.id);
+    ok(after.price && after.price.in === 0.75 && after.price.out === 3.75 && /LiteLLM/.test(after.price.src), 'Going to Revisar looks its price up by itself (' + JSON.stringify(after.price) + ')');
+    ok(after.tried.every(k => !/mock-small/.test(k)), 'The local test server is not looked up (' + after.tried.join(', ') + ')');
+    ok(true, 'The card shows a cost, not "Sin precio" (' + (await page.textContent('#rv-modules .mchip[data-mod="writing"] .cost')) + ')');
     ok(errors.length === 0, 'No console errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
   } finally {
     await browser.close();
