@@ -23,6 +23,7 @@ import { openFindingsWindow, syncFindingsWindow, findingsWindowSelect } from './
 import { openMenu } from './menu.js';
 import { reverify, benchDialog, resetReviewState } from './review-view.js';
 import { icon } from './icons.js';
+import { compareDialog } from './compare-view.js';
 
 let root, toolsHost, panes = {};
 let filt = { module: 'all', sev: 'all', state: 'open', q: '' };
@@ -135,6 +136,7 @@ function moreMenu(anchor) {
     { label: 'Copiar para IA externa\u2026', onClick: externalDialog },
     { label: 'Importar respuesta de IA externa\u2026', onClick: importDialog },
     { sep: true },
+    { label: 'Comparar con la versi\u00f3n final\u2026', onClick: compareDialog },
     { label: state.project && state.project.bench ? 'Resultado del banco de pruebas\u2026' : 'Banco de pruebas\u2026', onClick: benchDialog },
     { sep: true },
     helpItem('review-more', anchor)

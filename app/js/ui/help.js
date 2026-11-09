@@ -19,6 +19,15 @@ const T = {
       '**Nuevo proyecto** empieza otro documento; **Abrir proyecto (.umbra)** carga uno guardado en un archivo; **Banco de pruebas** abre el documento de prueba.',
       'El proyecto se guarda solo en este navegador: est\u00e1 en **Proyectos recientes** y en **Proyectos**, al pie de la barra de pasos.',
       'Los archivos no salen de su ordenador: a una IA solo llega texto enmascarado (y, con Nombres oficiales, la lista de nombres de organismos, \u00f3rganos, cargos, pa\u00edses y lugares), salvo que marque **Sin enmascarar**.'] ] },
+  compare: { t: 'Comparar con la versi\u00f3n final', b: [
+    'Cuando el texto ya est\u00e1 revisado y entregado, cargue aqu\u00ed la **versi\u00f3n final** de la traducci\u00f3n (el mismo documento, con el formato de la traducci\u00f3n). UMBRA la compara, p\u00e1rrafo a p\u00e1rrafo, con la traducci\u00f3n que revis\u00f3 y con sus hallazgos. No se env\u00eda nada a ninguna IA.',
+    ['**Acertado probable**: el revisor cambi\u00f3 algo donde UMBRA se\u00f1al\u00f3; **con la misma correcci\u00f3n**, si escribi\u00f3 lo que UMBRA propon\u00eda.',
+      '**Espurio probable**: el revisor no cambi\u00f3 nada ah\u00ed.',
+      '**Posible**: un hallazgo sin lugar exacto (una omisi\u00f3n) en un p\u00e1rrafo que el revisor cambi\u00f3.',
+      '**Omitido probable**: un cambio de palabras del revisor que UMBRA no se\u00f1al\u00f3. Los cambios solo de forma (espacios, puntuaci\u00f3n, may\u00fasculas) o solo de cifras se cuentan aparte: no son tarea de UMBRA.',
+      '**Descartados por el Verificador donde el revisor s\u00ed cambi\u00f3**: para ver si el Verificador tira hallazgos buenos.'],
+    'Es probable, no seguro: un revisor tambi\u00e9n cambia por preferencia. **Copiar el resumen** da el texto para pegar en el chat y ajustar UMBRA; **Descargar Excel**, el detalle; **Crear banco**, un banco de pruebas con este trabajo real (sus cambios como esperados y los p\u00e1rrafos intactos para medir el ruido).',
+    'Para poder comparar, no borre el proyecto ni vac\u00ede sus hallazgos antes: la comparaci\u00f3n usa la traducci\u00f3n que se revis\u00f3 y los hallazgos (tambi\u00e9n los descartados).'] },
   project: { t: 'El proyecto abierto', b: [
     'Arriba, junto al t\u00edtulo de cada paso: el proyecto abierto y sus dos archivos. Al pulsarlo:',
     ['**Nuevo proyecto**: cierra este (queda guardado) y vuelve a Archivos para cargar otros documentos.',
@@ -127,6 +136,7 @@ const T = {
   'review-more': { t: 'Men\u00fa M\u00e1s', b: [
     ['**Banco de pruebas** (o su **Resultado**, si est\u00e1 abierto): medir lo que detecta cada m\u00f3dulo.',
       '**Copiar para IA externa / Importar respuesta**: revisar con una IA de chat sin clave.',
+      '**Comparar con la versi\u00f3n final** (en Corregir): la traducci\u00f3n ya revisada y entregada frente a los hallazgos de UMBRA: acertados, espurios y omitidos probables, un resumen para ajustar UMBRA y un banco de pruebas con ese trabajo.',
       '**Verificar los hallazgos pendientes de la IA** (en Corregir): los manda al Verificador, que descarta los falsos positivos. Cuesta poco: solo env\u00eda los hallazgos con su contexto.',
       '**Los hallazgos que se ven** (en Corregir): aceptar, rechazar o volver a pendientes todos los que pasan los filtros.',
       '**Configurar m\u00f3dulos y modelos** (en Revisar): atajo a Ajustes \u203a M\u00f3dulos.'] ] },
