@@ -489,3 +489,7 @@ textarea.inp.ci-sug:disabled { border-color: var(--border); background: var(--bg
 .unmask-badge { display: inline-block; align-self: flex-start; margin-top: 2px; padding: 0 6px; border-radius: 8px; background: #fef3c7; color: #92400e; font-size: 10.5px; font-weight: 700; }
 .privacy.unmasked { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
 .privacy.unmasked .ic { color: #b45309; }
+/* The type of document (Archivos and Revisar) */
+.doctype { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 0 14px; color: var(--text-soft); }
+.doctype b { color: var(--text); font-weight: 600; }
+.doctype select { min-width: 240px; }

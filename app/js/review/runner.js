@@ -266,7 +266,7 @@ export async function verifyFindings(findings, ctx, call, progress) {
         String(f.reason || '').replace(/\|/g, '/') + '\n';
     });
     const r = await call({ module: 'verifier', role: 'deep', prompt: ctxText + '\n' + lines + '(FIN ' + chunk.length + ')',
-      system: verifierPrompt(ctx.prompts, session.srcLang, session.unmasked), words: 0, thinking: _thinking(ctx.cfg, 'verifier'), maxTokens: 4096 }, 0);
+      system: verifierPrompt(ctx.prompts, session.srcLang, { unmasked: session.unmasked, docType: session.docType }), words: 0, thinking: _thinking(ctx.cfg, 'verifier'), maxTokens: 4096 }, 0);
     const { verdicts } = parseVerdicts(r.text);
     for (const [id, v] of verdicts) {
       const f = ids.get(id);

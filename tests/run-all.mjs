@@ -19,7 +19,8 @@ const steps = [
   ['Ayuda contextual', 'node', [path.join(HERE, 'help.e2e.mjs')]],
   ['Navegacion por segmentos', 'node', [path.join(HERE, 'nav.e2e.mjs')]],
   ['Banco de pruebas y nombres', 'node', [path.join(HERE, 'bench.e2e.mjs')]],
-  ['Sin enmascarar', 'node', [path.join(HERE, 'unmasked.e2e.mjs')]]
+  ['Sin enmascarar', 'node', [path.join(HERE, 'unmasked.e2e.mjs')]],
+  ['Tipo de documento y paso siguiente', 'node', [path.join(HERE, 'doctype.e2e.mjs')]]
 ];
 
 let failed = 0;

@@ -18,6 +18,8 @@ import { externalDialog, importDialog } from './mask-view.js';
 import { openMenu } from './menu.js';
 import { loadBenchSpec, benchFiles, evaluateBench, benchSpecOf, readBenchZip } from '../review/bench.js';
 import { icon } from './icons.js';
+import { docTypeRow } from './doc-type.js';
+import { docTypeById } from '../review/doc-types.js';
 
 let root, toolsHost;
 let running = null;           // { abort: AbortController, modules:[] }
@@ -37,16 +39,20 @@ export function mountReviewView(host, tools) {
       el('div.kicker', 'PASO 3 DE 5'),
       el('h2.ptitle', '\u00bfQu\u00e9 quiere que revise la IA?', helpBtn('modules')),
       el('p.lead', 'Sentido es la revisi\u00f3n de fondo: compara cada p\u00e1rrafo con el original y se\u00f1ala lo que la traducci\u00f3n dice distinto, lo que falta y lo que sobra. Redacci\u00f3n lee solo el espa\u00f1ol, y Nombres oficiales comprueba las denominaciones. Despu\u00e9s, el Verificador descarta los falsos positivos.'),
+      docTypeRow('rv-doctype'),
       el('div.mgrid#rv-modules'),
       el('div.privacy#rv-privacy')),
     el('div.pfoot', el('div.pfoot-in',
       el('button.btn.big', { onclick: () => emit('goto', 'mask') }, icon('back', 16), 'Atr\u00e1s'),
       el('span.grow'),
       el('span.psum#rv-summary'),
+      el('button.btn.big.hidden#rv-next', { onclick: () => emit('goto', 'correct') }),
       el('button.btn.primary.big#rv-run', { onclick: onRun })))));
   on('view', (v) => { if (v === 'review') { renderAll(); scheduleEstimates(); } });
   on('findings', () => { if (state.view === 'review') { renderTools(); renderModules(); } });
   on('masked', () => { estimates = {}; renderPrivacy(); if (state.view === 'review') scheduleEstimates(); });
+  // A new type of document changes the instructions (and what the cache holds).
+  on('project-flags', () => { estimates = {}; if (state.view === 'review') scheduleEstimates(); });
   on('project', () => {
     progress = {}; estimates = {};
     emit('review-status', '');
@@ -75,6 +81,13 @@ function renderAll() {
 function onRun() {
   if (running) { running.abort.abort(); return; }
   runModules(Array.from(selectedModules));
+}
+
+/** The modules a deferred review still running will answer for (they are not sent again). */
+function _pendingDeferred() {
+  const out = new Set();
+  for (const r of ((state.project && state.project.deferred) || [])) if (r.status === 'running') for (const m of (r.modules || [])) out.add(m);
+  return out;
 }
 
 // ------------------------------------------------------------------ tools
@@ -125,18 +138,35 @@ function _updateTotal() {
     if (est && !est.error) { total += est.cost || 0; any = true; }
     else if (est && est.error) missing = true;
   }
+  // A deferred review still running: what is ticked and already sent is not sent again (it would be
+  // paid twice); the way on is Corregir, where its findings arrive by themselves.
+  const pend = _pendingDeferred();
+  const fresh = [...selectedModules].filter(id => !(_modCfg[id] && _modCfg[id].enabled === false) && !pend.has(id) && id !== 'verifier').length;
+  const waiting = pend.size > 0;
   const sum = $('#rv-summary');
   if (sum) {
     const units = state.session ? state.session.units.length : 0;
-    sum.textContent = n + (n === 1 ? ' revisor' : ' revisores') + ' \u00b7 ' + fmtInt(units) + ' p\u00e1rrafos' +
-      (any ? ' \u00b7 ~' + fmtMoney(total) : '') + (missing ? ' \u00b7 falta la clave de alg\u00fan proveedor' : '');
+    sum.textContent = waiting && !running
+      ? 'Revisi\u00f3n diferida en curso (' + [...pend].map(id => (moduleById(id) || { label: id }).label).join(', ') + '): sus hallazgos llegar\u00e1n a Corregir'
+      : n + (n === 1 ? ' revisor' : ' revisores') + ' \u00b7 ' + fmtInt(units) + ' p\u00e1rrafos' +
+        (any ? ' \u00b7 ~' + fmtMoney(total) : '') + (missing ? ' \u00b7 falta la clave de alg\u00fan proveedor' : '');
+  }
+  const goOn = !running && (waiting || state.findings.length > 0);
+  const next = $('#rv-next');
+  if (next) {
+    next.classList.toggle('hidden', !goOn);
+    next.classList.toggle('primary', goOn && (waiting || !fresh));
+    next.replaceChildren(waiting ? 'Ir a Corregir' : 'Siguiente: corregir', icon('arrow', 16));
+    next.title = waiting ? 'Los hallazgos de la revisi\u00f3n diferida aparecer\u00e1n en Corregir en cuanto lleguen' : 'Ir al paso 4 con los hallazgos de esta revisi\u00f3n';
   }
   const run = $('#rv-run');
   if (run) {
-    run.replaceChildren(...(running ? [icon('stop', 16), 'Detener'] : ['Revisar ahora', icon('arrow', 16)]));
+    run.replaceChildren(...(running ? [icon('stop', 16), 'Detener'] : [state.findings.length || waiting ? 'Revisar de nuevo' : 'Revisar ahora', icon('arrow', 16)]));
     run.classList.toggle('danger', !!running);
-    run.classList.toggle('primary', !running);
+    run.classList.toggle('primary', !running && !goOn);
     run.disabled = !running && !n;
+    run.classList.toggle('hidden', !running && waiting && !fresh);
+    run.title = running ? '' : waiting && !fresh ? 'Lo marcado ya est\u00e1 en la revisi\u00f3n diferida en curso' : (state.findings.length ? 'Vuelve a revisar con lo marcado (lo ya revisado y sin cambios sale de la cach\u00e9, sin coste)' : '');
   }
 }
 
@@ -233,7 +263,10 @@ function _status() {
 async function runModules(ids) {
   if (!state.session || running) return;
   const ctx = await _ctx();
-  const ai = ids.filter(id => id !== 'verifier' && moduleById(id) && moduleById(id).ai && ctx.cfg[id].enabled !== false);
+  const pend = _pendingDeferred();
+  const skipped = ids.filter(id => pend.has(id));
+  const ai = ids.filter(id => id !== 'verifier' && !pend.has(id) && moduleById(id) && moduleById(id).ai && ctx.cfg[id].enabled !== false);
+  if (skipped.length) toast(skipped.map(id => moduleById(id).label).join(', ') + ': ya est\u00e1 en la revisi\u00f3n diferida en curso; no se env\u00eda otra vez.', 'warn', 7000);
   if (!ai.length) { renderModules(); return; }
   const plan = await makePlan(state.session, ctx, { modules: ai });
   if (plan.errors.length && !plan.groups.length && !plan.names) {
@@ -310,6 +343,8 @@ async function runModules(ids) {
 
 function planDialog(plan, budget, cap) {
   const rows = [];
+  const dt = state.session && state.session.docType;
+  if (dt) rows.push(el('li', 'Tipo de documento: ' + docTypeById(dt).label + ' (sus convenciones no se se\u00f1alan como errores)'));
   for (const g of plan.groups) {
     rows.push(el('li', g.modules.map(id => moduleById(id).label).join(' + ') + (g.modules.length > 1 ? ' (fusionados)' : '') + ': ' +
       g.batches.length + ' lotes con ' + (g.tri.profile ? g.tri.profile.name + ' \u00b7 ' : '') + g.tri.modelId +
@@ -499,6 +534,8 @@ export async function benchDialog() {
     await openFiles(f.src, f.tgt);
     state.project.bench = true;
     if (spec) state.project.benchSpec = spec;
+    // A bench of one's own may say its type of document (banco.json "docType").
+    if (spec && typeof spec.docType === 'string') { state.project.docType = spec.docType; state.session.docType = spec.docType; }
     state.project.name = name;
     saveProjectSoon();
     emit('project');

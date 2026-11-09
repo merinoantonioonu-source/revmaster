@@ -19,6 +19,14 @@ const T = {
       '**Nuevo proyecto** empieza otro documento; **Abrir proyecto (.umbra)** carga uno guardado en un archivo; **Banco de pruebas** abre el documento de prueba.',
       'El proyecto se guarda solo en este navegador: est\u00e1 en **Proyectos recientes** y en **Proyectos**, al pie de la barra de pasos.',
       'Los archivos no salen de su ordenador: a una IA solo llega texto enmascarado (y, con Nombres oficiales, la lista de nombres de organismos, \u00f3rganos, cargos, pa\u00edses y lugares), salvo que marque **Sin enmascarar**.'] ] },
+  doctype: { t: 'Tipo de documento', b: [
+    'Dice a los revisores qu\u00e9 clase de texto es, para que no se\u00f1alen como errores sus convenciones. Se a\u00f1ade una sola l\u00ednea a las instrucciones.',
+    ['**Acta resumida**: el espa\u00f1ol narra en presente lo que el original cuenta en pasado (said: \u00abdice\u00bb) y \u00abhis delegation\u00bb puede darse con el nombre del pa\u00eds.',
+      '**Acta literal**: lo dicho tal cual, en primera persona y en el tiempo del orador.',
+      '**Resoluci\u00f3n o decisi\u00f3n**: el pre\u00e1mbulo con gerundio o participio y la parte dispositiva con el verbo en presente.',
+      '**Informe**, **Estados financieros o presupuesto** y **Carta o nota verbal**: solo el tipo, como contexto.',
+      'UMBRA lo deduce del s\u00edmbolo en el nombre del archivo (SR: acta resumida; PV: acta literal; RES o DEC: resoluci\u00f3n); c\u00e1mbielo si no acierta. Es el mismo en Archivos y en Revisar.',
+      'Un banco propio puede traerlo en su banco.json (\u00abdocType\u00bb: sr, pv, res, report, fin o letter).'] ] },
   unmasked: { t: 'Sin enmascarar', b: [
     'Para un texto **ya publicado** (por ejemplo, un original que ya est\u00e1 en la web): la IA recibe el texto real de los dos documentos, sin etiquetas, y no hace falta el paso Enmascarar.',
     ['Solo para este proyecto: cada proyecto nuevo empieza enmascarado. Al marcarlo, UMBRA lo pregunta.',

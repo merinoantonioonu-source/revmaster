@@ -88,6 +88,11 @@ See `docs/ARQUITECTURA.md` (contracts between modules) and `docs/PROPUESTA.md` (
   carry the models chosen before). The cascade (an economical model, then a strong one on what it
   flagged) is still in the planner and runner but no module uses it: Sentido reads everything with one
   model. Decide with the test bench before adding a reviewer back.
+- **Type of document** (`project.docType`, `review/doc-types.js`, 2026-11-09): guessed from the eLUNa symbol
+  in the file names (SR, PV, RES/DEC), chosen in Archivos or Revisar (same selector, `ui/doc-type.js`); ONE
+  short line in the instructions (after their first line) and in the Verifier's, so the conventions of
+  that kind of text (the present tense of summary records, the country's name for "his delegation") are
+  not reported. A bench may bring it (banco.json `docType`). Keep each line short: no rule lists.
 - "Exigencia" (module config `strictness`: grave | normal | estricta) is in the prompt AND enforced by
   the runner (`STRICT_ALLOWED`): findings of a severity not asked for are dropped. Severity is about
   the effect on what is understood, not the size of the change (one word can be MAY).

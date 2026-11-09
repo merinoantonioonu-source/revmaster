@@ -18,6 +18,7 @@
 
 import { getValue, setValue } from '../store/storage.js';
 import { fnv1a } from '../util/crypto.js';
+import { docTypeLine } from './doc-types.js';
 
 export const PROMPTS_KEY = 'prompts';
 
@@ -101,22 +102,35 @@ export function withoutTags(text) {
 function _task(store, moduleId, cfg) { return promptOf(store, moduleId) + '\n' + STRICT_TEXT[strictnessOf(cfg, moduleId)]; }
 
 /** System prompt for one or several fused modules. */
-export function systemPrompt(store, moduleIds, lang, cfg, unmasked) {
-  const cats = [];
-  for (const id of moduleIds) for (const c of (TASKS[id] ? TASKS[id].cats : [])) if (!cats.includes(c)) cats.push(c);
-  const t = COMMON.replace('{{LANG}}', lang === 'fr' ? 'franc\u00e9s' : 'ingl\u00e9s').replace('{{CATS}}', cats.join(', ')) +
-    '\n\n' + moduleIds.map(id => _task(store, id, cfg)).join('\n\n');
-  return unmasked ? withoutTags(t) : t;
+/** The type of document's line, after the first line of the instructions (none when unspecified). */
+function _withDocType(text, docType) {
+  const line = docTypeLine(docType);
+  if (!line) return text;
+  const k = text.indexOf('\n');
+  return k < 0 ? text + '\n' + line : text.slice(0, k) + '\n' + line + text.slice(k);
 }
 
-export function verifierPrompt(store, lang, unmasked) {
-  const t = promptOf(store, 'verifier').replace('{{LANG}}', lang === 'fr' ? 'franc\u00e9s' : 'ingl\u00e9s');
-  return unmasked ? withoutTags(t) : t;
+/** opts = { unmasked (a project "Sin enmascarar"), docType (doc-types.js) }. */
+export function systemPrompt(store, moduleIds, lang, cfg, opts) {
+  const o = opts || {};
+  const cats = [];
+  for (const id of moduleIds) for (const c of (TASKS[id] ? TASKS[id].cats : [])) if (!cats.includes(c)) cats.push(c);
+  let t = COMMON.replace('{{LANG}}', lang === 'fr' ? 'franc\u00e9s' : 'ingl\u00e9s').replace('{{CATS}}', cats.join(', ')) +
+    '\n\n' + moduleIds.map(id => _task(store, id, cfg)).join('\n\n');
+  if (!moduleIds.includes('names')) t = _withDocType(t, o.docType);
+  return o.unmasked ? withoutTags(t) : t;
+}
+
+export function verifierPrompt(store, lang, opts) {
+  const o = opts || {};
+  const t = _withDocType(promptOf(store, 'verifier').replace('{{LANG}}', lang === 'fr' ? 'franc\u00e9s' : 'ingl\u00e9s'), o.docType);
+  return o.unmasked ? withoutTags(t) : t;
 }
 
 /** Fingerprint of what a module asks (for the results cache). */
-export function promptVersion(store, moduleIds, cfg, unmasked) {
-  return fnv1a(COMMON + moduleIds.map(id => _task(store, id, cfg)).join('|') + (unmasked ? '|sin-enmascarar' : ''));
+export function promptVersion(store, moduleIds, cfg, opts) {
+  const o = opts || {};
+  return fnv1a(COMMON + moduleIds.map(id => _task(store, id, cfg)).join('|') + (o.unmasked ? '|sin-enmascarar' : '') + (o.docType ? '|tipo:' + o.docType : ''));
 }
 
 export const CAT_LABELS = {
