@@ -40,6 +40,10 @@ The owner is both developer and end user and **does not code**. Explain things i
   `unmaskedProject: true` instead of `masked: true`). It is per project, asked when switched on, off for
   every new project, and shown on every screen (side bar badge, Enmascarar, Revisar, the plan, the
   report). `tests/unmasked.e2e.mjs` covers it. No other way out for unmasked text.
+  The names table also carries names of the original that their paragraph's translation does not show
+  (a name translated wrong is not recognised, so it is "Sin pareja"): paired with a Spanish name of that
+  paragraph that has no counterpart in the original, or with "—" and the AI gives the official name;
+  a finding only where that name is absent (`review/names.js`). Still only names travel.
 - **Tests**: `node tests/run-all.mjs` (Playwright + Chromium are preinstalled; it starts a static
   server and a mock OpenAI-compatible provider). Run them before opening a PR.
 - **VERSION.md** is append-only: one line per change.
