@@ -90,14 +90,11 @@ const T = {
       '**Exportar**: pasa al paso 5.'],
     'Teclas: [[J]] / [[K]] siguiente y anterior, [[A]] aceptar, [[R]] rechazar, [[E]] editar la propuesta.'] },
   modules: { t: 'Paso 3 \u00b7 Revisar', b: [
-    'Cada tarjeta es un revisor con IA que se ci\u00f1e a su tarea, como lo har\u00eda un revisor humano. Marque los que necesite y pulse **Revisar ahora**: antes de gastar nada, UMBRA ense\u00f1a el plan con el coste estimado.',
-    ['**Fidelidad**: solo errores de SENTIDO: lo que hace que la traducci\u00f3n diga algo distinto del original.',
-      '**Integridad**: contenido que falta o sobra respecto del original, aunque sea una palabra.',
-      '**Nombres oficiales**: denominaci\u00f3n oficial y coherencia de organismos, \u00f3rganos, cargos, pa\u00edses y lugares; solo env\u00eda la lista de esos nombres, sin el texto.',
-      '**Gram\u00e1tica**: concordancia, r\u00e9gimen, tiempos y puntuaci\u00f3n (la ortograf\u00eda la corrige Word).',
-      '**Estilo**: calcos, pasivas, gerundios, registro institucional.',
-      '**Lectura en fr\u00edo**: lee la traducci\u00f3n sin el original, como un lector nuevo.',
-      '**Coherencia** y **Convenciones ONU**: miran el documento entero de una vez (listas, t\u00edtulos, f\u00f3rmulas de resoluci\u00f3n); son baratos.'],
+    'Tres revisores con IA. Marque los que necesite y pulse **Revisar ahora**: antes de gastar nada, UMBRA ense\u00f1a el plan con el coste estimado.',
+    ['**Sentido**: la revisi\u00f3n de fondo. Compara cada p\u00e1rrafo con el original y se\u00f1ala lo que la traducci\u00f3n dice distinto, lo que falta y lo que sobra, aunque sea una palabra que cambie el alcance. Conviene darle el modelo m\u00e1s fuerte (Ajustes \u203a M\u00f3dulos).',
+      '**Redacci\u00f3n**: lee solo el espa\u00f1ol, como un revisor de la ONU: gram\u00e1tica que afecta a la sintaxis, la coma de los incisos y el estilo institucional (calcos, pasivas, gerundios, registro). La ortograf\u00eda la corrige Word.',
+      '**Nombres oficiales**: denominaci\u00f3n oficial y coherencia de organismos, \u00f3rganos, cargos, pa\u00edses y lugares; solo env\u00eda la lista de esos nombres, sin el texto.'],
+    'Despu\u00e9s, el **Verificador** repasa los hallazgos y descarta los falsos positivos.',
     '**Exigencia** de cada tarjeta: **Solo lo importante** (lo que cambia lo que se entiende, aunque sea una palabra), **Normal** (tambi\u00e9n lo menor) o **Exhaustiva** (tambi\u00e9n las mejoras opcionales). Debajo, el modelo y el coste estimado; mientras revisa, el avance. El modelo se cambia en Ajustes \u203a M\u00f3dulos.'] },
   'review-more': { t: 'Men\u00fa M\u00e1s', b: [
     ['**Banco de pruebas** (o su **Resultado**, si est\u00e1 abierto): medir lo que detecta cada m\u00f3dulo.',
@@ -188,18 +185,17 @@ const T = {
   // ------------------------------------------------------------------ settings: modules
   'module-settings': { t: 'M\u00f3dulos de revisi\u00f3n', b: [
     ['**Activo**: si se desactiva, el m\u00f3dulo no se ejecuta aunque est\u00e9 marcado en Revisar.',
-      '**Modelo**: el proveedor y el modelo. **Cribado** repasa todo el texto (basta un modelo econ\u00f3mico); **A fondo** (Fidelidad e Integridad) usa un modelo m\u00e1s fuerte solo en lo que se\u00f1al\u00f3 el cribado. Para Fidelidad conviene un buen modelo \u00abA fondo\u00bb.',
-      '**Exigencia**: **Solo lo importante** (errores cr\u00edticos o mayores; recomendado para Fidelidad e Integridad), **Normal** (tambi\u00e9n los menores) o **Exhaustiva** (tambi\u00e9n matices y mejoras opcionales). Lo que quede fuera de la exigencia se descarta aunque la IA lo devuelva.',
+      '**Modelo**: el proveedor y el modelo de cada revisor. **Sentido** lee todo el texto con el modelo que elija: conviene el m\u00e1s fuerte. **Redacci\u00f3n** y **Nombres oficiales** pueden ir con uno econ\u00f3mico; el **Verificador**, con uno bueno.',
+      '**Exigencia**: **Solo lo importante** (errores cr\u00edticos o mayores; recomendado para Sentido), **Normal** (tambi\u00e9n los menores; Redacci\u00f3n, de serie) o **Exhaustiva** (tambi\u00e9n matices y mejoras opcionales). Lo que quede fuera de la exigencia se descarta aunque la IA lo devuelva.',
       '**Verificar**: los hallazgos del m\u00f3dulo pasan por el Verificador, que descarta falsos positivos y lo que no sea de la tarea del m\u00f3dulo.'],
     'Lo dem\u00e1s est\u00e1 en **Opciones avanzadas**: no hace falta tocarlo.'] },
   'module-advanced': { t: 'Opciones avanzadas', b: [
     ['**Razonamiento**: cu\u00e1nto \u00abpiensa\u00bb el modelo antes de responder. M\u00e1s razonamiento = mejor juicio, pero se cobra como salida.',
       '**Palabras por lote**: tama\u00f1o de cada env\u00edo. \u00abAuto\u00bb va bien.',
-      '**Fusionar**: Fidelidad con Integridad, y Gram\u00e1tica con Estilo, comparten una llamada por lote si usan el mismo modelo (la entrada se paga una vez).',
       '**Presupuesto**: tope de gasto por ejecuci\u00f3n del m\u00f3dulo.'] ] },
   'module-prompts': { t: 'Instrucciones de cada m\u00f3dulo', b: [
     'Lo que se le pide a la IA en cada m\u00f3dulo. Puede ampliarlas o cambiarlas (por ejemplo, para insistir en algo) y volver a las de serie con **Restaurar las de serie**.',
-    'El formato de respuesta y la explicaci\u00f3n de las etiquetas se a\u00f1aden siempre por su cuenta. Para indicaciones puntuales, mejor una regla de Estilo (Ajustes \u203a Reglas).'] },
+    'El formato de respuesta y la explicaci\u00f3n de las etiquetas se a\u00f1aden siempre por su cuenta.'] },
 
   // ------------------------------------------------------------------ settings: providers
   providers: { t: 'Proveedores de IA', b: [

@@ -47,7 +47,7 @@ async function main() {
       await reg.setApiKey(p.id, 'k');
       await reg.setGeneralModel({ provider: p.id, model: 'mock-small' });
       const mc = await import('/app/js/review/module-config.js');
-      for (const m of ['fidelity', 'integrity', 'grammar', 'style', 'coldread']) await mc.saveModuleConfig(m, { verify: false });
+      for (const m of ['meaning', 'writing']) await mc.saveModuleConfig(m, { verify: false });
     });
 
     // The gateway refuses anything that is not a table of names.
@@ -93,7 +93,7 @@ async function main() {
         '27 | MIST | MEN | consultas | reuniones | Menor: la exigencia lo descarta.\nFIN 31' }
     ], def: 'FIN 0' });
     await page.evaluate(() => { document.querySelectorAll('#rv-modules .mchip input[type=checkbox]').forEach(c => { if (c.checked) c.click(); }); });
-    for (const id of ['fidelity', 'integrity', 'names']) await page.click('#rv-modules .mchip[data-mod="' + id + '"] input[type=checkbox]');
+    for (const id of ['meaning', 'names']) await page.click('#rv-modules .mchip[data-mod="' + id + '"] input[type=checkbox]');
     await page.click('#rv-run');
     await page.waitForSelector('.modal:has-text("Plan de ejecuci")', { timeout: 15000 });
     ok(/Nombres oficiales: 1 llamada con \d+ nombres \(solo la lista de nombres/.test(await page.textContent('.modal')), 'The plan shows the names call and says only the list travels');
@@ -114,14 +114,14 @@ async function main() {
     }
     const bil = log.find(l => /\nO: /.test(l.prompt));
     ok(!!bil && /Prueba: \u00bfun lector/.test(bil.system) && /aunque sea una sola palabra/.test(bil.system) && /including, but not limited to/.test(bil.system) && /EXIGENCIA/.test(bil.system),
-      'Fidelity and Integrity carry the calibrated instructions (meaning test, small words, legal formulas, strictness)');
+      'Sentido carries the calibrated instructions (meaning test, small words, legal formulas, strictness)');
 
     // Results dialog.
     await page.click('#tools button:has-text("M\u00e1s")');
     await page.click('.menu .mi:has-text("Resultado del banco de pruebas")');
     await page.waitForSelector('.modal:has-text("Resultado del banco de pruebas")');
     const res = await page.textContent('.modal');
-    ok(/3 de 31 errores detectados/.test(res) && /\u00a72 \u00b7 Fidelidad/.test(res) && /\u00a718 \u00b7 Integridad/.test(res) && /Ruido \(1\)/.test(res), 'The result lists hits, misses and the noise');
+    ok(/3 de 31 errores detectados/.test(res) && /\u00a72 \u00b7 Sentido/.test(res) && /\u00a718 \u00b7 Sentido/.test(res) && /Ruido \(1\)/.test(res), 'The result lists hits, misses and the noise');
     await page.screenshot({ path: path.join(OUT, '1-result.png') });
     await page.keyboard.press('Escape');
 

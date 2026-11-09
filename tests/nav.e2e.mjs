@@ -194,8 +194,8 @@ async function main() {
       const s = state.session;
       const unitByN = new Map(s.units.map(u => [u.n, u]));
       const n = s.units.find(u => u.tgtPara !== null && /en base a/.test(s.tgt.paras[u.tgtPara].text)).n;
-      const a = anchorItem({ unit: n, cat: 'EST', sev: 'MEN', quote: 'en base a', suggestion: 'sobre la base de', reason: 'Calco.' }, { session: s, unitByN, module: 'style', source: 'ai', model: 'prueba' });
-      const b = anchorItem({ unit: n, cat: 'MIST', sev: 'MAY', quote: 'propuesta', suggestion: 'proposici\u00f3n', reason: 'Prueba.' }, { session: s, unitByN, module: 'fidelity', source: 'ai', model: 'prueba' });
+      const a = anchorItem({ unit: n, cat: 'EST', sev: 'MEN', quote: 'en base a', suggestion: 'sobre la base de', reason: 'Calco.' }, { session: s, unitByN, module: 'writing', source: 'ai', model: 'prueba' });
+      const b = anchorItem({ unit: n, cat: 'MIST', sev: 'MAY', quote: 'propuesta', suggestion: 'proposici\u00f3n', reason: 'Prueba.' }, { session: s, unitByN, module: 'meaning', source: 'ai', model: 'prueba' });
       addFindings([a, b]);
       return a.id;
     });
@@ -203,7 +203,7 @@ async function main() {
     await page.waitForSelector('#rv-findings .cx-row');
     const labels = await page.$$eval('#rv-bubbles .ffield > span', s => s.map(x => x.textContent));
     const modBtns = await page.$$eval('#cx-mods button', bs => bs.map(b => b.dataset.mod));
-    ok(labels.join(',') === 'Estado,Gravedad' && modBtns.join(',') === 'all,fidelity,style', 'Findings are filtered by module (buttons), state and severity (' + labels.join(', ') + ' | ' + modBtns.join(', ') + ')');
+    ok(labels.join(',') === 'Estado,Gravedad' && modBtns.join(',') === 'all,meaning,writing', 'Findings are filtered by module (buttons), state and severity (' + labels.join(', ') + ' | ' + modBtns.join(', ') + ')');
     ok(await page.locator('#rv-findings .cx-row').count() === 1 && await page.locator('#rv-findings .cx-badge').count() === 2, 'Corregir: one row per segment, one badge per finding');
     await page.click('#rv-findings .cx-badge[data-id="' + fid + '"]');
     await page.waitForTimeout(400);
@@ -294,8 +294,9 @@ async function main() {
     await page.waitForSelector('.modtable');
     const secs = await page.$$eval('.settings-nav button', bs => bs.map(b => b.dataset.sec));
     ok(!secs.includes('rules'), 'No Rules section any more (' + secs.join(', ') + ')');
-    const strict = await page.$eval('.modtable select[data-strict="fidelity"]', s => s.value);
-    ok(strict === 'grave' && await page.locator('.modtable select[data-module="fidelity"][data-role="deep"]').count() === 1, 'Modules: model and Exigencia per module; Fidelity asks only for what matters (' + strict + ')');
+    const strict = await page.$eval('.modtable select[data-strict="meaning"]', s => s.value);
+    ok(strict === 'grave' && await page.locator('.modtable select[data-module="meaning"][data-role="deep"]').count() === 1 &&
+      await page.locator('.modtable tr').count() === 5, 'Modules: four reviewers, one model each; Sentido asks only for what matters (' + strict + ')');
     await page.click('.settings-nav button[data-sec="lists"]');
     await page.click('.settings-nav button[data-sec="lists"]');
     await page.waitForTimeout(400);

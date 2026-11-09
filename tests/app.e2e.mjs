@@ -106,8 +106,7 @@ async function main() {
         models: [{ id: 'mock-small', label: 'Simulado peque\u00f1o' }, { id: 'mock-big', label: 'Simulado grande' }] });
       await reg.setApiKey(p.id, 'test-key');
       await reg.setGeneralModel({ provider: p.id, model: 'mock-small' });
-      await reg.setModuleModel('fidelity', 'deep', { provider: p.id, model: 'mock-big' });
-      await reg.setModuleModel('integrity', 'deep', { provider: p.id, model: 'mock-big' });
+      await reg.setModuleModel('meaning', 'deep', { provider: p.id, model: 'mock-big' });
       await reg.setModuleModel('verifier', 'deep', { provider: p.id, model: 'mock-big' });
       const { state } = await import('/app/js/state.js');
       const s = state.session;
@@ -117,9 +116,8 @@ async function main() {
     ok(info.uGram && info.uReq && info.uDec, 'Units located (' + JSON.stringify(info) + ')');
     Object.assign(mock.state, {
       rules: [
-        { match: 'HALLAZGOS A VERIFICAR', response: 'H1 | OK |  | Correcto.\nH2 | OK |  | Correcto.\nH3 | OK |  | Correcto.\nH4 | EDITAR | previsto inicialmente | Mejor as\u00ed.\nFIN 4' },
-        { match: 'GRUPO ', response: 'FIN 3' },
-        { match: 'DOCUMENTO: resoluci', response: 'FIN 0' },
+        // Sentido's findings come first now: H2 is the omission, whose suggestion the Verifier improves.
+        { match: 'HALLAZGOS A VERIFICAR', response: 'H1 | OK |  | Correcto.\nH2 | EDITAR | previsto inicialmente | Mejor as\u00ed.\nH3 | OK |  | Correcto.\nH4 | OK |  | Correcto.\nFIN 4' },
         { match: 'P\u00c1RRAFOS DE LA TRADUCCI\u00d3N', response: info.uGram + ' | GRA | MEN | fueron desplegado | fueron desplegados | Concordancia con \u00abfuncionarios\u00bb.\n' +
           info.uDec + ' | EST | MEN | asignar | destinar | Verbo m\u00e1s preciso.\n' +
           info.uDec + ' | GRA | SUG | asignar | asignar | Igual: se descarta.\nFIN 20' },
@@ -138,7 +136,7 @@ async function main() {
     await page.click('#rv-run');
     await page.waitForSelector('.modal:has-text("Plan de ejecuci")', { timeout: 15000 });
     const planText = await page.textContent('.modal');
-    ok(/fusionados/.test(planText), 'Plan fuses modules with the same input and model');
+    ok(/Sentido: /.test(planText) && /Redacci\u00f3n: /.test(planText) && !/fusionados/.test(planText), 'Plan: one group of calls for Sentido and one for Redaccion');
     await page.screenshot({ path: path.join(OUT, '2-plan.png') });
     await page.click('.modal-foot .btn.amber');
     await page.waitForSelector('.toast:has-text("Revisi\u00f3n terminada")', { timeout: 60000 });
@@ -149,7 +147,8 @@ async function main() {
         start: f.start, verified: f.verified || null, role: f.role, source: f.source }));
     });
     const log = mock.state.log;
-    ok(log.some(r => r.model === 'mock-big'), 'Cascade: the deep model was called for flagged units');
+    const meaningCalls = log.filter(r => /\nO: /.test(r.prompt));
+    ok(meaningCalls.length >= 1 && meaningCalls.every(r => r.model === 'mock-big'), 'Sentido: the strongest model reads every paragraph (no economical first pass)');
     ok(log.some(r => /HALLAZGOS A VERIFICAR/.test(r.prompt)), 'Verifier was called');
     // The names table (Nombres oficiales) is the one call with real names, by the owner's choice: only rows of names.
     const namesCall = log.find(r => /^NOMBRES \(fila/.test(r.prompt));
@@ -159,14 +158,16 @@ async function main() {
     if (leaks.length) console.log('LEAK SAMPLE:', leaks[0].prompt.slice(0, 600));
     ok(!leaks.length, 'No real entity reached the AI (only masked text in the prompts)');
     const fused = log.filter(r => /P\u00c1RRAFOS DE LA TRADUCCI\u00d3N/.test(r.prompt));
-    ok(fused.length >= 1 && /GRAM\u00c1TICA/.test(fused[0].system) && /ESTILO/.test(fused[0].system) && !/ORTOGRAF\u00cdA Y/.test(fused[0].system), 'Grammar (without spelling) and style fused in one call');
-    const gram = res.find(f => f.module === 'grammar' && /desplegado/.test(f.quote || ''));
+    ok(fused.length >= 1 && /TAREA \u2014 REDACCI\u00d3N/.test(fused[0].system) && /Gram\u00e1tica y sintaxis/.test(fused[0].system) && /Estilo institucional/.test(fused[0].system) &&
+      !/ORTOGRAF\u00cdA Y/.test(fused[0].system), 'Redaccion: grammar (without spelling) and style in one task');
+    const gram = res.find(f => f.module === 'writing' && /desplegado/.test(f.quote || ''));
     ok(!!gram && gram.start !== null, 'Grammar finding anchored in the real text');
     ok(res.some(f => f.state === 'discarded' || f.verified), 'Verifier verdicts applied');
-    ok(!res.some(f => f.module === 'fidelity' && f.sev === 'MEN'), 'Fidelity asks only for important errors: a minor one is dropped');
+    ok(!res.some(f => f.module === 'meaning' && f.sev === 'MEN'), 'Sentido asks only for important errors: a minor one is dropped');
     ok(fused.length >= 1 && /EXIGENCIA/.test(fused[0].system) && !/art\u00edculo que va DENTRO/.test(fused[0].system), 'Prompts carry the strictness and no article explanation');
     const bil = log.filter(r => /\nO: /.test(r.prompt));
-    ok(bil.length >= 1 && /FIDELIDAD DE SENTIDO/.test(bil[0].system) && bil[0].system.length < 4500, 'Fidelity prompt is about meaning and compact (' + (bil[0] ? bil[0].system.length : 0) + ' characters)');
+    ok(bil.length >= 1 && /TAREA \u2014 SENTIDO/.test(bil[0].system) && /lo que falta \(OMI\)/.test(bil[0].system) && /said: \u00abdice\u00bb/.test(bil[0].system) && bil[0].system.length < 4500,
+      'Sentido: one master task of meaning, omissions and additions, compact (' + (bil[0] ? bil[0].system.length : 0) + ' characters)');
     await page.screenshot({ path: path.join(OUT, '3-review.png') });
 
     // After the run UMBRA moves to Corregir; accept the grammar finding there, then export with

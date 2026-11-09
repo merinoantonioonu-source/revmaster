@@ -2,9 +2,11 @@
  * module-config.js - Per-module settings other than the model (the model lives in ai/registry.js):
  * storage key 'module_cfg' = { updatedAt, map:{ <moduleId>: cfg } }, travels in the sync file.
  *
- * cfg = { enabled, thinking:'minimal'|'low'|'high'|'', batchWords (0 = automatic), merge, verify,
+ * cfg = { enabled, thinking:'minimal'|'low'|'high'|'', batchWords (0 = automatic), verify,
  *         budget (US$ per run, 0 = no limit), scope:'all'|'changed', context,
  *         strictness:'grave'|'normal'|'estricta' (how demanding: prompts.js STRICTNESS) }
+ * Only the modules of today's list (module-list.js) are read: the settings of the reviewers merged or
+ * removed in the simplification (2026-11-09) are left where they are and not used.
  */
 
 import { getValue, setValue, storage } from '../store/storage.js';
@@ -13,15 +15,10 @@ import { MODULES } from './module-list.js';
 export const CFG_KEY = 'module_cfg';
 
 export const DEFAULTS = {
-  grammar: { enabled: true, thinking: 'minimal', batchWords: 0, merge: true, verify: true, budget: 0, scope: 'all', strictness: 'normal' },
-  fidelity: { enabled: true, thinking: 'low', batchWords: 0, merge: true, verify: true, budget: 0, scope: 'all', strictness: 'grave' },
-  integrity: { enabled: true, thinking: 'low', batchWords: 0, merge: true, verify: true, budget: 0, scope: 'all', strictness: 'grave' },
-  style: { enabled: true, thinking: 'minimal', batchWords: 0, merge: true, verify: true, budget: 0, scope: 'all', strictness: 'normal' },
-  coherence: { enabled: true, thinking: 'low', batchWords: 0, merge: false, verify: false, budget: 0, scope: 'all', strictness: 'normal' },
-  conventions: { enabled: true, thinking: 'minimal', batchWords: 0, merge: false, verify: false, budget: 0, scope: 'all', strictness: 'normal' },
-  coldread: { enabled: false, thinking: 'minimal', batchWords: 0, merge: false, verify: true, budget: 0, scope: 'all', strictness: 'grave' },
-  names: { enabled: true, thinking: 'low', batchWords: 0, merge: false, verify: false, budget: 0, scope: 'all', strictness: 'normal' },
-  verifier: { enabled: true, thinking: 'high', batchWords: 0, merge: false, verify: false, budget: 0, scope: 'all' }
+  meaning: { enabled: true, thinking: 'low', batchWords: 0, verify: true, budget: 0, scope: 'all', strictness: 'grave' },
+  writing: { enabled: true, thinking: 'minimal', batchWords: 0, verify: true, budget: 0, scope: 'all', strictness: 'normal' },
+  names: { enabled: true, thinking: 'low', batchWords: 0, verify: false, budget: 0, scope: 'all', strictness: 'normal' },
+  verifier: { enabled: true, thinking: 'high', batchWords: 0, verify: false, budget: 0, scope: 'all' }
 };
 
 export const THINKING_LABELS = { '': 'Del modelo', minimal: 'M\u00ednimo', low: 'Bajo', high: 'Alto' };

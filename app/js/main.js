@@ -406,6 +406,8 @@ async function boot() {
   on('goto-settings', (sec) => goSettings(sec));
   on('view', (v) => { if (v === 'files') renderRecent(); });
   await loadData();
+  // The models chosen before the simplification of the reviewers, carried over once (registry.js).
+  try { await (await import('./ai/registry.js')).migrateModuleModels(); } catch (e) { console.warn('module models', e); }
   mountMaskView($('#view-mask'), $('#tools'));
   mountReviewView($('#view-review'), $('#tools'));
   mountCorrectView($('#view-correct'), $('#tools'));

@@ -201,6 +201,27 @@ async function main() {
     }, prof.id);
     check('a choice without key falls back (fallback flag + wanted)', fb.pid === prof.id && fb.fb === true && fb.wanted && fb.wanted.provider === 'gemini', fb);
 
+    // The simplification (2026-11-09): Sentido and Redaccion keep the models chosen for the reviewers they
+    // replace - at once (resolveClient) and in their own slot after migrateModuleModels(), which keeps a
+    // choice of their own and runs once.
+    const leg = await page.evaluate(async (id) => {
+      await H.registry.addModel(id, { id: 'mock-big', label: 'Mock big' });
+      await H.registry.setModuleModel('fidelity', 'triage', { provider: id, model: 'mock-model' });
+      await H.registry.setModuleModel('fidelity', 'deep', { provider: id, model: 'mock-big' });
+      const before = await H.registry.resolveClient('meaning', 'deep');
+      const first = await H.registry.migrateModuleModels();
+      const again = await H.registry.migrateModuleModels();
+      const mm = await H.registry.getModuleModels();
+      await H.registry.setModuleModel('writing', 'triage', { provider: id, model: 'mock-model' });
+      await H.registry.setModuleModel('grammar', 'triage', { provider: id, model: 'mock-big' });
+      const own = await H.registry.resolveClient('writing', 'triage');
+      return { before: [before.modelId, before.source], first, again, slot: mm.map.meaning, own: own.modelId };
+    }, prof.id);
+    check('Sentido takes the strongest model chosen for Fidelidad before (and its own slot keeps it after the migration, once)',
+      leg.before[0] === 'mock-big' && leg.before[1] === 'module' && leg.first === true && leg.again === false &&
+      leg.slot && leg.slot.deep && leg.slot.deep.model === 'mock-big' && !leg.slot.triage, leg);
+    check('a choice of its own beats the old reviewers\' ones', leg.own === 'mock-model', leg.own);
+
     const tc = await page.evaluate(async ([id, CLOSED]) => {
       const p = await H.registry.getProvider(id);
       const ok = await H.providers.testConnection(p, 'mock-model', 'sk-test-123');
@@ -472,9 +493,10 @@ async function main() {
           /se elige en M/.test(txt) && /Proveedor general/.test(txt), txt.slice(0, 200));
         // The model of each module is chosen in Settings > Modulos with this select.
         const opts = await page.evaluate(async () => {
-          const sel = await H.ui.providers.moduleModelSelect('style', 'triage');
+          await H.registry.setModuleModel('writing', 'triage', { provider: 'gemini', model: 'gemini-2.5-flash' });
+          const sel = await H.ui.providers.moduleModelSelect('writing', 'triage');
           document.getElementById('mount').appendChild(sel);
-          return Array.from(document.querySelector('select[data-module="style"]').options).map(o => o.textContent);
+          return Array.from(document.querySelector('select[data-module="writing"]').options).map(o => o.textContent);
         });
         check('module select: General first, flagged choice, add options last', opts[0] === 'General' && opts.some(o => /sin clave: se usa el general/.test(o)) &&
           /A\u00f1adir modelo/.test(opts[opts.length - 2]) && /A\u00f1adir proveedor/.test(opts[opts.length - 1]), opts);
@@ -483,7 +505,7 @@ async function main() {
           const b = document.createElement('button'); b.id = 'anchor'; b.textContent = 'Modelo'; b.style.cssText = 'position:fixed;left:40px;top:40px';
           document.body.appendChild(b);
           window.__picked = null;
-          H.ui.providers.openModelMenu(b, { moduleId: 'coherence', role: 'triage', onPick: (c) => { window.__picked = c; } });
+          H.ui.providers.openModelMenu(b, { moduleId: 'names', role: 'triage', onPick: (c) => { window.__picked = c; } });
         });
         await page.waitForSelector('#umbra-model-menu');
         await page.screenshot({ path: path.join(OUT, 'model-menu.png') });
@@ -491,7 +513,7 @@ async function main() {
         await page.waitForFunction(() => window.__picked !== null);
         const picked = await page.evaluate(async () => {
           document.getElementById('anchor').remove();
-          return { picked: window.__picked, saved: (await H.registry.getModuleModels()).map.coherence };
+          return { picked: window.__picked, saved: (await H.registry.getModuleModels()).map.names };
         });
         check('openModelMenu picks and saves the module model', picked.saved && picked.saved.triage && picked.saved.triage.model === 'mock-model', picked);
         // The provider form.
@@ -501,7 +523,7 @@ async function main() {
         await page.click('.modal-foot >> text=Cancelar');
       }
       if (name === 'usage') {
-        check('usage screen shows totals, bars and the price table', /Uso de IA y coste/.test(txt) && /Gram\u00e1tica/.test(txt) && /A\/78\/100/.test(txt) &&
+        check('usage screen shows totals, bars and the price table', /Uso de IA y coste/.test(txt) && /Redacci\u00f3n/.test(txt) && /A\/78\/100/.test(txt) &&
           /Mock model/.test(txt) && /Precios/.test(txt), txt.slice(0, 300));
         const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }), page.click('text=Exportar a Excel')]);
         const p = path.join(OUT, 'usage-export.xlsx');

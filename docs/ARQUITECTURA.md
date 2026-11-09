@@ -3,6 +3,14 @@
 Documento técnico para quien programe UMBRA (personas o sesiones de Claude). La propuesta
 funcional está en `docs/PROPUESTA.md`.
 
+> **Estado actual (2026-11-09).** Partes de este documento describen el diseño inicial y ya no
+> están en la app: la Capa 0 sin IA, las reglas y la similitud semántica (quitadas el 2026-11-05) y
+> los nueve módulos de revisión. Hoy la revisión tiene tres revisores y el Verificador: **Sentido**
+> (`meaning`: Fidelidad + Integridad en una tarea), **Redacción** (`writing`: Gramática + Estilo) y
+> **Nombres oficiales** (`names`); Lectura en frío, Coherencia y Convenciones ONU ya no existen (ni
+> `parallel.js`, `skeleton.js` ni `conventions.json`). Lo vigente está en `CLAUDE.md` y en el código
+> (`app/js/review/module-list.js`, `prompts.js`).
+
 ## Reglas de código (obligatorias)
 
 - **Sin compilación.** Módulos ES nativos (`<script type="module">`), importaciones relativas con

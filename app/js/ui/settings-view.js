@@ -6,7 +6,7 @@
 import { helpBtn, helpItem } from './help.js';
 import { el, clear, toast, confirmDialog } from '../util/dom.js';
 import { state, on, emit } from '../state.js';
-import { MODULES, moduleById, INPUT_LABELS, ROLE_LABELS } from '../review/module-list.js';
+import { MODULES } from '../review/module-list.js';
 import { loadModuleConfig, saveModuleConfig, THINKING_LABELS } from '../review/module-config.js';
 import { loadPrompts, savePrompt, defaultPrompt, promptOf, STRICTNESS, strictnessOf } from '../review/prompts.js';
 import { idbClear } from '../store/idb.js';
@@ -73,13 +73,8 @@ async function mountModules(host) {
   for (const m of MODULES) {
     const c = cfg[m.id] || {};
     const save = (patch) => saveModuleConfig(m.id, patch).then(saved);
-    const modelCell = el('div.modsel');
-    for (const role of m.roles) {
-      const sel = await moduleModelSelect(m.id, role, saved);
-      modelCell.appendChild(m.roles.length > 1 || role === 'deep'
-        ? el('label.row', el('span.muted', { style: { minWidth: '60px', fontSize: '11px' } }, ROLE_LABELS[role]), sel)
-        : sel);
-    }
+    // One model per module (Sentido and the Verifier: the strongest one).
+    const modelCell = el('div.modsel', await moduleModelSelect(m.id, m.roles[0], saved));
     t.appendChild(el('tr',
       el('td', el('b', m.label), el('div.muted', { style: { fontSize: '11px' } }, m.desc)),
       el('td', el('input', { type: 'checkbox', checked: c.enabled !== false, onchange: (e) => save({ enabled: e.target.checked }) })),
@@ -93,13 +88,13 @@ async function mountModules(host) {
       el('td', m.id === 'verifier' ? '\u2014' : el('input', { type: 'checkbox', checked: !!c.verify, onchange: (e) => save({ verify: e.target.checked }) }))));
   }
   host.appendChild(el('div.card', el('h3', 'M\u00f3dulos de revisi\u00f3n', helpBtn('module-settings')), el('div.body',
-    el('p.info', { style: { marginBottom: '8px' } }, el('b', 'Cribado'), ': repasa todo el texto con un modelo econ\u00f3mico. ', el('b', 'A fondo'),
-      ' (Fidelidad e Integridad): un modelo m\u00e1s fuerte revisa solo lo que se\u00f1al\u00f3 el cribado. ', el('b', 'Exigencia'), ': solo lo importante, tambi\u00e9n lo menor o todo. ', el('b', 'General'), ': el proveedor general de ',
+    el('p.info', { style: { marginBottom: '8px' } }, el('b', 'Sentido'), ' es la revisi\u00f3n de fondo: elija para \u00e9l el modelo m\u00e1s fuerte, que lee todo el texto. ',
+      el('b', 'Redacci\u00f3n'), ' y ', el('b', 'Nombres oficiales'), ' pueden ir con uno econ\u00f3mico. ', el('b', 'Exigencia'), ': solo lo importante, tambi\u00e9n lo menor o todo. ', el('b', 'General'), ': el proveedor general de ',
       el('a', { href: '#', onclick: (e) => { e.preventDefault(); showSettingsSection('providers'); } }, 'Proveedores y modelos'), '.'),
     t)));
 
   // 3) Advanced: thinking, batch size, fusion, budget.
-  const adv = el('table.grid', el('tr', el('th', 'M\u00f3dulo'), el('th', 'Razonamiento'), el('th', 'Palabras por lote'), el('th', 'Fusionar'), el('th', 'Presupuesto (US$)')));
+  const adv = el('table.grid', el('tr', el('th', 'M\u00f3dulo'), el('th', 'Razonamiento'), el('th', 'Palabras por lote'), el('th', 'Presupuesto (US$)')));
   for (const m of MODULES.filter(x => x.ai)) {
     const c = cfg[m.id];
     const save = (patch) => saveModuleConfig(m.id, patch).then(saved);
@@ -109,15 +104,14 @@ async function mountModules(host) {
     adv.appendChild(el('tr',
       el('td', el('b', m.label)),
       el('td', thinking),
-      el('td', m.id === 'verifier' || m.input === 'skeleton' ? '\u2014' : el('input.inp', { type: 'number', min: 0, step: 100, value: c.batchWords || '', placeholder: 'Auto', style: { width: '80px' },
+      el('td', m.id === 'verifier' || m.input === 'names' ? '\u2014' : el('input.inp', { type: 'number', min: 0, step: 100, value: c.batchWords || '', placeholder: 'Auto', style: { width: '80px' },
         onchange: (e) => save({ batchWords: parseInt(e.target.value, 10) || 0 }) })),
-      el('td', ['fidelity', 'integrity', 'grammar', 'style'].includes(m.id) ? el('input', { type: 'checkbox', checked: c.merge !== false, onchange: (e) => save({ merge: e.target.checked }) }) : '\u2014'),
       el('td', el('input.inp', { type: 'number', min: 0, step: 0.05, value: c.budget || '', placeholder: 'Sin l\u00edmite', style: { width: '90px' },
         onchange: (e) => save({ budget: parseFloat(e.target.value) || 0 }) }))));
   }
   host.appendChild(el('div.card', el('h3', 'Opciones avanzadas', helpBtn('module-advanced')), el('div.body',
     el('details', el('summary', { style: { cursor: 'pointer', color: 'var(--primary)', fontWeight: 600 } }, 'Mostrar (no hace falta tocarlas)'),
-      el('p.info', { style: { margin: '8px 0' } }, 'Razonamiento: cu\u00e1nto piensa el modelo antes de responder (se cobra como salida). Palabras por lote: tama\u00f1o de cada env\u00edo. Fusionar: Fidelidad con Integridad, y Gram\u00e1tica con Estilo, comparten llamada si usan el mismo modelo. Presupuesto: tope de gasto por ejecuci\u00f3n.'),
+      el('p.info', { style: { margin: '8px 0' } }, 'Razonamiento: cu\u00e1nto piensa el modelo antes de responder (se cobra como salida). Palabras por lote: tama\u00f1o de cada env\u00edo. Presupuesto: tope de gasto por ejecuci\u00f3n.'),
       adv))));
   // Prompts (built-in, editable)
   const box = el('div.body');

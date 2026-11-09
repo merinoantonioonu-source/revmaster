@@ -373,9 +373,42 @@ async function _tryBuild(list, choice) {
   return { client: createClient(p, modelId, key), providerId: p.id, modelId, trust: p.trust, profile: p };
 }
 
+// The model slots of the reviewers merged in the simplification, in the order they stand in for the new
+// one: Sentido keeps Fidelidad's strongest model first; Redaccion, Estilo's or Gramatica's.
+const LEGACY_SLOTS = {
+  meaning: [['fidelity', 'deep'], ['fidelity', 'triage'], ['integrity', 'deep'], ['integrity', 'triage']],
+  writing: [['style', 'triage'], ['grammar', 'triage'], ['style', 'deep'], ['grammar', 'deep']]
+};
+
 /**
- * The client a module role uses: its own choice -> its other role -> the general choice -> the first
- * provider with a key. -> { client, providerId, modelId, trust, fallback, source, wanted, profile }.
+ * Once, after the simplification (2026-11-09): the model chosen for the reviewers merged into Sentido
+ * and Redaccion becomes theirs (in their own slot: 'deep' for Sentido, 'triage' for Redaccion), so
+ * Settings shows the model that is really used. A module that already has its own choice keeps it.
+ * -> true when something was copied.
+ */
+export async function migrateModuleModels() {
+  const mm = await getModuleModels();
+  let changed = false;
+  for (const [mod, list] of Object.entries(LEGACY_SLOTS)) {
+    const role = mod === 'meaning' ? 'deep' : 'triage';
+    const slot = Object.assign({ triage: null, deep: null }, mm.map[mod] || {});
+    if (_choice(slot.triage) || _choice(slot.deep)) continue;
+    for (const [old, oldRole] of list) {
+      const c = _choice((mm.map[old] || {})[oldRole]);
+      if (!c) continue;
+      slot[role] = c;
+      mm.map[mod] = slot;
+      changed = true;
+      break;
+    }
+  }
+  if (changed) { mm.updatedAt = Date.now(); await setValue(MODULE_MODELS_KEY, mm); }
+  return changed;
+}
+
+/**
+ * The client a module role uses: its own choice -> its other role -> the choice of the reviewers it
+ * replaces (LEGACY_SLOTS) -> the general choice -> the first provider with a key. -> { client, providerId, modelId, trust, fallback, source, wanted, profile }.
  * fallback is true when a choice made for it could not be used (no key, provider gone): `wanted`
  * says which. Throws err.code 'NO_PROVIDER' when nothing can be called.
  */
@@ -387,6 +420,11 @@ export async function resolveClient(moduleId, role) {
   const cands = [];
   if (_choice(slot[r])) cands.push({ choice: _choice(slot[r]), source: 'module' });
   if (_choice(slot[other])) cands.push({ choice: _choice(slot[other]), source: 'module-other' });
+  // A reviewer born of the simplification (2026-11-09) keeps the model chosen for the ones it replaces.
+  for (const [old, oldRole] of (LEGACY_SLOTS[moduleId] || [])) {
+    const c = _choice((mm.map[old] || {})[oldRole]);
+    if (c) cands.push({ choice: c, source: 'module' });
+  }
   if (mm.general) cands.push({ choice: mm.general, source: 'general' });
   for (let i = 0; i < cands.length; i++) {
     const got = await _tryBuild(list, cands[i].choice);

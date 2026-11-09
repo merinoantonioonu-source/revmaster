@@ -23,11 +23,11 @@ let root, toolsHost;
 let running = null;           // { abort: AbortController, modules:[] }
 let progress = {};            // moduleId -> { done, total, label, state:'run'|'done'|'err', msg }
 let estimates = {};           // moduleId -> { tok, cost } | { error }
-let selectedModules = new Set(['grammar', 'fidelity', 'integrity', 'style', 'coherence', 'conventions', 'names']);
+let selectedModules = new Set(['meaning', 'writing', 'names']);
 let estTimer = null;
 
-/** The order of the cards: meaning first, then the language, then the structure. */
-const CARD_ORDER = ['fidelity', 'integrity', 'names', 'grammar', 'style', 'coldread', 'coherence', 'conventions'];
+/** The order of the cards: the meaning first (the master review), then the Spanish, then the names. */
+const CARD_ORDER = ['meaning', 'writing', 'names'];
 
 export function mountReviewView(host, tools) {
   root = host;
@@ -36,7 +36,7 @@ export function mountReviewView(host, tools) {
     el('div.page-in',
       el('div.kicker', 'PASO 3 DE 5'),
       el('h2.ptitle', '\u00bfQu\u00e9 quiere que revise la IA?', helpBtn('modules')),
-      el('p.lead', 'Cada revisor busca un solo tipo de problema, como lo har\u00eda un revisor humano. Marque los que necesite para este documento.'),
+      el('p.lead', 'Sentido es la revisi\u00f3n de fondo: compara cada p\u00e1rrafo con el original y se\u00f1ala lo que la traducci\u00f3n dice distinto, lo que falta y lo que sobra. Redacci\u00f3n lee solo el espa\u00f1ol, y Nombres oficiales comprueba las denominaciones. Despu\u00e9s, el Verificador descarta los falsos positivos.'),
       el('div.mgrid#rv-modules'),
       el('div.privacy', icon('lock', 20),
         el('span', 'El texto sale enmascarado: personas, cifras, fechas y s\u00edmbolos nunca salen de este equipo (Nombres oficiales env\u00eda solo la lista de nombres de organismos, \u00f3rganos, cargos, pa\u00edses y lugares). Antes de enviar ver\u00e1 cu\u00e1ntas llamadas se har\u00e1n y su coste.'))),
@@ -225,7 +225,7 @@ async function runModules(ids) {
   const ai = ids.filter(id => id !== 'verifier' && moduleById(id) && moduleById(id).ai && ctx.cfg[id].enabled !== false);
   if (!ai.length) { renderModules(); return; }
   const plan = await makePlan(state.session, ctx, { modules: ai });
-  if (plan.errors.length && !plan.groups.length && !plan.skeleton.length && !plan.names) {
+  if (plan.errors.length && !plan.groups.length && !plan.names) {
     toast('No hay ning\u00fan proveedor de IA con clave. Config\u00farelo en Ajustes \u203a Proveedores.', 'err', 8000);
     emit('goto-settings', 'providers');
     return;
@@ -306,16 +306,14 @@ function planDialog(plan, budget, cap) {
       (g.cachedHits.length ? '; ' + g.cachedHits.length + ' p\u00e1rrafos ya revisados (cach\u00e9)' : '') +
       (g.dupOf.size ? '; ' + g.dupOf.size + ' repetidos se revisan una vez' : '')));
   }
-  for (const s of plan.skeleton) rows.push(el('li', moduleById(s.module).label + ': 1 llamada con el esqueleto (' + s.units.size + ' elementos)'));
   if (plan.names) rows.push(el('li', 'Nombres oficiales: 1 llamada con ' + plan.names.rows.length + ' nombres (solo la lista de nombres, sin el texto)'));
   if (plan.verify) rows.push(el('li', 'Verificador: ' + plan.verify.est.calls + ' llamada(s) con ' + plan.verify.client.modelId));
   for (const e of plan.errors) rows.push(el('li.err-t', moduleById(e.module).label + ': ' + e.message));
   const budgetIn = el('input.inp', { type: 'number', min: 0, step: 0.05, value: budget || '', placeholder: 'Sin l\u00edmite', style: { width: '110px' } });
-  const nothing = !plan.groups.some(g => g.batches.length) && !plan.skeleton.length && !plan.names;
-  // Deferred mode: the first pass (and the skeleton calls) at about half the price; the deep pass and
-  // the Verifier, which are small, run when the answers arrive, at the normal price.
-  const firstPass = plan.groups.reduce((n, g) => n + (g.est.cost || 0) - ((g.est.deep && g.est.deep.cost) || 0), 0) +
-    plan.skeleton.reduce((n, s) => n + (s.est.cost || 0), 0);
+  const nothing = !plan.groups.some(g => g.batches.length) && !plan.names;
+  // Deferred mode: the first pass at about half the price; the Verifier, which is small, runs when the
+  // answers arrive, at the normal price.
+  const firstPass = plan.groups.reduce((n, g) => n + (g.est.cost || 0) - ((g.est.deep && g.est.deep.cost) || 0), 0);
   const deferredCost = plan.totals.cost - firstPass * 0.5;
   const c = cap || { ok: false, parts: [], missing: [] };
   const defChk = el('input', { type: 'checkbox', disabled: !c.ok || nothing ? true : null });

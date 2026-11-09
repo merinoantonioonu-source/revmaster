@@ -4,25 +4,26 @@
  *   - only units that need it (no separators, no units with nothing but tags or figures);
  *   - identical pairs reviewed once (duplicates get a copy of the results);
  *   - results cache: a unit already reviewed with the same text, prompt and model is skipped;
- *   - fusion: modules with the same input and the same model share ONE call per batch;
  *   - batches cut by words and, when possible, at section boundaries;
- *   - cascade: the strong ("deep") model only sees what the economical one flagged (estimated here at
- *     25 % of the units, decided at run time).
+ *   - cascade: a module with two models (an economical one and a strong one) gives the strong one only
+ *     what the economical one flagged (estimated here at 25 % of the units, decided at run time). Since
+ *     the simplification (2026-11-09) no reviewer has two models: Sentido uses the strongest one on
+ *     everything, so the cascade stays idle.
+ * Each module is one group of calls (the old fusion of Fidelidad with Integridad, and of Gramatica with
+ * Estilo, is now one module each: Sentido and Redaccion).
  */
 
-import { AI_MODULES, moduleById } from './module-list.js';
+import { AI_MODULES, moduleById, currentModuleId } from './module-list.js';
 import { unitSrcMasked, unitTgtMasked, reviewableUnits } from './session.js';
 import { systemPrompt, promptVersion, TASKS } from './prompts.js';
 import { fnv1a } from '../util/crypto.js';
 import { idbGet } from '../store/idb.js';
 import { resolveClient } from '../ai/registry.js';
 import { estimateCost } from '../ai/usage.js';
-import { buildSkeleton } from './skeleton.js';
 import { namesRows, namesTableText } from './names.js';
 
 const TOK = (s) => Math.ceil(String(s || '').length / 3.8);
 const WORDS = (s) => (String(s || '').match(/\S+/g) || []).length;
-const FUSABLE = [['fidelity', 'integrity'], ['grammar', 'style']];
 
 export function unitKey(session, u, input) {
   const s = input === 'bilingual' ? unitSrcMasked(session, u) : '';
@@ -47,12 +48,13 @@ function _reviewText(session, u, input) {
  * opts = { modules:[ids], unitFilter:Set(idx)|null, changedOnly:bool }
  */
 export async function makePlan(session, ctx, opts) {
-  const wanted = (opts.modules || []).filter(id => moduleById(id) && moduleById(id).ai && id !== 'verifier');
-  const plan = { groups: [], skeleton: [], names: null, verify: null, totals: { calls: 0, inTok: 0, outTok: 0, cost: 0, cached: 0, dups: 0, units: 0 },
+  // An old reviewer's id (an old project, a saved selection) asks for the module that covers it now.
+  const wanted = Array.from(new Set((opts.modules || []).map(currentModuleId))).filter(id => moduleById(id) && moduleById(id).ai && id !== 'verifier');
+  const plan = { groups: [], names: null, verify: null, totals: { calls: 0, inTok: 0, outTok: 0, cost: 0, cached: 0, dups: 0, units: 0 },
     errors: [], session };
   const units = reviewableUnits(session).filter(u => !opts.unitFilter || opts.unitFilter.has(u.idx));
 
-  // Resolve models first: fusion only between modules that use the same triage model.
+  // Resolve the models first.
   const models = {};
   for (const id of wanted) {
     try {
@@ -70,26 +72,10 @@ export async function makePlan(session, ctx, opts) {
     }
   }
 
-  const done = new Set();
   const groupsSpec = [];
   for (const id of wanted) {
-    if (done.has(id) || !models[id]) continue;
-    const input = moduleById(id).input;
-    if (input === 'skeleton') { done.add(id); plan.skeleton.push(id); continue; }
-    if (input === 'names') { done.add(id); continue; }
-    let mates = [id];
-    const fuse = FUSABLE.find(f => f.includes(id));
-    if (fuse && ctx.cfg[id] && ctx.cfg[id].merge !== false) {
-      for (const other of fuse) {
-        if (other === id || done.has(other) || !wanted.includes(other) || !models[other]) continue;
-        if (ctx.cfg[other] && ctx.cfg[other].merge === false) continue;
-        const a = models[id].tri, b = models[other].tri;
-        const sameDeep = (models[id].deep ? models[id].deep.modelId : '') === (models[other].deep ? models[other].deep.modelId : '');
-        if (a.providerId === b.providerId && a.modelId === b.modelId && sameDeep) mates.push(other);
-      }
-    }
-    mates.forEach(m => done.add(m));
-    groupsSpec.push(mates);
+    if (!models[id] || moduleById(id).input === 'names') continue;
+    groupsSpec.push([id]);
   }
 
   for (const mates of groupsSpec) {
@@ -173,20 +159,6 @@ export async function makePlan(session, ctx, opts) {
     plan.totals.units += items.length;
   }
 
-  // Skeleton modules: one call each (or nothing when there is nothing to look at).
-  const skel = [];
-  for (const id of plan.skeleton) {
-    const sk = buildSkeleton(session, id);
-    if (!sk.text) continue;
-    const system = systemPrompt(ctx.prompts, [id], session.srcLang, ctx.cfg);
-    const inTok = TOK(system) + TOK(sk.text), outTok = 30 + sk.count * 8;
-    const tri = models[id].tri;
-    const cost = await _cost(tri, inTok, outTok, 0);
-    skel.push({ module: id, tri, system, user: sk.text, units: sk.units, est: { inTok, outTok, cost, calls: 1 } });
-    plan.totals.calls++; plan.totals.inTok += inTok; plan.totals.outTok += outTok; plan.totals.cost += cost;
-  }
-  plan.skeleton = skel;
-
   // Official names: one call with the table of names only (no text of the document).
   if (wanted.includes('names') && models.names) {
     const rows = namesRows(session);
@@ -253,7 +225,6 @@ export function serializePlan(plan) {
         user: b.user, inTok: b.inTok, outTok: b.outTok })),
       dupOf: Array.from(g.dupOf.entries()), est: g.est
     })),
-    skeleton: plan.skeleton.map(s => ({ module: s.module, tri: ref(s.tri), system: s.system, user: s.user, units: Array.from(s.units), est: s.est })),
     names: plan.names ? { module: 'names', tri: ref(plan.names.tri), system: plan.names.system, rows: plan.names.rows, est: plan.names.est } : null,
     verify: plan.verify ? { modules: plan.verify.modules, client: ref(plan.verify.client), est: plan.verify.est } : null,
     totals: plan.totals
@@ -270,7 +241,6 @@ export function restorePlan(data, session) {
         user: b.user, inTok: b.inTok, outTok: b.outTok })),
       dupOf: new Map(g.dupOf || []), cachedHits: [], est: g.est || {}
     })),
-    skeleton: (data.skeleton || []).map(s => Object.assign({}, s, { units: new Set(s.units) })),
     names: data.names || null,
     verify: data.verify || null,
     totals: data.totals || { calls: 0 },
@@ -282,6 +252,5 @@ export function restorePlan(data, session) {
 export function deferredKeys(plan) {
   const out = [];
   plan.groups.forEach((g, gi) => g.batches.forEach((b, bi) => out.push({ key: 'g' + gi + 'b' + bi, gi, bi, kind: 'batch' })));
-  plan.skeleton.forEach((s, si) => out.push({ key: 's' + si, si, kind: 'skel' }));
   return out;
 }
