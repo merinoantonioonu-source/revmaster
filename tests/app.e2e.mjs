@@ -139,7 +139,9 @@ async function main() {
     ok(/Sentido: /.test(planText) && /Redacci\u00f3n: /.test(planText) && !/fusionados/.test(planText), 'Plan: one group of calls for Sentido and one for Redaccion');
     await page.screenshot({ path: path.join(OUT, '2-plan.png') });
     await page.click('.modal-foot .btn.amber');
-    await page.waitForSelector('.toast:has-text("Revisi\u00f3n terminada")', { timeout: 60000 });
+    await page.waitForSelector('.modal:has-text("Revisi\u00f3n terminada")', { timeout: 60000 });
+    ok(/hallazgos? nuevos?/.test(await page.textContent('.modal')) && /Coste:/.test(await page.textContent('.modal')), 'The end of the review is said in a window: findings and cost');
+    await page.click('.modal-foot .btn:has-text("Ir a Corregir")');
     await page.waitForTimeout(500);
     const res = await page.evaluate(async () => {
       const { state } = await import('/app/js/state.js');

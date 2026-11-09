@@ -150,8 +150,12 @@ export async function runPlan(plan, ctx, hooks) {
     try {
       const r = await call({ module: 'names', role: 'triage', rows: plan.names.rows, system: plan.names.system, words: 0,
         thinking: _thinking(ctx.cfg, 'names'), maxTokens: 8192 }, plan.names.est.cost);
-      const parsed = parseFindings(r.text, new Set(plan.names.rows.map(x => x.n)));
+      const parsed = parseFindings(r.text, new Set(plan.names.rows.map(x => x.n)), { cat: 'NOM' });
       push(namesFindings(session, plan.names.rows, parsed.items, { model: r.modelId }));
+      // An answer with lines and nothing read from it must be said, not lost in silence.
+      if (!parsed.items.length && parsed.ignored > 0) {
+        out.errors.push({ module: 'names', message: 'No se pudo leer la respuesta (' + parsed.ignored + ' l\u00edneas sin el formato pedido).' });
+      }
     } catch (e) {
       if (e.code !== 'BUDGET' && e.code !== 'ABORT') out.errors.push({ module: 'names', message: e.message, code: e.code });
     }

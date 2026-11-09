@@ -50,7 +50,7 @@ function _reviewText(session, u, input) {
 export async function makePlan(session, ctx, opts) {
   // An old reviewer's id (an old project, a saved selection) asks for the module that covers it now.
   const wanted = Array.from(new Set((opts.modules || []).map(currentModuleId))).filter(id => moduleById(id) && moduleById(id).ai && id !== 'verifier');
-  const plan = { groups: [], names: null, verify: null, totals: { calls: 0, inTok: 0, outTok: 0, cost: 0, cached: 0, dups: 0, units: 0 },
+  const plan = { groups: [], names: null, verify: null, totals: { calls: 0, inTok: 0, outTok: 0, cost: 0, cached: 0, dups: 0, units: 0, unpriced: [] },
     errors: [], session };
   const units = reviewableUnits(session).filter(u => !opts.unitFilter || opts.unitFilter.has(u.idx));
 
@@ -143,10 +143,10 @@ export async function makePlan(session, ctx, opts) {
     // Prefix cache: the system part is paid in full once, discounted afterwards (rough: 25 %).
     const sysTok = TOK(system);
     const cachedTok = Math.max(0, group.est.calls - 1) * sysTok;
-    group.est.cost = await _cost(tri, group.est.inTok, group.est.outTok, cachedTok);
+    group.est.cost = await _cost(tri, group.est.inTok, group.est.outTok, cachedTok, plan.totals.unpriced);
     if (deep) {
       const dIn = Math.ceil(group.est.inTok * 0.25) + sysTok, dOut = Math.ceil(group.est.outTok * 0.4);
-      group.est.deep = { inTok: dIn, outTok: dOut, cost: await _cost(deep, dIn, dOut, 0) };
+      group.est.deep = { inTok: dIn, outTok: dOut, cost: await _cost(deep, dIn, dOut, 0, plan.totals.unpriced) };
       group.est.cost += group.est.deep.cost;
       group.est.inTok += dIn;
       group.est.outTok += dOut;
@@ -167,7 +167,7 @@ export async function makePlan(session, ctx, opts) {
       const system = systemPrompt(ctx.prompts, ['names'], session.srcLang, ctx.cfg, { unmasked: session.unmasked });
       const inTok = TOK(system) + TOK(namesTableText(rows)), outTok = 30 + Math.ceil(rows.length * 0.3) * 40;
       const tri = models.names.tri;
-      const cost = await _cost(tri, inTok, outTok, 0);
+      const cost = await _cost(tri, inTok, outTok, 0, plan.totals.unpriced);
       plan.names = { module: 'names', tri, system, rows, est: { inTok, outTok, cost, calls: 1 } };
       plan.totals.calls++; plan.totals.inTok += inTok; plan.totals.outTok += outTok; plan.totals.cost += cost;
     }
@@ -180,7 +180,7 @@ export async function makePlan(session, ctx, opts) {
       const v = await resolveClient('verifier', 'deep');
       const expected = Math.ceil(plan.totals.units * 0.25 * verifyMods.length / Math.max(1, wanted.length));
       const inTok = 600 + expected * 160, outTok = 20 + expected * 25;
-      const cost = await _cost(v, inTok, outTok, 0);
+      const cost = await _cost(v, inTok, outTok, 0, plan.totals.unpriced);
       plan.verify = { modules: verifyMods, client: v, est: { inTok, outTok, cost, calls: Math.max(1, Math.ceil(expected / 25)) } };
       plan.totals.calls += plan.verify.est.calls; plan.totals.inTok += inTok; plan.totals.outTok += outTok; plan.totals.cost += cost;
     } catch (_) { plan.verify = null; }
@@ -188,11 +188,15 @@ export async function makePlan(session, ctx, opts) {
   return plan;
 }
 
-async function _cost(client, inTok, outTok, cachedTok) {
+// A model with no price: its cost is not known (counted as 0, its id added to `unpriced`, which the plan
+// shows as plan.totals.unpriced).
+async function _cost(client, inTok, outTok, cachedTok, unpriced) {
   try {
     const c = await estimateCost(client.providerId, client.modelId, inTok, outTok, cachedTok || 0);
-    return (typeof c === 'number' && isFinite(c)) ? c : 0;
-  } catch (_) { return 0; }
+    if (typeof c === 'number' && isFinite(c)) return c;
+  } catch (_) {}
+  if (unpriced && client && client.modelId && !unpriced.includes(client.modelId)) unpriced.push(client.modelId);
+  return 0;
 }
 
 /** The user part of a batch call: the units, nothing else (the instructions are in the system part). */

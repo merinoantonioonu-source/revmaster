@@ -19,6 +19,11 @@ const T = {
       '**Nuevo proyecto** empieza otro documento; **Abrir proyecto (.umbra)** carga uno guardado en un archivo; **Banco de pruebas** abre el documento de prueba.',
       'El proyecto se guarda solo en este navegador: est\u00e1 en **Proyectos recientes** y en **Proyectos**, al pie de la barra de pasos.',
       'Los archivos no salen de su ordenador: a una IA solo llega texto enmascarado (y, con Nombres oficiales, la lista de nombres de organismos, \u00f3rganos, cargos, pa\u00edses y lugares), salvo que marque **Sin enmascarar**.'] ] },
+  'review-done': { t: 'Revisi\u00f3n terminada', b: [
+    'Al acabar una revisi\u00f3n (tambi\u00e9n una diferida, aunque est\u00e9 en otro paso) UMBRA lo dice en esta ventana: los hallazgos nuevos, los que descart\u00f3 el Verificador, lo que queda pendiente, el coste y los errores, si los hubo.',
+    ['Mientras una revisi\u00f3n diferida sigue en curso, la barra de pasos dice cu\u00e1ntas respuestas han llegado y Corregir lo avisa: espere a que termine antes de exportar, porque faltan hallazgos y lo que descarte el Verificador.',
+      '**Coste desconocido**: el modelo no tiene precio. P\u00f3ngaselo en Ajustes \u203a Proveedores y modelos (US$ por mill\u00f3n de tokens) y UMBRA lo calcular\u00e1.',
+      'En un banco de pruebas, tambi\u00e9n su resultado.'] ] },
   doctype: { t: 'Tipo de documento', b: [
     'Dice a los revisores qu\u00e9 clase de texto es, para que no se\u00f1alen como errores sus convenciones. Se a\u00f1ade una sola l\u00ednea a las instrucciones.',
     ['**Acta resumida**: el espa\u00f1ol narra en presente lo que el original cuenta en pasado (said: \u00abdice\u00bb) y \u00abhis delegation\u00bb puede darse con el nombre del pa\u00eds.',
@@ -110,6 +115,7 @@ const T = {
       '**Redacci\u00f3n**: lee solo el espa\u00f1ol, como un revisor de la ONU: gram\u00e1tica que afecta a la sintaxis, la coma de los incisos y el estilo institucional (calcos, pasivas, gerundios, registro). La ortograf\u00eda la corrige Word.',
       '**Nombres oficiales**: denominaci\u00f3n oficial y coherencia de organismos, \u00f3rganos, cargos, pa\u00edses y lugares; solo env\u00eda la lista de esos nombres, sin el texto. Tambi\u00e9n los nombres del original que la traducci\u00f3n de su p\u00e1rrafo no muestra (un nombre mal traducido no se reconoce y queda \u00abSin pareja\u00bb): la IA da la denominaci\u00f3n oficial y, si no est\u00e1 en esa traducci\u00f3n, sale un hallazgo.'],
     'Despu\u00e9s, el **Verificador** repasa los hallazgos y descarta los falsos positivos.',
+    '**Modelo** de cada tarjeta: \u00abGeneral\u00bb (el elegido en Ajustes) o cualquier modelo de un proveedor con clave; es el mismo ajuste que en Ajustes \u203a M\u00f3dulos. Si un modelo no tiene precio, la tarjeta dice **Sin precio** y el coste no se puede calcular hasta que se lo ponga en Ajustes \u203a Proveedores y modelos.',
     '**Exigencia** de cada tarjeta: **Solo lo importante** (lo que cambia lo que se entiende, aunque sea una palabra), **Normal** (tambi\u00e9n lo menor) o **Exhaustiva** (tambi\u00e9n las mejoras opcionales). Debajo, el modelo y el coste estimado; mientras revisa, el avance. El modelo se cambia en Ajustes \u203a M\u00f3dulos.'] },
   'review-more': { t: 'Men\u00fa M\u00e1s', b: [
     ['**Banco de pruebas** (o su **Resultado**, si est\u00e1 abierto): medir lo que detecta cada m\u00f3dulo.',

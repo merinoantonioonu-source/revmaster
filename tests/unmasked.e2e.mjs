@@ -87,7 +87,8 @@ async function main() {
       const warned = await page.locator('.modal .note.warn:has-text("Sin enmascarar")').count() === 1;
       if (expectWarn) await page.screenshot({ path: path.join(OUT, '2-plan.png') });
       await page.click('.modal-foot .btn.amber');
-      await page.waitForSelector('.toast:has-text("Revisi\u00f3n terminada")', { timeout: 60000 });
+      await page.waitForSelector('.modal:has-text("Revisi\u00f3n terminada")', { timeout: 60000 });
+      await page.click('.modal-foot .btn:has-text("Cerrar")');
       await page.evaluate(() => document.querySelectorAll('.toast').forEach(t => t.remove()));
       return { warned, calls: mock.state.log.filter(l => l.kind === 'openai' && /\nO: /.test(l.prompt)) };
     };
