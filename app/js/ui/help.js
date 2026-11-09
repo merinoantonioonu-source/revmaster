@@ -18,7 +18,14 @@ const T = {
       'Para cambiar un archivo, vuelva a pulsar su casilla.',
       '**Nuevo proyecto** empieza otro documento; **Abrir proyecto (.umbra)** carga uno guardado en un archivo; **Banco de pruebas** abre el documento de prueba.',
       'El proyecto se guarda solo en este navegador: est\u00e1 en **Proyectos recientes** y en **Proyectos**, al pie de la barra de pasos.',
-      'Los archivos no salen de su ordenador: a una IA solo llega texto enmascarado (y, con Nombres oficiales, la lista de nombres de organismos, \u00f3rganos, cargos, pa\u00edses y lugares).'] ] },
+      'Los archivos no salen de su ordenador: a una IA solo llega texto enmascarado (y, con Nombres oficiales, la lista de nombres de organismos, \u00f3rganos, cargos, pa\u00edses y lugares), salvo que marque **Sin enmascarar**.'] ] },
+  unmasked: { t: 'Sin enmascarar', b: [
+    'Para un texto **ya publicado** (por ejemplo, un original que ya est\u00e1 en la web): la IA recibe el texto real de los dos documentos, sin etiquetas, y no hace falta el paso Enmascarar.',
+    ['Solo para este proyecto: cada proyecto nuevo empieza enmascarado. Al marcarlo, UMBRA lo pregunta.',
+      'Mientras est\u00e1 marcado, la barra de pasos lo dice bajo el nombre del proyecto, Revisar lo avisa y el plan de ejecuci\u00f3n lo repite antes de enviar; el informe de revisi\u00f3n dice que se revis\u00f3 sin enmascarar.',
+      'Con el texto real, los revisores ven lo que las etiquetas ocultan (el g\u00e9nero de un cargo, un nombre propio, una cifra en su frase).',
+      'Nombres oficiales sigue enviando su lista de nombres, como siempre.',
+      'Para volver a enmascarar, desm\u00e1rquelo en Archivos.'] ] },
 
   // ------------------------------------------------------------------ step 2: mask
   'mask-tools': { t: 'Paso 2 \u00b7 Enmascarar', b: [

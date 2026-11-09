@@ -88,23 +88,35 @@ export function promptOf(store, moduleId) {
   return (t && t.trim()) ? t : defaultPrompt(moduleId);
 }
 
+/**
+ * A text "Sin enmascarar" (a published text, the real words): the instructions say nothing of hidden
+ * data or tags (it would only puzzle the model).
+ */
+export function withoutTags(text) {
+  return String(text || '')
+    .split('\n').filter(l => !/^Datos ocultos:/.test(l) && !/^Las expresiones entre llaves/.test(l)).join('\n')
+    .replace(', con las etiquetas tal cual', '');
+}
+
 function _task(store, moduleId, cfg) { return promptOf(store, moduleId) + '\n' + STRICT_TEXT[strictnessOf(cfg, moduleId)]; }
 
 /** System prompt for one or several fused modules. */
-export function systemPrompt(store, moduleIds, lang, cfg) {
+export function systemPrompt(store, moduleIds, lang, cfg, unmasked) {
   const cats = [];
   for (const id of moduleIds) for (const c of (TASKS[id] ? TASKS[id].cats : [])) if (!cats.includes(c)) cats.push(c);
-  return COMMON.replace('{{LANG}}', lang === 'fr' ? 'franc\u00e9s' : 'ingl\u00e9s').replace('{{CATS}}', cats.join(', ')) +
+  const t = COMMON.replace('{{LANG}}', lang === 'fr' ? 'franc\u00e9s' : 'ingl\u00e9s').replace('{{CATS}}', cats.join(', ')) +
     '\n\n' + moduleIds.map(id => _task(store, id, cfg)).join('\n\n');
+  return unmasked ? withoutTags(t) : t;
 }
 
-export function verifierPrompt(store, lang) {
-  return promptOf(store, 'verifier').replace('{{LANG}}', lang === 'fr' ? 'franc\u00e9s' : 'ingl\u00e9s');
+export function verifierPrompt(store, lang, unmasked) {
+  const t = promptOf(store, 'verifier').replace('{{LANG}}', lang === 'fr' ? 'franc\u00e9s' : 'ingl\u00e9s');
+  return unmasked ? withoutTags(t) : t;
 }
 
 /** Fingerprint of what a module asks (for the results cache). */
-export function promptVersion(store, moduleIds, cfg) {
-  return fnv1a(COMMON + moduleIds.map(id => _task(store, id, cfg)).join('|'));
+export function promptVersion(store, moduleIds, cfg, unmasked) {
+  return fnv1a(COMMON + moduleIds.map(id => _task(store, id, cfg)).join('|') + (unmasked ? '|sin-enmascarar' : ''));
 }
 
 export const CAT_LABELS = {

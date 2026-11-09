@@ -115,8 +115,13 @@ function _resolutionParts(units, src, tgt) {
   }
 }
 
-/** Recomputes entities and masked texts (after any masking adjustment). */
+/**
+ * Recomputes entities and masked texts (after any masking adjustment). With input.unmasked (the
+ * project's "Sin enmascarar" switch: a text already published) the "masked" texts are the real ones:
+ * the entities are still found (Nombres oficiales works on them) but nothing is replaced by a tag.
+ */
 export function remask(session, input) {
+  session.unmasked = !!input.unmasked;
   const ent = computeEntities({
     units: session.units, src: session.src, tgt: session.tgt, srcLang: session.srcLang,
     mask: input.mask, gazetteer: input.gazetteer, dict: input.dict
@@ -127,11 +132,11 @@ export function remask(session, input) {
   for (const u of session.units) {
     if (u.srcPara !== null) {
       const t = session.src.paras[u.srcPara].text;
-      session.masked.src.set(u.srcPara, maskText(t, ent.occ.src.get(u.srcPara) || [], 'src', ent.byKey));
+      session.masked.src.set(u.srcPara, maskText(t, session.unmasked ? [] : (ent.occ.src.get(u.srcPara) || []), 'src', ent.byKey));
     }
     if (u.tgtPara !== null) {
       const t = session.tgt.paras[u.tgtPara].text;
-      session.masked.tgt.set(u.tgtPara, maskText(t, ent.occ.tgt.get(u.tgtPara) || [], 'tgt', ent.byKey));
+      session.masked.tgt.set(u.tgtPara, maskText(t, session.unmasked ? [] : (ent.occ.tgt.get(u.tgtPara) || []), 'tgt', ent.byKey));
     }
   }
   return session;

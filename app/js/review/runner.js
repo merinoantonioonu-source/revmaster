@@ -38,8 +38,10 @@ export async function runPlan(plan, ctx, hooks) {
       throw Object.assign(new Error('Se ha alcanzado el presupuesto m\u00e1ximo de esta ejecuci\u00f3n.'), { code: 'BUDGET' });
     }
     const base = { project: ctx.project && ctx.project.name, file: ctx.project && ctx.project.file, signal: h.signal };
-    // The names table is the only call that is not masked text; the gateway checks it row by row.
-    const r = args.rows ? await callAINames(Object.assign(base, args)) : await callAI(Object.assign({ masked: true }, base, args));
+    // The names table is the only call that is not masked text; the gateway checks it row by row. A
+    // project "Sin enmascarar" (a published text) sends its real text, and says so to the gateway.
+    const r = args.rows ? await callAINames(Object.assign(base, args))
+      : await callAI(Object.assign(session.unmasked ? { unmaskedProject: true } : { masked: true }, base, args));
     out.spent += r.cost || 0;
     out.calls++;
     done++;
@@ -264,7 +266,7 @@ export async function verifyFindings(findings, ctx, call, progress) {
         String(f.reason || '').replace(/\|/g, '/') + '\n';
     });
     const r = await call({ module: 'verifier', role: 'deep', prompt: ctxText + '\n' + lines + '(FIN ' + chunk.length + ')',
-      system: verifierPrompt(ctx.prompts, session.srcLang), words: 0, thinking: _thinking(ctx.cfg, 'verifier'), maxTokens: 4096 }, 0);
+      system: verifierPrompt(ctx.prompts, session.srcLang, session.unmasked), words: 0, thinking: _thinking(ctx.cfg, 'verifier'), maxTokens: 4096 }, 0);
     const { verdicts } = parseVerdicts(r.text);
     for (const [id, v] of verdicts) {
       const f = ids.get(id);

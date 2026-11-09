@@ -132,7 +132,8 @@ export function exportReportHtml(filter) {
     'del{background:#fee2e2}ins{background:#dcfce7}.muted{color:#64748b;font-size:12px}</style></head><body>' +
     '<h1>Informe de revisi\u00f3n UMBRA \u2014 ' + esc(state.project.name) + '</h1>' +
     '<p class="muted">' + esc(state.project.srcName) + ' \u2192 ' + esc(state.project.tgtName) + ' \u00b7 ' + new Date().toLocaleString('es') +
-    ' \u00b7 ' + rows.length + ' hallazgos (' + Object.keys(by).map(k => by[k] + ' ' + k.toLowerCase()).join(', ') + ')</p>' +
+    ' \u00b7 ' + rows.length + ' hallazgos (' + Object.keys(by).map(k => by[k] + ' ' + k.toLowerCase()).join(', ') + ')' +
+    (state.project.unmasked ? ' \u00b7 <b>revisado sin enmascarar</b> (texto ya publicado)' : '') + '</p>' +
     '<table><tr><th>P\u00e1rr.</th><th>M\u00f3dulo</th><th>Gravedad</th><th>Categor\u00eda</th><th>Cita \u2192 sugerencia</th><th>Motivo</th><th>Estado</th></tr>' +
     rows.map(r => '<tr><td>' + r.n + '</td><td>' + esc(r.module) + '</td><td><span class="sev" style="background:' + (sevColor[r.sev] || '#6b7280') + '">' +
       esc(r.sev) + '</span></td><td>' + esc(r.cat) + '</td><td>' + (r.quote ? '<del>' + esc(r.quote) + '</del> ' : '') +
@@ -189,7 +190,7 @@ export async function exportFeedbackXlsx(opts) {
   ws['!autofilter'] = { ref: 'A1:Q' + (rows.length + 1) };
   const info = [['Hallazgos de UMBRA para valorar'], [],
     ['Proyecto', state.project.name], ['Original', state.project.srcName], ['Traducci\u00f3n', state.project.tgtName],
-    ['Fecha', new Date().toLocaleString('es')], ['Texto', o.masked ? 'Enmascarado (sin datos reales)' : 'Real'],
+    ['Fecha', new Date().toLocaleString('es')], ['Texto', o.masked ? 'Enmascarado (sin datos reales)' : 'Real'], ['Revisi\u00f3n', state.project.unmasked ? 'Sin enmascarar (texto ya publicado)' : 'Con el texto enmascarado'],
     ['Perfil de reglas', state.project.profile || 'Todas las reglas'], ['Hallazgos', rows.length], [],
     ['C\u00f3mo rellenarlo'],
     ['Su valoraci\u00f3n', 'Elija en la lista: ' + FEEDBACK_VERDICTS.join(', ') + '.'],
