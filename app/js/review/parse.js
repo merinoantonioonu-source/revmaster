@@ -44,8 +44,11 @@ function _clean(s) {
 /**
  * parseFindings(text, validUnits?) -> { items:[{ unit, cat, sev, quote, suggestion, reason }], fin, ignored }
  * validUnits: Set of unit numbers accepted (others are ignored).
+ * opts.cat: the one category of this answer (the names module): whatever the model wrote there (it
+ * tends to copy the table's ORG, ORGANO...) is taken as that category.
  */
-export function parseFindings(text, validUnits) {
+export function parseFindings(text, validUnits, opts) {
+  const forceCat = opts && opts.cat;
   const items = [];
   let fin = null;
   let ignored = 0;
@@ -63,7 +66,7 @@ export function parseFindings(text, validUnits) {
     const um = /(\d+)/.exec(parts[0]);
     if (!um) { ignored++; continue; }
     const unit = parseInt(um[1], 10);
-    const cat = _cat(parts[1]);
+    const cat = forceCat || _cat(parts[1]);
     const sev = _sev(parts[2]);
     if (!cat || !sev) { ignored++; continue; }
     if (validUnits && !validUnits.has(unit)) { ignored++; continue; }

@@ -67,6 +67,16 @@ async function main() {
     });
     await page.waitForSelector('#rv-modules .mchip');
     ok(await page.inputValue('#rv-doctype') === '', 'Revisar shows the type: "Sin especificar"');
+    // Each card: its model, chosen here; a model with no price says so instead of a cost of 0.
+    await page.waitForFunction(() => { const s = document.querySelector('#rv-modules .mchip[data-mod="writing"] .mc-model'); return s && s.options.length > 1; }, null, { timeout: 10000 });
+    const opts = await page.evaluate(() => [...document.querySelector('#rv-modules .mchip[data-mod="writing"] .mc-model').options].map(o => o.textContent));
+    ok(/^General: Simulado/.test(opts[0]) && opts.includes('Simulador \u00b7 Simulado'), 'Each card has its model: "General" or a model of a provider with a key (' + opts.join(' | ') + ')');
+    await page.selectOption('#rv-modules .mchip[data-mod="writing"] .mc-model', { label: 'Simulador \u00b7 Simulado' });
+    await page.waitForTimeout(300);
+    ok(await page.evaluate(async () => { const r = await import('/app/js/ai/registry.js'); const mm = await r.getModuleModels(); return JSON.stringify(mm.map.writing.triage); }) === JSON.stringify({ provider: (await page.evaluate(async () => (await (await import('/app/js/ai/registry.js')).listProviders()).find(p => p.name === 'Simulador').id)), model: 'mock-small' }),
+      'Choosing it saves it as the module\'s model (as in Ajustes)');
+    await page.waitForFunction(() => /Sin precio/.test(document.querySelector('#rv-modules .mchip[data-mod="meaning"] .cost').textContent), null, { timeout: 10000 });
+    ok(true, 'A model with no price: "Sin precio", not ~0,000 US$');
     const pick = async () => {
       await page.evaluate(() => { document.querySelectorAll('#rv-modules .mchip input[type=checkbox]').forEach(c => { if (c.checked) c.click(); }); });
       await page.click('#rv-modules .mchip[data-mod="meaning"] input[type=checkbox]');
@@ -77,12 +87,16 @@ async function main() {
       await page.click('#rv-run');
       await page.waitForSelector('.modal:has-text("Plan de ejecuci")', { timeout: 15000 });
       const plan = await page.textContent('.modal');
+      planNoPrice = /coste desconocido/.test(plan) && /Sin precio: mock-small/.test(plan) && !/~0,000/.test(plan);
       await page.click('.modal-foot .btn.amber');
-      await page.waitForSelector('.toast:has-text("Revisi\u00f3n terminada")', { timeout: 60000 });
+      await page.waitForSelector('.modal:has-text("Revisi\u00f3n terminada")', { timeout: 60000 });
+      await page.click('.modal-foot .btn:has-text("Cerrar")');
       await page.evaluate(() => document.querySelectorAll('.toast').forEach(t => t.remove()));
       return { plan, calls: mock.state.log.filter(l => l.kind === 'openai' && /\nO: /.test(l.prompt)) };
     };
+    let planNoPrice = false;
     let r = await review();
+    ok(planNoPrice, 'The plan says the cost is unknown and why (no ~0,000 US$)');
     ok(r.calls.length > 0 && !/Tipo de documento/.test(r.calls[0].system) && !/Tipo de documento/.test(r.plan), 'Unspecified: nothing added to the instructions or the plan');
 
     // A summary record, chosen in Revisar: also in Archivos; its line goes after the first line.
@@ -128,9 +142,11 @@ async function main() {
     await page.screenshot({ path: path.join(OUT, '2-deferred.png') });
     await page.click('#rv-modules .mchip[data-mod="writing"] input[type=checkbox]');
     ok(await page.isVisible('#rv-run') && !(await page.isDisabled('#rv-run')), 'Another reviewer can still be run');
+    ok(/Diferida en curso \u00b7 0\/2 respuestas/.test(await page.textContent('#st-review')), 'The side bar says a deferred review is on (' + (await page.textContent('#st-review')) + ')');
     await page.click('#rv-next');
     await page.waitForSelector('#view-correct.on');
     ok(true, '"Ir a Corregir" goes to step 4');
+    ok(await page.locator('#tools .pill.warn:has-text("Revisi\u00f3n diferida en curso")').count() === 1, 'Corregir warns that answers are still to come');
     await page.evaluate(async () => { const { state } = await import('/app/js/state.js'); state.project.deferred = []; });
 
     // A bench of one's own with its type.

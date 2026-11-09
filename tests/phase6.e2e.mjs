@@ -125,7 +125,9 @@ async function main() {
       await btn.click();
       await page.waitForTimeout(1500);
     }
-    await page.waitForSelector('.toast:has-text("Lote diferido terminado")', { timeout: 20000 }).catch(() => null);
+    const doneWin = await page.waitForSelector('.modal:has-text("Revisi\u00f3n diferida terminada")', { timeout: 20000 }).catch(() => null);
+    ok(!!doneWin, 'The end of the deferred review is said in a window');
+    if (doneWin) await page.click('.modal-foot .btn:has-text("Cerrar")');
     const fin = await page.evaluate(async () => {
       const { state } = await import('/app/js/state.js');
       const u = await import('/app/js/ai/usage.js');

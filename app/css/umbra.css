@@ -394,6 +394,7 @@ table.grid.recent td { padding: 9px 8px; }
 .mc-meta { display: flex; align-items: center; gap: 10px; padding-left: 30px; font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
 .mc-ex { display: flex; align-items: center; gap: 6px; }
 .mc-strict { font-size: 12px; padding: 3px 6px; }
+.mc-model { font-size: 12px; padding: 3px 6px; max-width: 230px; min-width: 0; text-overflow: ellipsis; }
 .mchip .cost { font-weight: 600; color: var(--text-soft); white-space: nowrap; }
 .mchip .model { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
 .mchip i.bar { position: absolute; left: 0; bottom: 0; height: 3px; margin: 0; border-radius: 0; background: var(--primary); }

@@ -98,9 +98,10 @@ async function main() {
     await page.waitForSelector('.modal:has-text("Plan de ejecuci")', { timeout: 15000 });
     ok(/Nombres oficiales: 1 llamada con \d+ nombres \(solo la lista de nombres/.test(await page.textContent('.modal')), 'The plan shows the names call and says only the list travels');
     await page.click('.modal-foot .btn.amber');
-    await page.waitForSelector('.toast:has-text("Banco de pruebas:")', { timeout: 60000 });
+    await page.waitForSelector('.modal:has-text("Banco de pruebas:")', { timeout: 60000 });
+    const toastText = await page.textContent('.modal');
+    await page.click('.modal-foot .btn:has-text("Ir a Corregir")');
     await page.waitForSelector('#view-correct.on', { timeout: 10000 });
-    const toastText = await page.textContent('.toast:has-text("Banco de pruebas:")');
     ok(/3 de 31 errores detectados, 1 hallazgos de ruido/.test(toastText), 'After the run the bench counts hits and noise (' + toastText.trim() + ')');
 
     // What was sent.

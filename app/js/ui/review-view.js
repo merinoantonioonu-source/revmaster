@@ -57,6 +57,7 @@ export function mountReviewView(host, tools) {
     progress = {}; estimates = {};
     emit('review-status', '');
     if (state.project && (state.project.deferred || []).some(r => r.status === 'running')) startDeferredPolling();
+    _deferredStatus();
   });
 }
 
@@ -116,26 +117,18 @@ function moreMenu(anchor) {
 
 // ------------------------------------------------------------------ module cards
 
-async function modelLabel(moduleId, role) {
-  try {
-    const reg = await import('../ai/registry.js');
-    const r = await reg.resolveClient(moduleId, role);
-    const name = (r.profile && r.profile.models && (r.profile.models.find(m => m.id === r.modelId) || {}).label) || r.modelId;
-    return (r.fallback ? 'General: ' : '') + name;
-  } catch (e) { return 'Sin modelo'; }
-}
 
 let _modsGen = 0;
 let _modCfg = {};
 
 /** The footer: how many reviewers, how many paragraphs and the estimated cost of what is ticked. */
 function _updateTotal() {
-  let total = 0, any = false, missing = false, n = 0;
+  let total = 0, any = false, missing = false, n = 0, unpriced = false;
   for (const id of selectedModules) {
     if (_modCfg[id] && _modCfg[id].enabled === false) continue;
     n++;
     const est = estimates[id];
-    if (est && !est.error) { total += est.cost || 0; any = true; }
+    if (est && !est.error) { total += est.cost || 0; any = true; if (est.unpriced && est.unpriced.length) unpriced = true; }
     else if (est && est.error) missing = true;
   }
   // A deferred review still running: what is ticked and already sent is not sent again (it would be
@@ -149,7 +142,7 @@ function _updateTotal() {
     sum.textContent = waiting && !running
       ? 'Revisi\u00f3n diferida en curso (' + [...pend].map(id => (moduleById(id) || { label: id }).label).join(', ') + '): sus hallazgos llegar\u00e1n a Corregir'
       : n + (n === 1 ? ' revisor' : ' revisores') + ' \u00b7 ' + fmtInt(units) + ' p\u00e1rrafos' +
-        (any ? ' \u00b7 ~' + fmtMoney(total) : '') + (missing ? ' \u00b7 falta la clave de alg\u00fan proveedor' : '');
+        (any ? (unpriced ? ' \u00b7 coste desconocido (un modelo no tiene precio)' : ' \u00b7 ~' + fmtMoney(total)) : '') + (missing ? ' \u00b7 falta la clave de alg\u00fan proveedor' : '');
   }
   const goOn = !running && (waiting || state.findings.length > 0);
   const next = $('#rv-next');
@@ -166,6 +159,7 @@ function _updateTotal() {
     run.classList.toggle('primary', !running && !goOn);
     run.disabled = !running && !n;
     run.classList.toggle('hidden', !running && waiting && !fresh);
+    if (!running) _deferredStatus();
     run.title = running ? '' : waiting && !fresh ? 'Lo marcado ya est\u00e1 en la revisi\u00f3n diferida en curso' : (state.findings.length ? 'Vuelve a revisar con lo marcado (lo ya revisado y sin cambios sale de la cach\u00e9, sin coste)' : '');
   }
 }
@@ -211,8 +205,11 @@ function moduleCard(m, cfg) {
     onchange: async (e) => { await saveModuleConfig(m.id, { strictness: e.target.value }); delete estimates[m.id]; scheduleEstimates(); } },
     Object.keys(STRICTNESS).map(k => el('option', { value: k }, STRICTNESS[k])));
   strict.value = strictnessOf(cfg, m.id);
-  const cost = el('span.cost' + (est && est.error ? '.warn-t' : ''), est && !est.error ? '~' + fmtMoney(est.cost) : (est && est.error ? (/clave/.test(est.error) ? 'Sin clave' : 'Sin estimar') : 'Calculando\u2026'));
-  const model = el('span.model', '');
+  const noPrice = !!(est && !est.error && est.unpriced && est.unpriced.length);
+  const cost = el('span.cost' + ((est && est.error) || noPrice ? '.warn-t' : ''), {
+    title: noPrice ? 'El modelo ' + est.unpriced.join(', ') + ' no tiene precio: p\u00f3ngalo en Ajustes \u203a Proveedores y modelos (US$ por mill\u00f3n de tokens) para ver el coste' : '' },
+    est && !est.error ? (noPrice ? 'Sin precio' : '~' + fmtMoney(est.cost)) : (est && est.error ? (/clave/.test(est.error) ? 'Sin clave' : 'Sin estimar') : 'Calculando\u2026'));
+  const model = modelSelect(m, off);
   const tip = [m.desc, p && p.msg ? (p.state === 'err' ? 'Error: ' : '') + p.msg : '', off ? 'Desactivado en Ajustes \u203a M\u00f3dulos.' : ''].filter(Boolean).join('\n');
   const card = el('div.mchip' + (on ? '.on' : '') + (off ? '.off' : '') + (st ? '.' + st : ''), { 'data-mod': m.id, title: tip },
     el('label.mc-main', chk,
@@ -224,8 +221,43 @@ function moduleCard(m, cfg) {
       el('span.grow'),
       model, cost));
   if (p && p.state === 'run') card.appendChild(el('i.bar', { style: { width: (p.total ? Math.round(100 * (p.done || 0) / Math.max(1, p.total)) : 15) + '%' } }));
-  modelLabel(m.id, m.roles[0]).then(t => { model.textContent = t; });
   return card;
+}
+
+/**
+ * The reviewer's model, chosen here as in Ajustes > Modulos: "General" (the general choice) or any model
+ * of a provider that is ready to use.
+ */
+function modelSelect(m, off) {
+  const role = m.roles[0];
+  const sel = el('select.mc-model', { 'data-model': m.id, disabled: off ? true : null, title: 'Modelo de IA de este revisor' }, el('option', { value: '' }, 'Cargando\u2026'));
+  (async () => {
+    try {
+      const reg = await import('../ai/registry.js');
+      const [provs, mm, gen] = await Promise.all([reg.providersWithStatus(), reg.getModuleModels(), reg.resolveClient('', role).catch(() => null)]);
+      const cur = (mm.map[m.id] || {})[role] || null;
+      const opts = [el('option', { value: '' }, 'General' + (gen ? ': ' + reg.modelLabel(gen.profile, gen.modelId) : ''))];
+      let found = !cur;
+      for (const { profile, usable } of provs) {
+        if (!usable) continue;
+        for (const x of reg.modelsOf(profile)) {
+          const v = JSON.stringify({ provider: profile.id, model: x.id });
+          if (cur && cur.provider === profile.id && cur.model === x.id) found = true;
+          opts.push(el('option', { value: v }, profile.name + ' \u00b7 ' + (x.label || x.id)));
+        }
+      }
+      if (!found) opts.push(el('option', { value: JSON.stringify(cur) }, cur.provider + ' \u00b7 ' + cur.model + ' (sin clave)'));
+      sel.replaceChildren(...opts);
+      sel.value = cur ? JSON.stringify({ provider: cur.provider, model: cur.model }) : '';
+    } catch (e) { sel.replaceChildren(el('option', { value: '' }, 'Sin modelo')); }
+  })();
+  sel.addEventListener('change', async () => {
+    const reg = await import('../ai/registry.js');
+    await reg.setModuleModel(m.id, role, sel.value ? JSON.parse(sel.value) : null);
+    delete estimates[m.id];
+    scheduleEstimates();
+  });
+  return sel;
 }
 
 function scheduleEstimates() {
@@ -245,7 +277,7 @@ async function computeEstimates() {
     try {
       const plan = await makePlan(state.session, Object.assign({}, ctx, { cfg: Object.assign({}, ctx.cfg, { [m.id]: Object.assign({}, ctx.cfg[m.id], { verify: false }) }) }), { modules: [m.id] });
       if (plan.errors.length) estimates[m.id] = { error: 'Sin proveedor con clave' };
-      else estimates[m.id] = { tok: plan.totals.inTok + plan.totals.outTok, cost: plan.totals.cost, cached: plan.totals.cached };
+      else estimates[m.id] = { tok: plan.totals.inTok + plan.totals.outTok, cost: plan.totals.cost, cached: plan.totals.cached, unpriced: plan.totals.unpriced || [] };
     } catch (e) { estimates[m.id] = { error: 'Sin estimaci\u00f3n' }; console.warn('estimate', m.id, e); }
   }
   renderModules();
@@ -254,7 +286,7 @@ async function computeEstimates() {
 // ------------------------------------------------------------------ running
 
 function _status() {
-  if (!running) { emit('review-status', ''); return; }
+  if (!running) { _deferredStatus(); return; }
   const ps = running.modules.map(id => progress[id]).filter(Boolean);
   const pct = ps.length ? Math.round(100 * ps.reduce((n, p) => n + (p.state === 'run' ? (p.done || 0) / Math.max(1, p.total || 1) : 1), 0) / ps.length) : 0;
   emit('review-status', 'Revisando\u2026 ' + pct + ' %');
@@ -285,6 +317,7 @@ async function runModules(ids) {
       saveProjectSoon();
       toast('Enviado en modo diferido (' + rec.jobs.length + ' lote' + (rec.jobs.length > 1 ? 's' : '') + '). UMBRA comprobar\u00e1 cada minuto si ya hay respuesta; puede cerrar la p\u00e1gina y volver despu\u00e9s.', 'ok', 9000);
       startDeferredPolling();
+      _deferredStatus();
     } catch (e) { console.error(e); toast('No se pudo enviar el lote: ' + e.message, 'err', 9000); }
     renderModules();
     return;
@@ -326,22 +359,49 @@ async function runModules(ids) {
   _status();
   renderAll();
   scheduleEstimates();
-  const found = (res.findings || []).filter(f => f.state !== 'discarded').length;
-  const discarded = (res.findings || []).filter(f => f.state === 'discarded').length;
-  toast('Revisi\u00f3n terminada: ' + found + ' hallazgos' +
-    (discarded ? ' (' + discarded + ' descartados por el verificador)' : '') + ' \u00b7 ' + fmtMoney(res.spent || 0) +
-    (res.stopped ? ' \u00b7 detenida' : '') + '.', (res.errors || []).length ? 'warn' : 'ok', 7000);
-  for (const e of res.errors || []) toast((moduleById(String(e.module).split('+')[0]) || { label: e.module }).label + ': ' + e.message, 'err', 9000);
+  await finishedDialog({
+    found: (res.findings || []).filter(f => f.state !== 'discarded').length,
+    discarded: (res.findings || []).filter(f => f.state === 'discarded').length,
+    spent: res.spent || 0, unpriced: !!(plan.totals.unpriced && plan.totals.unpriced.length),
+    stopped: !!res.stopped, errors: res.errors || [] });
+}
+
+/**
+ * The end of a review, said so it cannot be missed (a toast went by unnoticed, above all when a
+ * deferred review finished while the translator was elsewhere): what was found, what the Verifier
+ * threw away, the cost, the errors, the bench's score; and the way on to Corregir.
+ */
+async function finishedDialog(o) {
+  let bench = null;
   if (state.project && state.project.bench) {
-    try {
-      const r = evaluateBench(state.session, state.findings, await benchSpecOf(state.project));
-      toast('Banco de pruebas: ' + r.found + ' de ' + r.expected + ' errores detectados, ' + r.noise.length + ' hallazgos de ruido. Detalle en M\u00e1s \u203a Resultado del banco de pruebas.', 'ok', 10000);
-    } catch (e) { console.warn('bench', e); }
+    try { bench = evaluateBench(state.session, state.findings, await benchSpecOf(state.project)); } catch (e) { console.warn('bench', e); }
   }
-  if (state.findings.some(f => f.state === 'open') && state.view === 'review') emit('goto', 'correct');
+  const open = state.findings.filter(f => f.state === 'open').length;
+  const body = el('div',
+    el('p', el('b', o.found + (o.found === 1 ? ' hallazgo nuevo' : ' hallazgos nuevos')),
+      o.discarded ? ' (y ' + o.discarded + ' descartados por el Verificador)' : '', o.stopped ? ' \u00b7 la revisi\u00f3n se detuvo antes de acabar' : '', '.'),
+    el('p', open ? open + (open === 1 ? ' hallazgo pendiente' : ' hallazgos pendientes') + ' en Corregir.' : 'No queda nada pendiente en Corregir.'),
+    el('p.info', 'Coste: ' + (o.unpriced ? 'desconocido (un modelo no tiene precio en Ajustes \u203a Proveedores y modelos)' : '~' + fmtMoney(o.spent || 0)) + '.'),
+    bench ? el('p.info', 'Banco de pruebas: ' + bench.found + ' de ' + bench.expected + ' errores detectados, ' + bench.noise.length + ' hallazgos de ruido (detalle en M\u00e1s \u203a Resultado del banco de pruebas).') : null,
+    (o.errors || []).length ? el('div.note.warn', el('b', 'Con errores: '), el('ul', (o.errors || []).map(e =>
+      el('li', (moduleById(String(e.module).split('+')[0]) || { label: e.module }).label + ': ' + e.message)))) : null);
+  const r = await modal({ title: o.deferred ? 'Revisi\u00f3n diferida terminada' : 'Revisi\u00f3n terminada', help: helpBtn('review-done'), width: '560px', body,
+    buttons: [{ label: 'Cerrar', value: null }, { label: 'Ir a Corregir', kind: 'primary', value: 'go' }] });
+  if (r === 'go') emit('goto', 'correct');
+}
+
+/** The side bar says a deferred review is still on (and how far its answers have come). */
+function _deferredStatus() {
+  if (running) return;
+  const recs = ((state.project && state.project.deferred) || []).filter(r => r.status === 'running');
+  if (!recs.length) { emit('review-status', ''); return; }
+  const done = recs.reduce((n, r) => n + r.jobs.reduce((k, j) => k + (j.done || 0), 0), 0);
+  const total = recs.reduce((n, r) => n + r.jobs.reduce((k, j) => k + (j.total || 0), 0), 0);
+  emit('review-status', 'Diferida en curso \u00b7 ' + done + '/' + (total || '?') + ' respuestas');
 }
 
 function planDialog(plan, budget, cap) {
+  const noPrice = !!(plan.totals.unpriced && plan.totals.unpriced.length);
   const rows = [];
   const dt = state.session && state.session.docType;
   if (dt) rows.push(el('li', 'Tipo de documento: ' + docTypeById(dt).label + ' (sus convenciones no se se\u00f1alan como errores)'));
@@ -364,7 +424,7 @@ function planDialog(plan, budget, cap) {
   const c = cap || { ok: false, parts: [], missing: [] };
   const defChk = el('input', { type: 'checkbox', disabled: !c.ok || nothing ? true : null });
   const defBox = el('div.note' + (c.ok ? '' : '.warn'), { style: { marginTop: '10px' } },
-    el('label', defChk, ' ', el('b', 'Modo diferido (lotes)'), c.ok ? ' \u00b7 ~' + fmtMoney(deferredCost) + ' en lugar de ~' + fmtMoney(plan.totals.cost) : ''),
+    el('label', defChk, ' ', el('b', 'Modo diferido (lotes)'), c.ok ? (noPrice ? ' \u00b7 la mitad de precio en la primera pasada' : ' \u00b7 ~' + fmtMoney(deferredCost) + ' en lugar de ~' + fmtMoney(plan.totals.cost)) : ''),
     el('div', { style: { marginTop: '4px' } }, c.ok
       ? 'La primera pasada va a la API de lotes del proveedor: cuesta la mitad y responde en minutos u horas (hasta 24 h). Puede cerrar la p\u00e1gina: al volver, UMBRA recoge las respuestas y termina la revisi\u00f3n (la parte a fondo y el verificador, que son peque\u00f1os, se hacen entonces al precio normal).'
       : (nothing ? 'No hay nada que enviar.' : 'No disponible: ' + (c.missing.join(', ') || 'ning\u00fan proveedor') + ' no tiene API de lotes en UMBRA (Gemini, Anthropic, Mistral y OpenAI s\u00ed la tienen; en un proveedor compatible con OpenAI se activa en su perfil).')));
@@ -372,7 +432,10 @@ function planDialog(plan, budget, cap) {
   const body = el('div',
     um ? el('div.note.warn', { style: { marginBottom: '10px' } }, el('b', 'Sin enmascarar: '), 'se enviar\u00e1 el texto real de los dos documentos, con nombres, cargos, cifras y fechas. \u00daselo solo con textos ya publicados.') : null,
     el('ul', rows),
-    el('p', el('b', fmtInt(plan.totals.calls) + ' llamadas \u00b7 ~' + fmtInt(plan.totals.inTok + plan.totals.outTok) + ' tokens \u00b7 ~' + fmtMoney(plan.totals.cost))),
+    el('p', el('b', fmtInt(plan.totals.calls) + ' llamadas \u00b7 ~' + fmtInt(plan.totals.inTok + plan.totals.outTok) + ' tokens \u00b7 ' +
+      (noPrice ? 'coste desconocido' + (plan.totals.cost ? ' (al menos ~' + fmtMoney(plan.totals.cost) + ')' : '') : '~' + fmtMoney(plan.totals.cost)))),
+    noPrice ? el('div.note.warn', { style: { marginTop: '6px' } }, el('b', 'Sin precio: '), plan.totals.unpriced.join(', ') +
+      '. UMBRA no sabe cu\u00e1nto cuesta este modelo, as\u00ed que no puede calcular el coste (ni antes ni despu\u00e9s). P\u00f3ngale el precio en Ajustes \u203a Proveedores y modelos: US$ por mill\u00f3n de tokens de entrada y de salida, como los publica el proveedor.') : null,
     el('p.info', 'Estimaci\u00f3n orientativa: el gasto real se registra en Uso de IA. ' + (um ? 'Proyecto sin enmascarar: el texto se env\u00eda tal cual.' : 'Solo se env\u00eda texto enmascarado (y, si est\u00e1 marcado Nombres oficiales, la lista de nombres de organismos, \u00f3rganos, cargos, pa\u00edses y lugares).') +
       (nothing ? ' No hay nada nuevo que enviar: todo est\u00e1 en la cach\u00e9.' : '')),
     el('label.lbl', 'Presupuesto m\u00e1ximo de esta ejecuci\u00f3n (US$)'), budgetIn,
@@ -480,9 +543,14 @@ async function pollDeferredNow(manual) {
       });
       if (r.changed) saveProjectSoon();
       if (r.finished) {
-        if (rec.status === 'done') toast('Lote diferido terminado: ' + rec.findings + ' hallazgos \u00b7 ' + fmtMoney(rec.spent || 0) + '.', 'ok', 9000);
-        else toast('El lote diferido no se complet\u00f3: ' + (rec.error || rec.status), 'err', 9000);
         estimates = {};
+        _deferredStatus();
+        if (rec.status === 'done') {
+          const mine = state.findings.filter(f => rec.modules.includes(f.module) && f.source === 'ai');
+          finishedDialog({ deferred: true, found: rec.findings, discarded: mine.filter(f => f.state === 'discarded').length,
+            spent: rec.spent || 0, unpriced: !!(rec.plan && rec.plan.totals && rec.plan.totals.unpriced && rec.plan.totals.unpriced.length),
+            errors: rec.error ? [{ module: 'other', message: rec.error }] : [] });
+        } else toast('El lote diferido no se complet\u00f3: ' + (rec.error || rec.status), 'err', 9000);
       } else if (manual) {
         const done = rec.jobs.reduce((n, j) => n + (j.done || 0), 0), total = rec.jobs.reduce((n, j) => n + (j.total || 0), 0);
         toast('El lote sigue en curso (' + done + '/' + (total || '?') + ').', '', 4000);
@@ -493,6 +561,7 @@ async function pollDeferredNow(manual) {
     if (manual) toast('No se pudo comprobar el lote: ' + e.message, 'err', 8000);
   } finally {
     _polling = false;
+    _deferredStatus();
     emit('findings');
     if (state.view === 'review') renderAll();
   }

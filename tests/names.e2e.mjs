@@ -66,7 +66,8 @@ async function main() {
 
     // The AI's answer: the official names; the Volunteers' is in the translation already.
     const answer = [
-      desa.n + ' | NOM | MAY | \u2014 | Departamento de Asuntos Econ\u00f3micos y Sociales / DAES | Nombre oficial.',
+      // The model copies the table's category (ORG) instead of NOM: it is still read.
+      desa.n + ' | ORG | MAY | \u2014 | Departamento de Asuntos Econ\u00f3micos y Sociales / DAES | Nombre oficial.',
       vol.n + ' | NOM | MAY | \u2014 | Voluntarios de las Naciones Unidas / VNU | Nombre oficial.',
       untso.n + ' | NOM | MAY | UNTSO | ONUVT | Sigla oficial en espa\u00f1ol.',
       'FIN 3'].join('\n');
@@ -78,7 +79,8 @@ async function main() {
     await page.click('#rv-run');
     await page.waitForSelector('.modal:has-text("Plan de ejecuci")', { timeout: 15000 });
     await page.click('.modal-foot .btn.amber');
-    await page.waitForSelector('.toast:has-text("Revisi\u00f3n terminada")', { timeout: 60000 });
+    await page.waitForSelector('.modal:has-text("Revisi\u00f3n terminada")', { timeout: 60000 });
+    await page.click('.modal-foot .btn:has-text("Cerrar")');
 
     const call = mock.state.log.find(l => l.kind === 'openai' && /^NOMBRES \(fila/.test(l.prompt));
     ok(!!call && call.prompt.split('\n').slice(1, -1).every(l => /^\d+ \| (ORG|ORGANO|CARGO|PAIS|LUGAR) \| [^|]+ \| [^|]+$/.test(l)) && !/organiz|ceasefire|veinte/.test(call.prompt),

@@ -65,6 +65,7 @@ export function mountCorrectView(host, tools) {
     if (list.length && !list.some(f => f.id === selected)) select(list[0].id, { fromRow: true });
   });
   on('findings', () => { syncFindingsWindow(); if (state.view === 'correct') renderAll(); });
+  on('review-status', () => { if (state.view === 'correct') renderTools(); });
   on('finding', () => { syncFindingsWindow(); if (state.view === 'correct') renderAll(); });
   on('masked', () => { if (state.view === 'correct') renderBody(); });
   on('project', () => { selected = null; filt.q = ''; const qi = $('#cx-q'); if (qi) qi.value = ''; });
@@ -92,6 +93,8 @@ function setMode(m) {
 
 // ------------------------------------------------------------------ tools
 
+function _deferredRunning() { return ((state.project && state.project.deferred) || []).some(r => r.status === 'running'); }
+
 function renderTools() {
   if (state.view !== 'correct') return;
   clear(toolsHost);
@@ -103,7 +106,9 @@ function renderTools() {
     n('MAY') ? el('span.pill.warn', n('MAY') + (n('MAY') === 1 ? ' mayor' : ' mayores')) : null,
     n('MEN') ? el('span.pill.info', n('MEN') + (n('MEN') === 1 ? ' menor' : ' menores')) : null,
     n('SUG') ? el('span.pill.gray', n('SUG') + (n('SUG') === 1 ? ' sugerencia' : ' sugerencias')) : null,
-    !open.length ? el('span.pill.ok', 'Sin hallazgos pendientes') : null));
+    !open.length ? el('span.pill.ok', 'Sin hallazgos pendientes') : null,
+    // A deferred review still on: its findings (and the Verifier's verdicts) are still to come.
+    _deferredRunning() ? el('span.pill.warn', { title: 'Faltan respuestas de la revisi\u00f3n diferida: los hallazgos y lo que descarte el Verificador llegar\u00e1n solos. Espere a que termine antes de exportar.' }, 'Revisi\u00f3n diferida en curso') : null));
   toolsHost.appendChild(el('div.grow'));
   toolsHost.appendChild(el('button.btn', { title: 'Abrir los hallazgos en una ventana aparte, en forma de tabla', onclick: openTable }, icon('table', 16), 'Tabla'));
   toolsHost.appendChild(el('button.btn', { title: 'Borrar los hallazgos para empezar de cero', onclick: resetFindings }, icon('trash', 16), 'Vaciar'));
