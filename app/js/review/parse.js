@@ -6,9 +6,10 @@
  * severity words, code fences, extra spaces. Lines that do not fit are ignored (and counted).
  */
 
-const CATS = ['MIST', 'UNTR', 'OMI', 'ADD', 'ORT', 'GRA', 'PUNT', 'EST', 'LEC', 'COH', 'CONV'];
+// NOM: an official name (the names module). Without it every answer of that module was dropped.
+const CATS = ['NOM', 'MIST', 'UNTR', 'OMI', 'ADD', 'ORT', 'GRA', 'PUNT', 'EST', 'LEC', 'COH', 'CONV'];
 const CAT_ALIASES = {
-  TRAD: 'MIST', ERROR: 'MIST', MISTRANSLATION: 'MIST', OMISION: 'OMI', OMISSION: 'OMI', ADICION: 'ADD', ADDITION: 'ADD',
+  NOMBRE: 'NOM', NOMBREOFICIAL: 'NOM', NAME: 'NOM', TRAD: 'MIST', ERROR: 'MIST', MISTRANSLATION: 'MIST', OMISION: 'OMI', OMISSION: 'OMI', ADICION: 'ADD', ADDITION: 'ADD',
   ORTOGRAFIA: 'ORT', SPELLING: 'ORT', GRAMATICA: 'GRA', GRAMMAR: 'GRA', PUNTUACION: 'PUNT', PUNCTUATION: 'PUNT',
   ESTILO: 'EST', STYLE: 'EST', LECTURA: 'LEC', COHERENCIA: 'COH', CONSISTENCY: 'COH', CONVENCIONES: 'CONV', CONVENTION: 'CONV'
 };
