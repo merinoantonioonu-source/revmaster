@@ -133,7 +133,8 @@ const T = {
       'En Revisar, marque los revisores con los modelos y la exigencia que quiera probar y pulse **Revisar ahora**.',
       '**Resultado**: cu\u00e1ntos errores detecta cada m\u00f3dulo, cu\u00e1les se le escapan, cu\u00e1les descart\u00f3 el Verificador y cu\u00e1nto **ruido** mete (hallazgos que no corresponden a ning\u00fan error).',
       '**Copiar el resumen**: p\u00e9guelo en el chat para ajustar las instrucciones de los m\u00f3dulos.',
-      'Antes de repetir una prueba, use **Vaciar** (en Corregir) con \u00abOlvidar las respuestas guardadas\u00bb.'],
+      'Antes de repetir una prueba, use **Vaciar** (en Corregir) con \u00abOlvidar las respuestas guardadas\u00bb.',
+      '**Cargar un banco propio (.zip)**: el mismo tipo de prueba con sus propios p\u00e1rrafos, por ejemplo traducciones ya aprobadas de su corpus (todo lo que se se\u00f1ale en ellas es ruido). El .zip lleva banco.json y los dos documentos, banco_en.docx (o banco_fr.docx) y banco_es.docx; se queda en este equipo.'],
     'Sirve para comparar modelos, exigencias e instrucciones con datos, y no a ojo.'] },
   'review-sheets': { t: 'Vista Documento', b: [
     ['La traducci\u00f3n lleva subrayados los hallazgos visibles, con el color de su gravedad.',

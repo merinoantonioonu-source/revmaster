@@ -6,7 +6,7 @@
  */
 
 import { helpBtn, helpItem } from './help.js';
-import { el, $, clear, toast, modal, fmtInt, fmtMoney, confirmDialog } from '../util/dom.js';
+import { el, $, clear, toast, modal, fmtInt, fmtMoney, confirmDialog, pickFiles } from '../util/dom.js';
 import { state, on, emit, addFindings, saveProjectSoon, openFiles } from '../state.js';
 import { MODULES, moduleById } from '../review/module-list.js';
 import { makePlan } from '../review/planner.js';
@@ -16,7 +16,7 @@ import { loadModuleConfig, saveModuleConfig } from '../review/module-config.js';
 import { loadPrompts, STRICTNESS, strictnessOf } from '../review/prompts.js';
 import { externalDialog, importDialog } from './mask-view.js';
 import { openMenu } from './menu.js';
-import { loadBenchSpec, benchFiles, evaluateBench } from '../review/bench.js';
+import { loadBenchSpec, benchFiles, evaluateBench, benchSpecOf, readBenchZip } from '../review/bench.js';
 import { icon } from './icons.js';
 
 let root, toolsHost;
@@ -290,7 +290,7 @@ async function runModules(ids) {
   for (const e of res.errors || []) toast((moduleById(String(e.module).split('+')[0]) || { label: e.module }).label + ': ' + e.message, 'err', 9000);
   if (state.project && state.project.bench) {
     try {
-      const r = evaluateBench(state.session, state.findings, await loadBenchSpec());
+      const r = evaluateBench(state.session, state.findings, await benchSpecOf(state.project));
       toast('Banco de pruebas: ' + r.found + ' de ' + r.expected + ' errores detectados, ' + r.noise.length + ' hallazgos de ruido. Detalle en M\u00e1s \u203a Resultado del banco de pruebas.', 'ok', 10000);
     } catch (e) { console.warn('bench', e); }
   }
@@ -467,24 +467,35 @@ export async function benchDialog() {
       el('li', 'Pulse \u00abCargar\u00bb: se abre como un proyecto aparte (el que tiene abierto queda guardado).'),
       el('li', 'En Revisar, marque los revisores que quiera, con los modelos y la exigencia que quiera probar, y pulse \u00abRevisar ahora\u00bb.'),
       el('li', 'Al terminar, M\u00e1s \u203a Resultado del banco de pruebas: cu\u00e1ntos errores detecta cada m\u00f3dulo y cu\u00e1nto ruido mete.')),
-    el('p.info', 'Sirve para comparar modelos, exigencias e instrucciones con datos y no a ojo. Antes de repetir una prueba, use Vaciar (en Corregir) con \u00abOlvidar las respuestas guardadas\u00bb.')),
-    buttons: [{ label: 'Cancelar', value: null }, { label: 'Cargar el banco de pruebas', kind: 'primary', value: 'ok' }] });
-  if (r !== 'ok') return;
+    el('p.info', 'Sirve para comparar modelos, exigencias e instrucciones con datos y no a ojo. Antes de repetir una prueba, use Vaciar (en Corregir) con \u00abOlvidar las respuestas guardadas\u00bb.'),
+    el('p.info', 'Tambi\u00e9n puede cargar un banco propio: un .zip con banco.json y los dos documentos (banco_en.docx y banco_es.docx), hecho por ejemplo con traducciones ya aprobadas de su corpus para medir el ruido. Se abre igual y se queda en este equipo.')),
+    buttons: [{ label: 'Cancelar', value: null }, { label: 'Cargar un banco propio (.zip)\u2026', value: 'own' }, { label: 'Cargar el banco de pruebas', kind: 'primary', value: 'ok' }] });
+  if (r !== 'ok' && r !== 'own') return;
   try {
-    const f = await benchFiles();
+    let f, spec = null, name = 'Banco de pruebas';
+    if (r === 'own') {
+      const [file] = await pickFiles('.zip,application/zip', false);
+      if (!file) return;
+      f = await readBenchZip(file);
+      spec = f.spec;
+      name = spec.name || file.name.replace(/\.zip$/i, '');
+    } else {
+      f = await benchFiles();
+    }
     await openFiles(f.src, f.tgt);
     state.project.bench = true;
-    state.project.name = 'Banco de pruebas';
+    if (spec) state.project.benchSpec = spec;
+    state.project.name = name;
     saveProjectSoon();
     emit('project');
     emit('goto', 'review');
-    toast('Banco de pruebas cargado: elija los revisores y pulse \u00abRevisar ahora\u00bb.', 'ok', 6000);
+    toast((spec ? 'Banco propio cargado (' + spec.paragraphs.length + ' p\u00e1rrafos)' : 'Banco de pruebas cargado') + ': elija los revisores y pulse \u00abRevisar ahora\u00bb.', 'ok', 6000);
   } catch (e) { console.error(e); toast('No se pudo cargar el banco de pruebas: ' + e.message, 'err', 8000); }
 }
 
 async function benchResults() {
   let res;
-  try { res = evaluateBench(state.session, state.findings, await loadBenchSpec()); } catch (e) { toast(e.message, 'err', 8000); return; }
+  try { res = evaluateBench(state.session, state.findings, await benchSpecOf(state.project)); } catch (e) { toast(e.message, 'err', 8000); return; }
   const pct = (a, b) => b ? Math.round(100 * a / b) + ' %' : '\u2014';
   const mods = Object.keys(res.byModule);
   const table = el('table.grid', el('tr', el('th', 'M\u00f3dulo'), el('th', 'Errores esperados'), el('th', 'Detectados'), el('th', 'Ruido')),

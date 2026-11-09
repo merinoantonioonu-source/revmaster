@@ -7,6 +7,11 @@
  * reason contains one of the error's keys (accents and case ignored); each finding counts once.
  * Everything else is NOISE (in a correct paragraph, or in a paragraph with an error but about
  * something else).
+ *
+ * A bench of one's own (2026-11-09): a .zip with banco.json (the same spec) and the two documents,
+ * banco_en.docx (or banco_fr.docx) and banco_es.docx, loaded from the computer (readBenchZip). Its spec
+ * is kept in the project (project.benchSpec) and scores the run instead of the built-in one. Made from
+ * the translator's own corpus, so it never goes into the repository (it is public).
  */
 
 const BASE = new URL('../../data/calibration/', import.meta.url);
@@ -25,6 +30,35 @@ export async function benchFiles() {
     return new File([await r.blob()], name, { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
   };
   return { src: await get('banco_en.docx'), tgt: await get('banco_es.docx') };
+}
+
+/** The spec of the bench open in this project: its own (a .zip loaded) or the built-in one. */
+export async function benchSpecOf(project) {
+  return project && project.benchSpec ? project.benchSpec : loadBenchSpec();
+}
+
+/**
+ * A bench of one's own from a .zip: -> { spec, src, tgt } (src/tgt as File objects), or throws with a
+ * message for the translator. The spec must have paragraphs [{ en, es, expect:[{ module, keys, what }] }].
+ */
+export async function readBenchZip(file) {
+  const JSZip = window.JSZip;
+  if (!JSZip) throw new Error('No se puede leer el .zip (falta JSZip).');
+  let zip;
+  try { zip = await JSZip.loadAsync(await file.arrayBuffer()); } catch (e) { throw new Error('El archivo no es un .zip v\u00e1lido.'); }
+  const find = (re) => Object.keys(zip.files).find(n => re.test(n.split('/').pop()) && !zip.files[n].dir);
+  const specName = find(/^banco\.json$/i), srcName = find(/^banco_(en|fr)\.docx$/i), tgtName = find(/^banco_es\.docx$/i);
+  if (!specName || !srcName || !tgtName) throw new Error('El .zip debe contener banco.json, banco_en.docx (o banco_fr.docx) y banco_es.docx.');
+  let spec;
+  try { spec = JSON.parse(await zip.files[specName].async('string')); } catch (e) { throw new Error('banco.json no se puede leer.'); }
+  if (!spec || !Array.isArray(spec.paragraphs) || !spec.paragraphs.length ||
+      spec.paragraphs.some(p => !p || typeof p.es !== 'string' || !Array.isArray(p.expect || []))) {
+    throw new Error('banco.json no tiene la forma de un banco de pruebas (paragraphs con en, es y expect).');
+  }
+  for (const p of spec.paragraphs) if (!Array.isArray(p.expect)) p.expect = [];
+  const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  const asFile = async (name) => new File([await zip.files[name].async('blob')], name.split('/').pop(), { type: DOCX });
+  return { spec, src: await asFile(srcName), tgt: await asFile(tgtName) };
 }
 
 const fold = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
