@@ -17,6 +17,7 @@ import { mountSettingsView, showSettingsSection, preselectSettingsSection } from
 import { showGuide } from './ui/guide.js';
 import { helpBtn, showHelp } from './ui/help.js';
 import { icon } from './ui/icons.js';
+import { docTypeRow } from './ui/doc-type.js';
 
 const VIEWS = ['files', 'mask', 'review', 'correct', 'export', 'settings'];
 const TITLES = { files: 'Documentos', mask: 'Enmascarar', review: 'Revisar', correct: 'Corregir', export: 'Exportar', settings: 'Ajustes' };
@@ -222,6 +223,7 @@ function mountFiles() {
         el('input#files-unmask-chk', { type: 'checkbox', onchange: (e) => onUnmaskToggle(e.currentTarget) }),
         el('span', el('b', 'Sin enmascarar'), ' \u00b7 para un texto ya publicado: la IA recibe el texto real, sin etiquetas, y no hace falta el paso Enmascarar'),
         helpBtn('unmasked')),
+      docTypeRow('files-doctype'),
       el('div.page-acts',
         el('button.btn.primary.big#files-next.hidden', { onclick: () => setView(state.project && state.project.unmasked ? 'review' : 'mask') }, 'Siguiente: enmascarar', icon('arrow', 16)),
         el('span.grow'),

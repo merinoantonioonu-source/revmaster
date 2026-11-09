@@ -9,6 +9,7 @@ import { parseFindings } from './parse.js';
 import { anchorItem } from './findings.js';
 import { TASKS, CAT_LABELS } from './prompts.js';
 import { moduleById } from './module-list.js';
+import { docTypeLine } from './doc-types.js';
 
 /**
  * opts = { modules:[ids] (tasks to ask for; default Sentido and Redaccion), bilingual:true, withInstructions:true }
@@ -21,7 +22,8 @@ export function buildExternalText(session, opts) {
   let head = '';
   if (o.withInstructions) {
     const lang = session.srcLang === 'fr' ? 'franc\u00e9s' : 'ingl\u00e9s';
-    head = 'Eres un revisor profesional de traducciones de las Naciones Unidas del ' + lang + ' al espa\u00f1ol.\n\n' +
+    const dt = docTypeLine(session.docType);
+    head = 'Eres un revisor profesional de traducciones de las Naciones Unidas del ' + lang + ' al espa\u00f1ol.\n' + (dt ? dt + '\n' : '') + '\n' +
       (session.unmasked ? '' : 'El texto est\u00e1 ENMASCARADO: las expresiones entre llaves sustituyen datos confidenciales ({CARGO1}, {ORGANO2}, {NUM3}, {PAIS4}...); ' +
       'la misma etiqueta en el original y en la traducci\u00f3n es el mismo dato. No cambies las etiquetas ni intentes adivinar lo que ocultan.\n\n') +
       'Revisa:\n' + o.modules.filter(id => TASKS[id]).map(id => '- ' + TASKS[id].text.replace(/^TAREA \u2014 /, '')).join('\n') + '\n\n' +

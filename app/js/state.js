@@ -4,7 +4,8 @@
  * A project lives in IndexedDB ('projects' store) as:
  *   { id, name, createdAt, updatedAt, srcName, tgtName, srcBytes, tgtBytes, srcLang, profile,
  *     mask (entities.defaultMaskSettings shape), unmasked (bool: "Sin enmascarar", a published text whose
- *     real words may go to the AI), findings:[...], runs:[...] }
+ *     real words may go to the AI), docType (review/doc-types.js: guessed from the file names, changeable),
+ *     findings:[...], runs:[...] }
  * The documents are parsed again when a project is reopened (models are not stored).
  *
  * Events: 'project' (opened/closed), 'masked' (entities recomputed), 'findings' (list changed),
@@ -20,6 +21,7 @@ import { defaultMaskSettings } from './redact/entities.js';
 import { guessLang } from './redact/detect.js';
 import { uid } from './util/dom.js';
 import { currentModuleId } from './review/module-list.js';
+import { guessDocType } from './review/doc-types.js';
 
 export const state = {
   project: null, src: null, tgt: null, session: null, findings: [],
@@ -106,7 +108,8 @@ export async function openFiles(srcFile, tgtFile, opts) {
   const project = {
     id: uid('p'), name: tgtFile.name.replace(/\.[^.]+$/, ''), createdAt: Date.now(), updatedAt: Date.now(),
     srcName: srcFile.name, tgtName: tgtFile.name, srcBytes, tgtBytes, srcLang: null,
-    profile: (await getValue('last_profile', '')) || '', mask: defaultMaskSettings(), unmasked: !!(opts && opts.unmasked), findings: [], runs: []
+    profile: (await getValue('last_profile', '')) || '', mask: defaultMaskSettings(), unmasked: !!(opts && opts.unmasked),
+    docType: opts && typeof opts.docType === 'string' ? opts.docType : guessDocType([srcFile.name, tgtFile.name]), findings: [], runs: []
   };
   await _load(project);
   await saveProject();
@@ -125,7 +128,7 @@ async function _load(project) {
     state.src = src;
     state.tgt = tgt;
     state.session = buildSession({ src, tgt, alignment, srcLang: project.srcLang, mask: project.mask,
-      unmasked: !!project.unmasked, gazetteer: state.data.gazetteer, dict: state.dict });
+      unmasked: !!project.unmasked, docType: project.docType || '', gazetteer: state.data.gazetteer, dict: state.dict });
     // Findings of reviewers merged in the simplification (2026-11-09) go under the one that covers them now.
     state.findings = (project.findings || []).map(f => { if (f && f.module) f.module = currentModuleId(f.module); return f; });
     await setValue('last_project', project.id);
@@ -204,9 +207,18 @@ export async function importProjectObject(p) {
 
 export function remaskNow() {
   if (!state.session) return;
-  remask(state.session, { mask: state.project.mask, unmasked: !!state.project.unmasked, gazetteer: state.data.gazetteer, dict: state.dict });
+  remask(state.session, { mask: state.project.mask, unmasked: !!state.project.unmasked, docType: state.project.docType || '', gazetteer: state.data.gazetteer, dict: state.dict });
   emit('masked');
   saveProjectSoon();
+}
+
+/** The open project's type of document (review/doc-types.js): one line in the reviewers' instructions. */
+export function setDocType(id) {
+  if (!state.project) return;
+  state.project.docType = id || '';
+  if (state.session) state.session.docType = state.project.docType;
+  saveProjectSoon();
+  emit('project-flags');
 }
 
 /** "Sin enmascarar" for the open project (a text already published): its real text may go to the AI. */

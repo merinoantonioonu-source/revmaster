@@ -122,6 +122,7 @@ function _resolutionParts(units, src, tgt) {
  */
 export function remask(session, input) {
   session.unmasked = !!input.unmasked;
+  session.docType = input.docType || '';
   const ent = computeEntities({
     units: session.units, src: session.src, tgt: session.tgt, srcLang: session.srcLang,
     mask: input.mask, gazetteer: input.gazetteer, dict: input.dict
