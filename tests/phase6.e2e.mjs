@@ -99,9 +99,9 @@ async function main() {
       { match: 'P\u00c1RRAFOS DE LA TRADUCCI\u00d3N', response: '11 | GRA | MEN | y y | y | Palabra repetida.\nFIN 12' },
       { match: 'HALLAZGOS A VERIFICAR', response: 'H1 | OK |  | Correcto.\nFIN 1' }
     ], def: 'FIN 0' });
-    // Only grammar+style (fused) to keep it short.
+    // Only Redaccion, to keep it short.
     await page.evaluate(() => { document.querySelectorAll('#rv-modules .mchip input[type=checkbox]').forEach(c => { if (c.checked) c.click(); }); });
-    for (const name of ['Gram\u00e1tica', 'Estilo']) await page.click('#rv-modules .mchip:has-text("' + name + '") input[type=checkbox]');
+    await page.click('#rv-modules .mchip[data-mod="writing"] input[type=checkbox]');
     await page.click('#rv-run');
     await page.waitForSelector('.modal:has-text("Plan de ejecuci")', { timeout: 15000 });
     const defText = await page.textContent('.modal');
@@ -132,7 +132,7 @@ async function main() {
       const rows = await u.readUsageRows();
       const batchRow = rows.find(r => /#batch$/.test(r.model));
       const price = batchRow ? await u.priceFor(batchRow.provider, batchRow.model) : null;
-      return { status: (state.project.deferred || [])[0].status, findings: state.findings.filter(f => f.module === 'grammar' && /y y/.test(f.quote || '')).length,
+      return { status: (state.project.deferred || [])[0].status, findings: state.findings.filter(f => f.module === 'writing' && /y y/.test(f.quote || '')).length,
         batchRow: !!batchRow, price };
     });
     ok(fin.status === 'done' && fin.findings === 1, 'Deferred job finished after a reload and produced the finding (' + JSON.stringify(fin) + ')');

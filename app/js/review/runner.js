@@ -1,6 +1,7 @@
 /**
- * runner.js - Executes a plan (planner.js): triage batches, cascade to the deep model, skeleton
- * calls, the Verifier, the results cache and the budget.
+ * runner.js - Executes a plan (planner.js): the batches of each module (and the cascade to a strong
+ * model, idle since the simplification: see planner.js), the official names, the Verifier, the results
+ * cache and the budget.
  *
  * runPlan(plan, ctx, hooks) -> { findings:[...], spent, calls, errors:[{module, message}], stopped }
  * ctx   = { session, project: { id, name, file }, prompts, cfg }
@@ -18,7 +19,7 @@ import { moduleById } from './module-list.js';
 import { unitSrcMasked, unitTgtMasked } from './session.js';
 import { rehydrate } from '../redact/entities.js';
 
-const DEEP_CATS = { fidelity: ['MIST', 'UNTR'], integrity: ['OMI', 'ADD'] };
+const DEEP_CATS = { meaning: ['MIST', 'UNTR', 'OMI', 'ADD'] };
 
 export async function runPlan(plan, ctx, hooks) {
   const h = hooks || {};
@@ -139,25 +140,6 @@ export async function runPlan(plan, ctx, hooks) {
       }
     }
     push(groupFindings);
-  }
-
-  // ---- skeleton modules
-  for (let si = 0; si < plan.skeleton.length; si++) {
-    const s = plan.skeleton[si];
-    if (out.stopped) break;
-    progress('Esqueleto', s.module);
-    try {
-      const pre = h.prefetched ? h.prefetched.get('s' + si) : null;
-      if (h.prefetched && !pre) continue;
-      if (pre && pre.error) { out.errors.push({ module: s.module, message: 'Lote diferido: ' + pre.error }); continue; }
-      const r = pre ? { text: pre.text, modelId: (s.tri && s.tri.modelId) || '' } : await call({ module: s.module, role: 'triage', prompt: s.user, system: s.system, words: 0,
-        thinking: _thinking(ctx.cfg, s.module), maxTokens: 4096 }, s.est.cost);
-      const parsed = parseFindings(r.text, s.units);
-      push(parsed.items.map(it => anchorItem(it, { session, unitByN, module: s.module, source: 'ai', model: r.modelId + (pre ? ' \u00b7 lote' : ''), role: 'triage' })));
-    } catch (e) {
-      if (e.code === 'BUDGET' || e.code === 'ABORT') break;
-      out.errors.push({ module: s.module, message: e.message, code: e.code });
-    }
   }
 
   // ---- Official names (the table of names only)

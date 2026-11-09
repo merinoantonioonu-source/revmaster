@@ -13,7 +13,7 @@
    "es": "El Consejo alent\u00f3 a otros Estados Miembros a que apoyaran los esfuerzos para aplicar los embargos de armas y petr\u00f3leo e informaran sobre ellos.",
    "expect": [
     {
-     "module": "fidelity",
+     "module": "meaning",
      "keys": [
       "informaran",
       "informar sobre",
@@ -28,7 +28,7 @@
    "es": "El Consejo recibi\u00f3 exposiciones informativas sobre las medidas coercitivas mar\u00edtimas adoptadas despu\u00e9s de las resoluciones pertinentes del Consejo.",
    "expect": [
     {
-     "module": "fidelity",
+     "module": "meaning",
      "keys": [
       "despues de",
       "en virtud de",
@@ -43,7 +43,7 @@
    "es": "Desde 2012, a\u00f1o en que se emiti\u00f3 una nota de la Presidencia del Consejo de Seguridad sobre el particular, el proceso de nombramiento de las Presidencias y las Vicepresidencias se llevaba a cabo con la participaci\u00f3n de todos los miembros del Consejo.",
    "expect": [
     {
-     "module": "fidelity",
+     "module": "meaning",
      "keys": [
       "llevaba",
       "se lleva"
@@ -57,7 +57,7 @@
    "es": "El 16 de abril, el Comit\u00e9 aprob\u00f3 el informe presentado al Consejo, en el que se\u00f1al\u00f3 que era incapaz de hacer una recomendaci\u00f3n un\u00e1nime.",
    "expect": [
     {
-     "module": "fidelity",
+     "module": "meaning",
      "keys": [
       "presentado",
       "su informe"
@@ -65,7 +65,7 @@
      "what": "\u00abel informe presentado al Consejo\u00bb presupone que ya se hab\u00eda presentado: \u00absu informe al Consejo\u00bb."
     },
     {
-     "module": "fidelity",
+     "module": "meaning",
      "keys": [
       "incapaz",
       "no habia podido"
@@ -79,7 +79,7 @@
    "es": "Se explic\u00f3 con mayor detalle la funci\u00f3n del Comit\u00e9 en lo concerniente a la liquidaci\u00f3n de los art\u00edculos confiscados durante las inspecciones de buques prevista en la resoluci\u00f3n 2292 (2016).",
    "expect": [
     {
-     "module": "fidelity",
+     "module": "meaning",
      "keys": [
       "prevista",
       "realizadas"
@@ -93,7 +93,7 @@
    "es": "Se pod\u00eda encontrar m\u00e1s informaci\u00f3n sobre la labor del Equipo de Vigilancia en su 15.\u00ba informe.",
    "expect": [
     {
-     "module": "fidelity",
+     "module": "meaning",
      "keys": [
       "podia",
       "puede encontrarse",
@@ -108,7 +108,7 @@
    "es": "Como en el caso de los comit\u00e9s, salvo decisi\u00f3n en contrario, los grupos de trabajo se formaron con representantes de los 15 miembros del Consejo y celebraron sus reuniones a puerta cerrada.",
    "expect": [
     {
-     "module": "fidelity",
+     "module": "meaning",
      "keys": [
       "salvo decision",
       "contrario"
@@ -116,7 +116,7 @@
      "what": "\u00absalvo decisi\u00f3n en contrario\u00bb desplazado: modifica la composici\u00f3n en lugar del car\u00e1cter privado de las reuniones."
     },
     {
-     "module": "fidelity",
+     "module": "meaning",
      "keys": [
       "se formaron",
       "integrados",
@@ -131,7 +131,7 @@
    "es": "El Grupo de Trabajo deb\u00eda examinar las medidas pr\u00e1cticas que se han de imponer contra las personas, los grupos y las entidades involucrados en actividades terroristas o asociados con ellas, adem\u00e1s de las ya enunciadas por el Comit\u00e9 establecido en virtud de la resoluci\u00f3n 1267 (1999), entre ellas establecer los procedimientos m\u00e1s eficaces que se consideren adecuados.",
    "expect": [
     {
-     "module": "fidelity",
+     "module": "meaning",
      "keys": [
       "ademas de",
       "salvo",
@@ -140,7 +140,7 @@
      "what": "other than those designated = \u00absalvo los designados\u00bb (personas, excluyente), no \u00abadem\u00e1s de las ya enunciadas\u00bb (medidas, aditivo)."
     },
     {
-     "module": "fidelity",
+     "module": "meaning",
      "keys": [
       "los procedimientos mas eficaces",
       "mas eficaces",
@@ -156,7 +156,7 @@
    "es": "El Consejo tambi\u00e9n se refiri\u00f3 a otros aspectos relacionados con la gesti\u00f3n, la presentaci\u00f3n de informes y el desempe\u00f1o de las funciones del Tribunal.",
    "expect": [
     {
-     "module": "fidelity",
+     "module": "meaning",
      "keys": [
       "desempeno",
       "conclusion",
@@ -171,7 +171,7 @@
    "es": "El Consejo solicit\u00f3 al Secretario General que expusiera claramente una serie de opciones para la financiaci\u00f3n de la Misi\u00f3n, por ejemplo, el apoyo de los asociados internacionales.",
    "expect": [
     {
-     "module": "integrity",
+     "module": "meaning",
      "keys": [
       "por ejemplo",
       "sin caracter restrictivo",
@@ -187,7 +187,7 @@
    "es": "El Consejo expres\u00f3 su intenci\u00f3n de convocar una reuni\u00f3n privada en octubre.",
    "expect": [
     {
-     "module": "integrity",
+     "module": "meaning",
      "keys": [
       "cerrada",
       "closed"
@@ -201,7 +201,7 @@
    "es": "El Consejo solicit\u00f3 al Secretario General que hiciera posible implementar en la AUSSOM el marco establecido por la resoluci\u00f3n 2719 (2023) a partir del 1 de julio de 2025 con los recursos que quedaran disponibles tras ajustar el tama\u00f1o de la UNSOS.",
    "expect": [
     {
-     "module": "integrity",
+     "module": "meaning",
      "keys": [
       "eventual",
       "potential",
@@ -210,7 +210,7 @@
      "what": "Falta potential (\u00abeventual\u00bb)."
     },
     {
-     "module": "integrity",
+     "module": "meaning",
      "keys": [
       "existentes",
       "existing"
@@ -224,7 +224,7 @@
    "es": "El Consejo les solicit\u00f3 que lo informaran a m\u00e1s tardar el 30 de septiembre de 2025, presentando una estrategia de salida actualizada para la AUSSOM.",
    "expect": [
     {
-     "module": "integrity",
+     "module": "meaning",
      "keys": [
       "presentando",
       "en particular",
@@ -234,7 +234,7 @@
      "what": "including on restringido a \u00abpresentando\u00bb: el informe incluye la estrategia, no se limita a ella."
     },
     {
-     "module": "grammar",
+     "module": "writing",
      "keys": [
       "lo informaran",
       "le informaran",
@@ -249,7 +249,7 @@
    "es": "El Consejo modific\u00f3 el nombre del Comit\u00e9 del Consejo de Seguridad establecido en virtud de la resoluci\u00f3n 2127 (2013) relativa a la Rep\u00fablica Centroafricana por \"Comit\u00e9 dimanante de la resoluci\u00f3n 2745 (2024)\".",
    "expect": [
     {
-     "module": "integrity",
+     "module": "meaning",
      "keys": [
       "consejo de seguridad",
       "security council"
@@ -257,7 +257,7 @@
      "what": "En el nuevo nombre falta \u00abdel Consejo de Seguridad\u00bb."
     },
     {
-     "module": "grammar",
+     "module": "writing",
      "keys": [
       "modifico",
       "cambio",
@@ -272,7 +272,7 @@
    "es": "Con sujeci\u00f3n a cualquier pr\u00f3rroga de ese per\u00edodo que acordara el Comit\u00e9, el Estado pertinente podr\u00eda presentar una solicitud actualizada.",
    "expect": [
     {
-     "module": "integrity",
+     "module": "meaning",
      "keys": [
       "falta de aprobacion",
       "lack of approval"
@@ -286,7 +286,7 @@
    "es": "El Consejo alent\u00f3 al Comit\u00e9 a que, cuando procediera, considerara la posibilidad de realizar visitas a determinados pa\u00edses.",
    "expect": [
     {
-     "module": "integrity",
+     "module": "meaning",
      "keys": [
       "donde",
       "where"
@@ -300,7 +300,7 @@
    "es": "El Consejo autoriz\u00f3 inspecciones a fin de asegurar la estricta aplicaci\u00f3n del embargo de armas en alta mar frente a las costas de Libia.",
    "expect": [
     {
-     "module": "integrity",
+     "module": "meaning",
      "keys": [
       "estricta"
      ],
@@ -313,7 +313,7 @@
    "es": "Asimismo, se examinan otros \u00f3rganos subsidiarios, como la Oficina del \u00d3mbudsman, la Direcci\u00f3n Ejecutiva del Comit\u00e9 contra el Terrorismo y algunos grupos de expertos, junto con los comit\u00e9s correspondientes.",
    "expect": [
     {
-     "module": "integrity",
+     "module": "meaning",
      "keys": [
       "algunos"
      ],
@@ -326,7 +326,7 @@
    "es": "En 2024, el mandato del Comit\u00e9 establecido en virtud de la resoluci\u00f3n 1591 (2005) se mantuvo en su mayor parte sin cambios.",
    "expect": [
     {
-     "module": "integrity",
+     "module": "meaning",
      "keys": [
       "en su mayor parte",
       "mayor parte"
@@ -340,7 +340,7 @@
    "es": "El informe se bas\u00f3 en una serie de consultas con los Estados Miembros, las partes pertinentes del sistema de las Naciones Unidas y representantes de la sociedad civil.",
    "expect": [
     {
-     "module": "integrity",
+     "module": "meaning",
      "keys": [
       "pertinentes"
      ],
@@ -382,7 +382,7 @@
    "es": "El Consejo solicit\u00f3 al Secretario General que le proporcionara an\u00e1lisis integrados para describir el impacto de la misi\u00f3n, facilitar la reevaluaci\u00f3n del mandato y seguir comunic\u00e1ndole los progresos, e incluyera informaci\u00f3n en los informes combinados.",
    "expect": [
     {
-     "module": "grammar",
+     "module": "writing",
      "keys": [
       "incluyera",
       "y que"
@@ -396,7 +396,7 @@
    "es": "Hacer recomendaciones al Consejo sobre posibles medidas para promover la protecci\u00f3n de los ni\u00f1os afectados por conflictos armados, que se refirieran tambi\u00e9n a los mandatos apropiados.",
    "expect": [
     {
-     "module": "grammar",
+     "module": "writing",
      "keys": [
       "refirieran",
       "refieran"
@@ -410,7 +410,7 @@
    "es": "Record\u00f3 a ese respecto que en el Art\u00edculo 52, p\u00e1rrafo 1 se presum\u00eda la existencia de acuerdos regionales.",
    "expect": [
     {
-     "module": "grammar",
+     "module": "writing",
      "keys": [
       "parrafo 1,",
       "coma"

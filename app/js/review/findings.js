@@ -52,7 +52,7 @@ export function anchorItem(item, ctx) {
   const { session } = ctx;
   const u = ctx.unitByN.get(item.unit);
   if (!u) return null;
-  const module = ctx.module || CAT_MODULE[item.cat] || 'fidelity';
+  const module = ctx.module || CAT_MODULE[item.cat] || 'meaning';
   const f = {
     id: newFindingId(ctx.source === 'external' ? 'X' : 'A'), module, source: ctx.source || 'ai', state: 'open',
     unit: u.idx, side: 'tgt', cat: item.cat, sev: item.sev, start: null, end: null,

@@ -1,6 +1,6 @@
 /**
- * deferred.js - Deferred mode: the first pass of a review (the triage batches and the skeleton
- * calls) goes to the providers' batch APIs, which answer within minutes or hours (up to 24 h) at about
+ * deferred.js - Deferred mode: the first pass of a review (the batches of each module) goes to the
+ * providers' batch APIs, which answer within minutes or hours (up to 24 h) at about
  * half the price. When the answers arrive, the run is finished here exactly as an immediate one:
  * parsing, anchoring, cache, cascade to the deep model and Verifier (those last two, being small,
  * run at once at the normal price).
@@ -17,13 +17,14 @@ import { runPlan } from './runner.js';
 import { unitSrcMasked, unitTgtMasked } from './session.js';
 import { fnv1a } from '../util/crypto.js';
 import { uid } from '../util/dom.js';
+import { moduleById } from './module-list.js';
 
 export function maskSignature(session) {
   return fnv1a(session.units.map(u => unitSrcMasked(session, u) + '\u0001' + unitTgtMasked(session, u)).join('\u0002'));
 }
 
 /**
- * Can this plan go deferred? Every triage group and skeleton call needs a provider with a batch API.
+ * Can this plan go deferred? Every group of batches needs a provider with a batch API.
  * -> { ok, parts:[{ label, ok, kind, provider }], missing:[labels] }
  */
 export async function deferredCapability(plan) {
@@ -31,11 +32,7 @@ export async function deferredCapability(plan) {
   for (const g of plan.groups) {
     if (!g.batches.length) continue;
     const s = await deferredSupport(g.modules[0], 'triage').catch(() => ({ ok: false }));
-    parts.push({ label: g.modules.join(' + '), ok: !!s.ok, kind: s.kind, provider: s.profileName });
-  }
-  for (const sk of plan.skeleton) {
-    const s = await deferredSupport(sk.module, 'triage').catch(() => ({ ok: false }));
-    parts.push({ label: sk.module, ok: !!s.ok, kind: s.kind, provider: s.profileName });
+    parts.push({ label: g.modules.map(id => (moduleById(id) || { label: id }).label).join(' + '), ok: !!s.ok, kind: s.kind, provider: s.profileName });
   }
   return { ok: parts.length > 0 && parts.every(p => p.ok), parts, missing: parts.filter(p => !p.ok).map(p => p.label + ' (' + (p.provider || '?') + ')') };
 }
@@ -47,20 +44,13 @@ export async function startDeferred(plan, ctx) {
   // the client, so every request of a job goes to the same provider and model.
   const byModule = new Map();
   for (const k of keys) {
-    let module, req;
-    if (k.kind === 'batch') {
-      const g = plan.groups[k.gi], b = g.batches[k.bi];
-      module = g.modules[0];
-      req = { key: k.key, prompt: b.user, system: g.system, maxTokens: 8192, thinking: _thinking(ctx.cfg, module) };
-    } else {
-      const s = plan.skeleton[k.si];
-      module = s.module;
-      req = { key: k.key, prompt: s.user, system: s.system, maxTokens: 4096, thinking: _thinking(ctx.cfg, module) };
-    }
+    const g = plan.groups[k.gi], b = g.batches[k.bi];
+    const module = g.modules[0];
+    const req = { key: k.key, prompt: b.user, system: g.system, maxTokens: 8192, thinking: _thinking(ctx.cfg, module) };
     if (!byModule.has(module)) byModule.set(module, []);
     byModule.get(module).push(req);
   }
-  const rec = { id: uid('d'), createdAt: Date.now(), status: 'running', modules: Array.from(new Set(plan.groups.flatMap(g => g.modules).concat(plan.skeleton.map(s => s.module)))),
+  const rec = { id: uid('d'), createdAt: Date.now(), status: 'running', modules: Array.from(new Set(plan.groups.flatMap(g => g.modules))),
     maskSig: maskSignature(ctx.session), plan: serializePlan(plan), jobs: [], findings: 0, spent: 0, error: '' };
   const done = [];
   try {
@@ -134,8 +124,6 @@ export async function checkDeferred(rec, ctx, hooks) {
 function _moduleOfKey(rec, key) {
   const m = /^g(\d+)b\d+$/.exec(key);
   if (m) { const g = rec.plan.groups[+m[1]]; return g ? g.modules.join('+') : 'other'; }
-  const s = /^s(\d+)$/.exec(key);
-  if (s) { const sk = rec.plan.skeleton[+s[1]]; return sk ? sk.module : 'other'; }
   return 'other';
 }
 

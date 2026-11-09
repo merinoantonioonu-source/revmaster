@@ -13,7 +13,7 @@
 
 import { helpBtn, helpItem } from './help.js';
 import { el, clear, toast, download, fmtInt, fmtMoney } from '../util/dom.js';
-import { MODULES } from '../review/module-list.js';
+import { moduleById } from '../review/module-list.js';
 import * as reg from '../ai/registry.js';
 import {
   readUsageRows, loadPrices, savePrices, lookupPrices, costOf, priceKey, priceFor, loadUsageNotes, saveUsageNote,
@@ -66,11 +66,15 @@ function _money(v) {
 function _moduleLabel(id) {
   if (id === OTHER_MODULE || id === 'test') return 'Otros (prueba de conexi\u00f3n)';
   if (!id) return 'Sin m\u00f3dulo';
-  // Fused calls are recorded as 'fidelity+integrity': name every module.
-  return String(id).split('+').map(part => {
-    const m = MODULES.find(x => x.id === part);
-    return m ? m.label : part;
-  }).join(' + ');
+  // Calls of reviewers fused before the simplification were recorded as 'fidelity+integrity': each part by
+  // the module that covers it now, named once.
+  const names = [];
+  for (const part of String(id).split('+')) {
+    const m = moduleById(part);
+    const n = m ? m.label : part;
+    if (!names.includes(n)) names.push(n);
+  }
+  return names.join(' + ');
 }
 
 function _groupBy(list, keyOf) {

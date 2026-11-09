@@ -8,13 +8,13 @@ import { reviewableUnits, unitSrcMasked, unitTgtMasked } from './session.js';
 import { parseFindings } from './parse.js';
 import { anchorItem } from './findings.js';
 import { TASKS, CAT_LABELS } from './prompts.js';
-import { MODULES } from './module-list.js';
+import { moduleById } from './module-list.js';
 
 /**
- * opts = { modules:[ids] (tasks to ask for; default the five main ones), bilingual:true, withInstructions:true }
+ * opts = { modules:[ids] (tasks to ask for; default Sentido and Redaccion), bilingual:true, withInstructions:true }
  */
 export function buildExternalText(session, opts) {
-  const o = Object.assign({ modules: ['grammar', 'fidelity', 'integrity', 'style'], bilingual: true, withInstructions: true }, opts || {});
+  const o = Object.assign({ modules: ['meaning', 'writing'], bilingual: true, withInstructions: true }, opts || {});
   const units = reviewableUnits(session).filter(u => u.tgtPara !== null || (o.bilingual && u.srcPara !== null));
   const cats = [];
   for (const id of o.modules) for (const c of (TASKS[id] ? TASKS[id].cats : [])) if (!cats.includes(c)) cats.push(c);
@@ -49,6 +49,6 @@ export function importExternal(text, session) {
 }
 
 export function moduleLabel(id) {
-  const m = MODULES.find(x => x.id === id);
+  const m = moduleById(id);
   return m ? m.label : id;
 }

@@ -18,10 +18,11 @@ import { buildSession, remask } from './review/session.js';
 import { defaultMaskSettings } from './redact/entities.js';
 import { guessLang } from './redact/detect.js';
 import { uid } from './util/dom.js';
+import { currentModuleId } from './review/module-list.js';
 
 export const state = {
   project: null, src: null, tgt: null, session: null, findings: [],
-  data: { gazetteer: [], conventions: {}, gazBase: [] },
+  data: { gazetteer: [], gazBase: [] },
   dict: [],
   view: 'files'
 };
@@ -39,9 +40,8 @@ export async function loadData() {
   const get = async (name, def) => {
     try { const r = await fetch(new URL('../data/' + name, import.meta.url)); return await r.json(); } catch (e) { console.warn(name, e); return def; }
   };
-  const [gaz, conv] = await Promise.all([get('gazetteer.json', { entries: [] }), get('conventions.json', {})]);
+  const gaz = await get('gazetteer.json', { entries: [] });
   state.data.gazBase = (gaz && gaz.entries) || [];
-  state.data.conventions = conv || {};
   await refreshLists();
   storage.onChanged(async (ch) => {
     if (ch[DICT_KEY] || ch[LISTS_KEY]) {
@@ -125,7 +125,8 @@ async function _load(project) {
     state.tgt = tgt;
     state.session = buildSession({ src, tgt, alignment, srcLang: project.srcLang, mask: project.mask,
       gazetteer: state.data.gazetteer, dict: state.dict });
-    state.findings = project.findings || [];
+    // Findings of reviewers merged in the simplification (2026-11-09) go under the one that covers them now.
+    state.findings = (project.findings || []).map(f => { if (f && f.module) f.module = currentModuleId(f.module); return f; });
     await setValue('last_project', project.id);
     emit('project', project);
     emit('masked');
@@ -217,7 +218,7 @@ export function addFindings(list, replaceModules) {
     // A new run of a module replaces its OPEN findings (decisions already taken are kept).
     state.findings = state.findings.filter(f => !(replaceModules.includes(f.module) && f.state === 'open'));
   }
-  state.findings = state.findings.concat(list);
+  state.findings = state.findings.concat(list.map(f => { if (f && f.module) f.module = currentModuleId(f.module); return f; }));
   emit('findings');
   saveProjectSoon();
 }

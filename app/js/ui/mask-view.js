@@ -138,9 +138,9 @@ async function run(fn) {
 }
 
 export async function externalDialog() {
-  const mods = [['grammar', 'Gram\u00e1tica'], ['fidelity', 'Fidelidad'], ['integrity', 'Omisiones y adiciones'], ['style', 'Estilo'], ['coldread', 'Lectura en fr\u00edo']];
+  const mods = [['meaning', 'Sentido'], ['writing', 'Redacci\u00f3n']];
   const checks = mods.map(([id, label]) => el('label', { style: { marginRight: '12px' } },
-    el('input', { type: 'checkbox', value: id, checked: id !== 'coldread' }), ' ' + label));
+    el('input', { type: 'checkbox', value: id, checked: true }), ' ' + label));
   const bil = el('input', { type: 'checkbox', checked: true });
   const ta = el('textarea.inp', { rows: 14, readonly: true });
   const refresh = () => {

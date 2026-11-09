@@ -5,8 +5,12 @@ Pages (`app/` only). It helps United Nations translators (EN/FR -> ES):
 1. **Mask** figures, organizations, organs, countries, places, persons, titles, dates, document
    symbols and URLs in DOCX/PPTX/XLSX files exported from eLUNa, with tags (`{CARGO1}`, the same
    tag in the source and in the Spanish target), and export the masked files.
-2. **Review** the masked translation with AI modules: each one is a specialist reviewer (its own
-   provider/model and strictness) that looks only for its kind of problem, as a human reviser would.
+2. **Review** the masked translation with AI, as a human reviser would. Since 2026-11-09 (the owner's
+   choice, to keep it simple): **Sentido** (`meaning`), the master review of meaning - what the
+   translation says differently, leaves out or adds - with the strongest model on every paragraph;
+   **Redaccion** (`writing`), the Spanish alone (grammar and institutional style); **Nombres oficiales**
+   (`names`); and the **Verificador**, which discards false positives. Each has its own model and
+   strictness.
 
 **Purpose (the owner's words, 2026-11-05):** a substantive, content-level review by AI. NO rule-based or
 AI-free checks (figures, spelling, glossaries, fixed rules): COMeT's QA Checker and Final Check do that,
@@ -71,6 +75,14 @@ See `docs/ARQUITECTURA.md` (contracts between modules) and `docs/PROPUESTA.md` (
   re-render call `nav.refresh()`. `tests/nav.e2e.mjs` covers it.
 - Removed on purpose (do not bring back): the spell checker (Word does spelling), the AI-free
   "Capa 0" checks, the rules system (editor, built-in rules, profiles) and the semantic similarity.
+  And (2026-11-09) the nine specialist reviewers: Fidelidad + Integridad are now Sentido, Gramatica +
+  Estilo are Redaccion; Lectura en frio, Coherencia and Convenciones ONU are gone (with the "skeleton"
+  they sent: `skeleton.js`, `parallel.js`, `conventions.json`), and so is the fusion of modules. Old ids
+  in projects, sync files and usage records map to the new modules (`LEGACY_MODULES` and
+  `currentModuleId` in `module-list.js`; `LEGACY_SLOTS` and `migrateModuleModels` in `ai/registry.js`
+  carry the models chosen before). The cascade (an economical model, then a strong one on what it
+  flagged) is still in the planner and runner but no module uses it: Sentido reads everything with one
+  model. Decide with the test bench before adding a reviewer back.
 - "Exigencia" (module config `strictness`: grave | normal | estricta) is in the prompt AND enforced by
   the runner (`STRICT_ALLOWED`): findings of a severity not asked for are dropped. Severity is about
   the effect on what is understood, not the size of the change (one word can be MAY).

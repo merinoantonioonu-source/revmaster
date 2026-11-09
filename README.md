@@ -31,20 +31,18 @@ navegador: no se suben a GitHub ni a ningún servidor. A una IA solo llega texto
    - el texto listo para pegar en una IA externa.
 2. **Revisar.** Una revisión de fondo, del contenido, hecha por IA como la haría un revisor humano.
    No repite lo que ya hacen el QA Checker y el Final Check de COMeT (cifras, ortografía, reglas fijas).
-   Cada módulo es un revisor especializado que solo busca lo que le compete:
-   - gramática (la ortografía la corrige Word);
-   - fidelidad de sentido;
-   - nombres oficiales (solo envía la lista de nombres de organismos, órganos, cargos, países y
-     lugares, nunca el texto);
-   - integridad (omisiones y adiciones);
-   - estilo;
-   - coherencia;
-   - convenciones de la ONU;
-   - lectura en frío;
-   - verificador.
+   Tres revisores:
+   - **Sentido**, la revisión de fondo: compara cada párrafo con el original y señala lo que la
+     traducción dice distinto, lo que falta y lo que sobra, aunque sea una palabra. Conviene darle el
+     modelo más fuerte;
+   - **Redacción**: lee solo el español (gramática que afecta a la sintaxis y estilo institucional;
+     la ortografía la corrige Word);
+   - **Nombres oficiales**: solo envía la lista de nombres de organismos, órganos, cargos, países y
+     lugares, nunca el texto.
 
-   Cada módulo tiene su propio proveedor, su modelo y su **exigencia** (solo lo importante, normal o
-   exhaustiva). Antes de gastar nada, UMBRA muestra el plan con su coste estimado.
+   Después, el **Verificador** descarta los falsos positivos. Cada revisor tiene su modelo y su
+   **exigencia** (solo lo importante, normal o exhaustiva). Antes de gastar nada, UMBRA muestra el plan
+   con su coste estimado.
 
    Además:
    - **Navegación por oraciones, como en Final Check:** al pulsar una oración se resalta con su
@@ -73,8 +71,8 @@ La barra de la izquierda tiene los cinco pasos y dice en qué punto está cada u
 2. **Enmascarar:** revisa las entidades. Para enmascarar algo más, selecciona el texto y pulsa
    **Alt+E** (o clic derecho › Enmascarar la selección). Para quitar una etiqueta, haz clic derecho
    sobre ella.
-3. **Revisar:** marca los revisores (cada uno en su tarjeta, con su exigencia) y pulsa
-   **Revisar ahora**.
+3. **Revisar:** deja marcados Sentido, Redacción y Nombres oficiales (o solo los que quieras), elige su
+   exigencia y pulsa **Revisar ahora**.
 4. **Corregir:** una fila por segmento con hallazgos (original y traducción lado a lado) y, a la
    derecha, el hallazgo elegido con su propuesta, que puedes cambiar. Atajos:
    - **A** acepta;
