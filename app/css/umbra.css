@@ -504,3 +504,5 @@ textarea.inp.ci-sug:disabled { border-color: var(--border); background: var(--bg
 .projchip .pc-tx small { font-size: 11px; }
 .recent-del { color: var(--text-muted); vertical-align: middle; }
 .recent-del:hover { color: #b42318; }
+/* Comparar con la version final: the figures */
+table.grid.cmp td:last-child { text-align: right; font-weight: 700; width: 90px; }

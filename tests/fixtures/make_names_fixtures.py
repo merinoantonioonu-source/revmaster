@@ -22,4 +22,15 @@ for rows, name in ((EN, "names_en.docx"), (ES, "names_es.docx")):
     for t in rows:
         d.add_paragraph(t)
     d.save(os.path.join(HERE, name))
+# The final, reviewed version of the translation (for "Comparar con la version final").
+FINAL = [
+    "El Departamento de Asuntos Económicos y Sociales organizó la reunión sobre el agua.",
+    "El UNTSO siguió observando el alto el fuego en la región.",
+    "El programa de los Voluntarios de las Naciones Unidas envió a veinte voluntarios a la región.",
+    "El Consejo de Seguridad se reunió, el mismo día, para examinar el informe.",
+]
+d = docx.Document()
+for t in FINAL:
+    d.add_paragraph(t)
+d.save(os.path.join(HERE, "names_es_final.docx"))
 print("ok")

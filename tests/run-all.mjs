@@ -22,7 +22,8 @@ const steps = [
   ['Sin enmascarar', 'node', [path.join(HERE, 'unmasked.e2e.mjs')]],
   ['Tipo de documento y paso siguiente', 'node', [path.join(HERE, 'doctype.e2e.mjs')]],
   ['Nombres oficiales sin pareja', 'node', [path.join(HERE, 'names.e2e.mjs')]],
-  ['Proyecto y limpieza', 'node', [path.join(HERE, 'project.e2e.mjs')]]
+  ['Proyecto y limpieza', 'node', [path.join(HERE, 'project.e2e.mjs')]],
+  ['Comparar con la version final', 'node', [path.join(HERE, 'compare.e2e.mjs')]]
 ];
 
 let failed = 0;
