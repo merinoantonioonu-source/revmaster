@@ -269,8 +269,20 @@ async function _ctx() {
   return { prompts: await loadPrompts(), cfg: await loadModuleConfig() };
 }
 
+/** The models of the reviewers (and the Verifier), so their missing prices are looked up by themselves. */
+async function _autoPrices() {
+  try {
+    const reg = await import('../ai/registry.js');
+    const u = await import('../ai/usage.js');
+    const clients = [];
+    for (const m of MODULES) if (m.ai) for (const role of m.roles) { try { clients.push(await reg.resolveClient(m.id, role)); } catch (_) {} }
+    return await u.autoPrices(clients);
+  } catch (_) { return 0; }
+}
+
 async function computeEstimates() {
   if (!state.session || state.view !== 'review') return;
+  if (await _autoPrices()) estimates = {};
   const ctx = await _ctx();
   for (const m of MODULES) {
     if (!m.ai || m.id === 'verifier' || estimates[m.id]) continue;
@@ -300,6 +312,7 @@ async function runModules(ids) {
   const ai = ids.filter(id => id !== 'verifier' && !pend.has(id) && moduleById(id) && moduleById(id).ai && ctx.cfg[id].enabled !== false);
   if (skipped.length) toast(skipped.map(id => moduleById(id).label).join(', ') + ': ya est\u00e1 en la revisi\u00f3n diferida en curso; no se env\u00eda otra vez.', 'warn', 7000);
   if (!ai.length) { renderModules(); return; }
+  await _autoPrices();
   let plan = await makePlan(state.session, ctx, { modules: ai });
   if (plan.errors.length && !plan.groups.length && !plan.names) {
     toast('No hay ning\u00fan proveedor de IA con clave. Config\u00farelo en Ajustes \u203a Proveedores.', 'err', 8000);

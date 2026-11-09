@@ -279,7 +279,7 @@ const T = {
       'Una nota (\u270e) junto a un proyecto le ayuda a reconocerlo.'],
     'El coste se calcula con precios de lista: puede diferir algo de la factura del proveedor.'] },
   prices: { t: 'Precios', b: [
-    'US$ por mill\u00f3n de tokens de cada modelo: entrada, en cach\u00e9 y salida. Vienen de la lista p\u00fablica de LiteLLM (**Buscar precios** la actualiza). Si escribe uno, manda el suyo.'] },
+    'US$ por mill\u00f3n de tokens de cada modelo: entrada, en cach\u00e9 y salida. Vienen de la lista p\u00fablica de LiteLLM: UMBRA busca sola el precio de un modelo que no lo tenga al ir a Revisar (como mucho una vez al d\u00eda), y **Buscar precios** actualiza todos. Si un modelo no est\u00e1 en la lista, sale **Sin precio**: escriba el suyo, que manda sobre la lista.'] },
   privacy: { t: 'Privacidad', b: [
     ['Los documentos se procesan en este navegador; la web solo sirve el programa.',
       'A una IA solo llega texto ENMASCARADO: la salida rechaza el texto sin enmascarar, salvo hacia un proveedor marcado como local.',

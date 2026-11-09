@@ -292,6 +292,48 @@ export async function lookupPrices(keys) {
   return { found, missing };
 }
 
+/**
+ * The prices that are missing, looked up by themselves (the owner's report, 2026-11-09: a model with no
+ * price showed a cost of 0 because nobody had pressed "Buscar precios"). `clients`: what
+ * registry.resolveClient gives ([{ providerId, modelId, profile }]). For every model with no price, at
+ * most once a day, LiteLLM's public list is read; what it has is saved (never over a price typed by
+ * hand); what it has not stays "Sin precio". Local endpoints (a model on this computer, a test server)
+ * have no list price and are left out. Never throws: a list that cannot be read changes nothing.
+ * -> the number of models priced now.
+ */
+export const PRICES_TRIED_KEY = 'ai_prices_tried';
+export async function autoPrices(clients) {
+  try {
+    const now = Date.now();
+    const tried = Object.assign({}, (await getValue(PRICES_TRIED_KEY, null)) || {});
+    const keys = [];
+    for (const c of (clients || [])) {
+      if (!c || !c.providerId || !c.modelId) continue;
+      const p = c.profile || {};
+      if (p.trust === 'local' || /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(String(p.baseUrl || ''))) continue;
+      const k = priceKey(c.providerId, c.modelId);
+      if (keys.some(x => priceKey(x.provider, x.model) === k)) continue;
+      if (tried[k] && now - tried[k] < 86400000) continue;
+      if (await priceFor(c.providerId, c.modelId)) continue;
+      keys.push({ provider: c.providerId, model: c.modelId, adapter: p.adapter });
+    }
+    if (!keys.length) return 0;
+    for (const k of keys) tried[priceKey(k.provider, k.model)] = now;
+    await setValue(PRICES_TRIED_KEY, tried);
+    const { found } = await lookupPrices(keys);
+    const pr = await loadPrices();
+    let n = 0;
+    for (const k of Object.keys(found)) {
+      const cur = pr.models[k];
+      if (cur && cur.src === 'Puesto a mano') continue;
+      pr.models[k] = found[k];
+      n++;
+    }
+    if (n) await savePrices(pr);
+    return n;
+  } catch (_) { return 0; }
+}
+
 // ------------------------------------------------------------------ notes
 
 /**
