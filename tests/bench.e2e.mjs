@@ -137,6 +137,25 @@ async function main() {
     ok(anchored.n === anchored.count && anchored.ok && anchored.cats.every(c => ['ORG', 'ORGANO', 'CARGO', 'PAIS', 'LUGAR'].includes(c)),
       'A names finding is anchored on each occurrence of that form (' + JSON.stringify(anchored) + ')');
 
+    // A bench of one's own: a .zip with banco.json and the two documents, read in the browser; its spec
+    // scores the project that holds it, the built-in one the others.
+    const own = await page.evaluate(async () => {
+      const B = await import('/app/js/review/bench.js');
+      const zip = new window.JSZip();
+      zip.file('banco.json', JSON.stringify({ kind: 'umbra-bench', name: 'Banco propio de prueba', paragraphs: [{ en: 'a', es: 'b' }] }));
+      const get = async (n) => (await fetch('/app/data/calibration/' + n)).blob();
+      zip.file('mio/banco_en.docx', await get('banco_en.docx'));
+      zip.file('mio/banco_es.docx', await get('banco_es.docx'));
+      const got = await B.readBenchZip(new File([await zip.generateAsync({ type: 'blob' })], 'mio.zip'));
+      const empty = await B.readBenchZip(new File([await (new window.JSZip()).generateAsync({ type: 'blob' })], 'x.zip')).then(() => 'no error', e => e.message);
+      const notZip = await B.readBenchZip(new File(['hola'], 'x.zip')).then(() => 'no error', e => e.message);
+      return { n: got.spec.paragraphs.length, expect: got.spec.paragraphs[0].expect, src: got.src.name, tgt: got.tgt.name, size: got.src.size > 1000,
+        empty, notZip, own: (await B.benchSpecOf({ benchSpec: got.spec })).name, builtIn: (await B.benchSpecOf({ bench: true })).paragraphs.length };
+    });
+    ok(own.n === 1 && Array.isArray(own.expect) && own.expect.length === 0 && own.src === 'banco_en.docx' && own.tgt === 'banco_es.docx' && own.size &&
+      /debe contener banco\.json/.test(own.empty) && /no es un \.zip/.test(own.notZip) && own.own === 'Banco propio de prueba' && own.builtIn === 31,
+      'A bench of one\'s own is read from a .zip and scores its project; the built-in one the others (' + JSON.stringify(own) + ')');
+
     ok(!errors.length, 'No console errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
     await ctx.close();
   } catch (e) {
