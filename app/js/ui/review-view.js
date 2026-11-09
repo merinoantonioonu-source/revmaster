@@ -300,16 +300,22 @@ async function runModules(ids) {
   const ai = ids.filter(id => id !== 'verifier' && !pend.has(id) && moduleById(id) && moduleById(id).ai && ctx.cfg[id].enabled !== false);
   if (skipped.length) toast(skipped.map(id => moduleById(id).label).join(', ') + ': ya est\u00e1 en la revisi\u00f3n diferida en curso; no se env\u00eda otra vez.', 'warn', 7000);
   if (!ai.length) { renderModules(); return; }
-  const plan = await makePlan(state.session, ctx, { modules: ai });
+  let plan = await makePlan(state.session, ctx, { modules: ai });
   if (plan.errors.length && !plan.groups.length && !plan.names) {
     toast('No hay ning\u00fan proveedor de IA con clave. Config\u00farelo en Ajustes \u203a Proveedores.', 'err', 8000);
     emit('goto-settings', 'providers');
     return;
   }
   const budgetDefault = Math.min(...ai.map(id => ctx.cfg[id].budget || Infinity));
-  const cap = await deferredCapability(plan).catch(() => ({ ok: false, parts: [], missing: [] }));
-  const ok = await planDialog(plan, isFinite(budgetDefault) ? budgetDefault : 0, cap);
-  if (!ok) return;
+  let ok = null;
+  for (;;) {
+    const cap = await deferredCapability(plan).catch(() => ({ ok: false, parts: [], missing: [] }));
+    ok = await planDialog(plan, isFinite(budgetDefault) ? budgetDefault : 0, cap);
+    if (!ok) return;
+    // "Preguntar de nuevo a la IA": the plan without the saved answers, shown again with its cost.
+    if (ok.fresh) { plan = await makePlan(state.session, ctx, { modules: ai, noCache: true }); continue; }
+    break;
+  }
   if (ok.deferred) {
     try {
       const rec = await startDeferred(plan, { session: state.session, cfg: ctx.cfg });
@@ -416,6 +422,11 @@ function planDialog(plan, budget, cap) {
   if (plan.verify) rows.push(el('li', 'Verificador: ' + plan.verify.est.calls + ' llamada(s) con ' + plan.verify.client.modelId));
   for (const e of plan.errors) rows.push(el('li.err-t', moduleById(e.module).label + ': ' + e.message));
   const budgetIn = el('input.inp', { type: 'number', min: 0, step: 0.05, value: budget || '', placeholder: 'Sin l\u00edmite', style: { width: '110px' } });
+  // The saved answers of the AI (the results cache: by text, model and instructions, in every project).
+  const cachedN = plan.totals.cached || 0;
+  const cacheBox = cachedN ? el('div.note', { style: { marginTop: '10px' } }, el('b', 'Respuestas guardadas: '),
+    cachedN + (cachedN === 1 ? ' p\u00e1rrafo ya se revis\u00f3' : ' p\u00e1rrafos ya se revisaron') + ' con este modelo y estas instrucciones (en este u otro proyecto): se reutilizan sus respuestas, sin coste. ' +
+    'Si quiere que la IA los lea otra vez (por ejemplo, para comparar), pulse \u00abPreguntar de nuevo a la IA\u00bb: ver\u00e1 el plan con su coste antes de enviar nada.') : null;
   const nothing = !plan.groups.some(g => g.batches.length) && !plan.names;
   // Deferred mode: the first pass at about half the price; the Verifier, which is small, runs when the
   // answers arrive, at the normal price.
@@ -438,11 +449,13 @@ function planDialog(plan, budget, cap) {
       '. UMBRA no sabe cu\u00e1nto cuesta este modelo, as\u00ed que no puede calcular el coste (ni antes ni despu\u00e9s). P\u00f3ngale el precio en Ajustes \u203a Proveedores y modelos: US$ por mill\u00f3n de tokens de entrada y de salida, como los publica el proveedor.') : null,
     el('p.info', 'Estimaci\u00f3n orientativa: el gasto real se registra en Uso de IA. ' + (um ? 'Proyecto sin enmascarar: el texto se env\u00eda tal cual.' : 'Solo se env\u00eda texto enmascarado (y, si est\u00e1 marcado Nombres oficiales, la lista de nombres de organismos, \u00f3rganos, cargos, pa\u00edses y lugares).') +
       (nothing ? ' No hay nada nuevo que enviar: todo est\u00e1 en la cach\u00e9.' : '')),
+    cacheBox,
     el('label.lbl', 'Presupuesto m\u00e1ximo de esta ejecuci\u00f3n (US$)'), budgetIn,
     defBox);
   return modal({ title: 'Plan de ejecuci\u00f3n', help: helpBtn('plan'), body, width: '680px', buttons: [
     { label: 'Cancelar', value: null },
-    { label: 'Ejecutar', kind: 'amber', value: 'go' }] }).then(r => r === 'go' ? { budget: parseFloat(budgetIn.value) || 0, deferred: !!defChk.checked } : null);
+    ...(cachedN ? [{ label: 'Preguntar de nuevo a la IA', value: 'fresh' }] : []),
+    { label: 'Ejecutar', kind: 'amber', value: 'go' }] }).then(r => r === 'fresh' ? { fresh: true } : r === 'go' ? { budget: parseFloat(budgetIn.value) || 0, deferred: !!defChk.checked } : null);
 }
 
 /** Sends the pending AI findings to the Verifier (from Corregir > Mas). */
