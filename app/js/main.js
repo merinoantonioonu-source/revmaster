@@ -8,7 +8,7 @@
 import { el, $, $$, toast, modal, pickFiles, confirmDialog, fmtInt, fmtMoney, promptDialog } from './util/dom.js';
 import { getValue, setValue } from './store/storage.js';
 import { state, on, emit, loadData, openFiles, replaceFile, restoreLastProject, listProjects, openProject,
-  deleteProject, closeProject, refreshLists, remaskNow } from './state.js';
+  deleteProject, closeProject, refreshLists, remaskNow, setUnmasked } from './state.js';
 import { mountMaskView } from './ui/mask-view.js';
 import { mountReviewView, benchDialog } from './ui/review-view.js';
 import { mountCorrectView } from './ui/correct-view.js';
@@ -23,6 +23,8 @@ const TITLES = { files: 'Documentos', mask: 'Enmascarar', review: 'Revisar', cor
 const NEEDS_PROJECT = ['mask', 'review', 'correct', 'export'];
 const WORK_VIEWS = ['mask', 'correct'];     // the side bar folds there to leave room for the sheets
 let pending = { src: null, tgt: null };
+// "Sin enmascarar" chosen before the two files are loaded (it never carries over to another project).
+let pendingUnmasked = false;
 let sidePref = null;                        // null = automatic; 'open' | 'closed' = chosen by the user
 let reviewStatus = '';
 
@@ -63,20 +65,28 @@ function renderSteps() {
   const open = state.findings.filter(f => f.state === 'open').length;
   const done = {
     files: !!p,
-    mask: false,
+    mask: !!(p && p.unmasked),
     review: !!p && state.findings.length > 0,
     correct: !!p && state.findings.length > 0 && !open,
     export: false
   };
   _sub('files', p ? (p.srcName + ' \u00b7 ' + p.tgtName) : 'Cargue los dos documentos');
-  if (s) {
+  if (p && p.unmasked) _sub('mask', 'No necesario: sin enmascarar');
+  else if (s) {
     const ents = s.ent.entities;
     const bad = ents.filter(e => e.status !== 'ok').length;
     _sub('mask', fmtInt(ents.length) + ' entidades' + (bad ? ' \u00b7 ' + bad + ' por revisar' : ''));
   } else _sub('mask', 'Proteger los datos');
   _sub('review', reviewStatus || (state.findings.length ? 'Hecho: puede repetirlo' : 'Elegir qu\u00e9 buscar'));
   _sub('correct', !p ? 'Aceptar o descartar' : (open ? open + ' por revisar' : (state.findings.length ? 'Todo decidido' : 'Sin hallazgos todav\u00eda')));
+  // A project "Sin enmascarar" says so on every screen.
   $('#side-proj').textContent = p ? p.name : 'Sin proyecto';
+  let badge = $('#side-unmask');
+  if (!badge) {
+    badge = el('span.unmask-badge#side-unmask', { title: 'Este proyecto se revisa sin enmascarar: a la IA llega el texto real (se cambia en Archivos)' }, 'Sin enmascarar');
+    $('#side-proj').after(badge);
+  }
+  badge.classList.toggle('hidden', !(p && p.unmasked));
   for (const b of $$('.step')) {
     const v = b.dataset.view;
     b.classList.toggle('on', v === state.view);
@@ -132,9 +142,11 @@ async function handleFile(side, file) {
     if (pending.src && pending.tgt) {
       const s = pending.src, t = pending.tgt;
       pending = { src: null, tgt: null };
-      await openFiles(s, t);
-      setView('mask');
-      toast('Documentos cargados. Revise las entidades enmascaradas.', 'ok');
+      const unmasked = pendingUnmasked;
+      pendingUnmasked = false;
+      await openFiles(s, t, { unmasked });
+      if (unmasked) { setView('review'); toast('Documentos cargados sin enmascarar: elija los revisores.', 'ok'); }
+      else { setView('mask'); toast('Documentos cargados. Revise las entidades enmascaradas.', 'ok'); }
     }
   } catch (e) {
     console.error(e);
@@ -167,7 +179,32 @@ function updateDrops() {
     box.querySelector('.mt').textContent = meta;
   }
   const next = $('#files-next');
-  if (next) next.classList.toggle('hidden', !state.project);
+  if (next) {
+    next.classList.toggle('hidden', !state.project);
+    const um = !!(state.project && state.project.unmasked);
+    next.replaceChildren(um ? 'Siguiente: revisar' : 'Siguiente: enmascarar', icon('arrow', 16));
+  }
+  const chk = $('#files-unmask-chk');
+  if (chk) chk.checked = state.project ? !!state.project.unmasked : pendingUnmasked;
+  const box = $('#files-unmask');
+  if (box) box.classList.toggle('on', !!(chk && chk.checked));
+}
+
+/**
+ * "Sin enmascarar": the text is already published, so its real words may go to the AI. Asked every time
+ * it is switched on; it belongs to this project only.
+ */
+async function onUnmaskToggle(chk) {
+  if (chk.checked) {
+    const ok = await confirmDialog('Sin enmascarar',
+      'La IA recibir\u00e1 el texto completo de los dos documentos tal cual: nombres, cargos, cifras, fechas y todo lo dem\u00e1s. ' +
+      '\u00daselo solo con textos ya publicados. Vale solo para este proyecto.', 'Revisar sin enmascarar');
+    if (!ok) { chk.checked = false; updateDrops(); return; }
+  }
+  if (state.project) setUnmasked(chk.checked); else pendingUnmasked = chk.checked;
+  updateDrops();
+  renderSteps();
+  toast(chk.checked ? 'Sin enmascarar: a la IA llegar\u00e1 el texto real de este proyecto.' : 'El texto vuelve a salir enmascarado.', chk.checked ? 'warn' : 'ok');
 }
 
 // ------------------------------------------------------------------ Archivos: the screen
@@ -179,10 +216,14 @@ function mountFiles() {
     el('div.page-in',
       el('div.kicker', 'PASO 1 DE 5'),
       el('h2.ptitle', 'Los dos documentos'),
-      el('p.lead', 'Todo se procesa en este navegador: los documentos no se suben a ning\u00fan servidor. A la IA solo llega texto enmascarado.'),
+      el('p.lead', 'Todo se procesa en este navegador: los documentos no se suben a ning\u00fan servidor. A la IA solo llega texto enmascarado (salvo que marque \u00abSin enmascarar\u00bb).'),
       el('div.drops', makeDrop('src'), makeDrop('tgt')),
+      el('label.unmask#files-unmask',
+        el('input#files-unmask-chk', { type: 'checkbox', onchange: (e) => onUnmaskToggle(e.currentTarget) }),
+        el('span', el('b', 'Sin enmascarar'), ' \u00b7 para un texto ya publicado: la IA recibe el texto real, sin etiquetas, y no hace falta el paso Enmascarar'),
+        helpBtn('unmasked')),
       el('div.page-acts',
-        el('button.btn.primary.big#files-next.hidden', { onclick: () => setView('mask') }, 'Siguiente: enmascarar', icon('arrow', 16)),
+        el('button.btn.primary.big#files-next.hidden', { onclick: () => setView(state.project && state.project.unmasked ? 'review' : 'mask') }, 'Siguiente: enmascarar', icon('arrow', 16)),
         el('span.grow'),
         el('button.btn', { onclick: newProject }, icon('plus', 16), 'Nuevo proyecto'),
         open,
@@ -225,6 +266,7 @@ async function openUmbra() {
 function newProject() {
   closeProject();
   pending = { src: null, tgt: null };
+  pendingUnmasked = false;
   updateDrops();
   setView('files');
   renderRecent();
@@ -401,6 +443,7 @@ async function boot() {
   on('findings', renderSteps);
   on('finding', renderSteps);
   on('masked', renderSteps);
+  on('project-flags', () => { renderSteps(); updateDrops(); });
   on('review-status', (t) => { reviewStatus = t || ''; renderSteps(); });
   on('goto', (v) => setView(v));
   on('goto-settings', (sec) => goSettings(sec));

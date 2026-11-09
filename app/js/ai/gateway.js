@@ -5,7 +5,9 @@
  *
  * callAI() resolves the module's provider and model (registry.js: the module's role, its other role,
  * the general choice, the first provider with a key), REFUSES text that has not been masked unless
- * the caller allows it AND the provider is local (trust 'local'), calls the provider and records what
+ * the caller allows it AND the provider is local (trust 'local'), or the PROJECT is "Sin enmascarar"
+ * (unmaskedProject: a text already published, the translator's own choice, made project by project in
+ * Archivos and shown on every screen), calls the provider and records what
  * the call used (usage.js) - also when the provider cut the answer short (TRUNCATED), because those
  * tokens were spent too.
  */
@@ -23,6 +25,10 @@ function _err(code, message, extra) {
   return e;
 }
 
+/** May this text leave? Masked; or the project is "Sin enmascarar"; or allowed and the provider is local. */
+const _mayLeave = (o, trust) => o.masked === true || o.unmaskedProject === true || (o.allowUnmasked === true && trust === 'local');
+const _mayAsk = (o) => o.masked === true || o.unmaskedProject === true || o.allowUnmasked === true;
+
 const UNMASKED_MSG = 'El texto no est\u00e1 enmascarado: solo un proveedor local (de confianza "Local") puede recibirlo. ' +
   'Enmascara el documento o elige un proveedor local para este m\u00f3dulo.';
 
@@ -36,16 +42,16 @@ export function estimateTokens(text) {
  * callAI({ module, role, prompt, system, masked, allowUnmasked, project, file, words, thinking,
  *          maxTokens, temperature, signal })
  *   -> { text, usage, providerId, modelId, cost, fallback, source, wanted }
- * role: 'triage' (default) | 'deep'. masked must be true unless allowUnmasked === true and the
- * provider is local. Errors carry err.code: 'UNMASKED', 'NO_PROVIDER', and the providers' codes
+ * role: 'triage' (default) | 'deep'. masked must be true unless unmaskedProject === true (the project
+ * is "Sin enmascarar") or allowUnmasked === true and the provider is local. Errors carry err.code: 'UNMASKED', 'NO_PROVIDER', and the providers' codes
  * (NETWORK, HTTP_401, HTTP_429, TRUNCATED with err.partial...), plus err.providerId / err.modelId.
  */
 export async function callAI(opts) {
   const o = opts || {};
   // Refused before anything else when the caller did not even ask for a local provider.
-  if (o.masked !== true && o.allowUnmasked !== true) throw _err('UNMASKED', UNMASKED_MSG);
+  if (!_mayAsk(o)) throw _err('UNMASKED', UNMASKED_MSG);
   const r = await resolveClient(o.module || '', o.role || 'triage');
-  if (o.masked !== true && !(o.allowUnmasked === true && r.trust === 'local')) {
+  if (!_mayLeave(o, r.trust)) {
     throw _err('UNMASKED', UNMASKED_MSG, { providerId: r.providerId, modelId: r.modelId });
   }
 
@@ -130,12 +136,13 @@ export async function deferredSupport(module, role) {
 /**
  * submitDeferred({ module, role, requests:[{ key, prompt, system, maxTokens, thinking }], masked })
  *   -> job { kind, id, model, providerId, submittedAt, total }
- * Same masking rule as callAI: only masked text leaves, unless the provider is local and allowed.
+ * Same masking rule as callAI: only masked text leaves, unless the project is "Sin enmascarar" or the
+ * provider is local and allowed.
  */
 export async function submitDeferred(o) {
-  if (o.masked !== true && o.allowUnmasked !== true) throw _err('UNMASKED', UNMASKED_MSG);
+  if (!_mayAsk(o)) throw _err('UNMASKED', UNMASKED_MSG);
   const r = await resolveClient(o.module || '', o.role || 'triage');
-  if (o.masked !== true && !(o.allowUnmasked === true && r.trust === 'local')) throw _err('UNMASKED', UNMASKED_MSG);
+  if (!_mayLeave(o, r.trust)) throw _err('UNMASKED', UNMASKED_MSG);
   const key = await getApiKey(r.providerId);
   const reqs = (o.requests || []).map(q => Object.assign({ temperature: DEFAULT_TEMPERATURE }, q));
   const job = await submitBatch(r.profile, key, r.modelId, reqs);

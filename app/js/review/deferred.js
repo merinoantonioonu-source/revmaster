@@ -55,7 +55,7 @@ export async function startDeferred(plan, ctx) {
   const done = [];
   try {
     for (const [module, requests] of byModule) {
-      const job = await submitDeferred({ module, role: 'triage', requests, masked: true });
+      const job = await submitDeferred(Object.assign({ module, role: 'triage', requests }, ctx.session.unmasked ? { unmaskedProject: true } : { masked: true }));
       done.push(job);
       rec.jobs.push({ kind: job.kind, id: job.id, providerId: job.providerId, model: job.model, total: job.total,
         keys: requests.map(r => r.key), module, state: 'running', done: 0, message: 'Enviado' });

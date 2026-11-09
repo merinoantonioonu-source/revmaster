@@ -3,7 +3,8 @@
  *
  * A project lives in IndexedDB ('projects' store) as:
  *   { id, name, createdAt, updatedAt, srcName, tgtName, srcBytes, tgtBytes, srcLang, profile,
- *     mask (entities.defaultMaskSettings shape), findings:[...], runs:[...] }
+ *     mask (entities.defaultMaskSettings shape), unmasked (bool: "Sin enmascarar", a published text whose
+ *     real words may go to the AI), findings:[...], runs:[...] }
  * The documents are parsed again when a project is reopened (models are not stored).
  *
  * Events: 'project' (opened/closed), 'masked' (entities recomputed), 'findings' (list changed),
@@ -99,13 +100,13 @@ function _file(name, bytes) {
 }
 
 /** Opens a new project from the two files (File objects). */
-export async function openFiles(srcFile, tgtFile) {
+export async function openFiles(srcFile, tgtFile, opts) {
   const srcBytes = await srcFile.arrayBuffer();
   const tgtBytes = await tgtFile.arrayBuffer();
   const project = {
     id: uid('p'), name: tgtFile.name.replace(/\.[^.]+$/, ''), createdAt: Date.now(), updatedAt: Date.now(),
     srcName: srcFile.name, tgtName: tgtFile.name, srcBytes, tgtBytes, srcLang: null,
-    profile: (await getValue('last_profile', '')) || '', mask: defaultMaskSettings(), findings: [], runs: []
+    profile: (await getValue('last_profile', '')) || '', mask: defaultMaskSettings(), unmasked: !!(opts && opts.unmasked), findings: [], runs: []
   };
   await _load(project);
   await saveProject();
@@ -124,7 +125,7 @@ async function _load(project) {
     state.src = src;
     state.tgt = tgt;
     state.session = buildSession({ src, tgt, alignment, srcLang: project.srcLang, mask: project.mask,
-      gazetteer: state.data.gazetteer, dict: state.dict });
+      unmasked: !!project.unmasked, gazetteer: state.data.gazetteer, dict: state.dict });
     // Findings of reviewers merged in the simplification (2026-11-09) go under the one that covers them now.
     state.findings = (project.findings || []).map(f => { if (f && f.module) f.module = currentModuleId(f.module); return f; });
     await setValue('last_project', project.id);
@@ -203,9 +204,17 @@ export async function importProjectObject(p) {
 
 export function remaskNow() {
   if (!state.session) return;
-  remask(state.session, { mask: state.project.mask, gazetteer: state.data.gazetteer, dict: state.dict });
+  remask(state.session, { mask: state.project.mask, unmasked: !!state.project.unmasked, gazetteer: state.data.gazetteer, dict: state.dict });
   emit('masked');
   saveProjectSoon();
+}
+
+/** "Sin enmascarar" for the open project (a text already published): its real text may go to the AI. */
+export function setUnmasked(on) {
+  if (!state.project) return;
+  state.project.unmasked = !!on;
+  remaskNow();
+  emit('project-flags');
 }
 
 export function setMask(patch) {

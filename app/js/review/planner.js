@@ -82,10 +82,10 @@ export async function makePlan(session, ctx, opts) {
     const input = moduleById(mates[0]).input;
     const tri = models[mates[0]].tri;
     const deep = models[mates[0]].deep;
-    const system = systemPrompt(ctx.prompts, mates, session.srcLang, ctx.cfg);
+    const system = systemPrompt(ctx.prompts, mates, session.srcLang, ctx.cfg, session.unmasked);
     const rh = 'v2';
     const pv = {};
-    for (const m of mates) pv[m] = promptVersion(ctx.prompts, [m], ctx.cfg);
+    for (const m of mates) pv[m] = promptVersion(ctx.prompts, [m], ctx.cfg, session.unmasked);
 
     // Units to send: skip cached (for every module of the group) and duplicates.
     const seen = new Map();
@@ -163,7 +163,7 @@ export async function makePlan(session, ctx, opts) {
   if (wanted.includes('names') && models.names) {
     const rows = namesRows(session);
     if (rows.length) {
-      const system = systemPrompt(ctx.prompts, ['names'], session.srcLang, ctx.cfg);
+      const system = systemPrompt(ctx.prompts, ['names'], session.srcLang, ctx.cfg, session.unmasked);
       const inTok = TOK(system) + TOK(namesTableText(rows)), outTok = 30 + Math.ceil(rows.length * 0.3) * 40;
       const tri = models.names.tri;
       const cost = await _cost(tri, inTok, outTok, 0);

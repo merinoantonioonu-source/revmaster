@@ -216,6 +216,12 @@ FIN <n>
   de DOCX, notas del orador de PPTX ni comentarios de celda de XLSX.
 - **Prueba de enmascarado.** `gateway.callAI` exige `masked: true` (lo pone solo `runner.js`, que construye
   los prompts con `session.masked`). No hay una marca dentro del texto.
+- **Sin enmascarar** (2026-11-09, decisión del usuario): un proyecto marcado así en Archivos
+  (`project.unmasked`: texto ya publicado) tiene `session.unmasked`, sus textos «enmascarados» son los
+  reales (las entidades se siguen detectando para Nombres oficiales) y las llamadas llevan
+  `unmaskedProject: true`, que la puerta acepta para cualquier proveedor. Las instrucciones pierden la
+  línea de los datos ocultos (`prompts.withoutTags`). Se pregunta al marcarlo, no pasa a otros proyectos
+  y se ve en la barra de pasos, Enmascarar, Revisar, el plan y el informe.
 - **Llamadas fusionadas.** Se resuelve el modelo con el primer módulo (`module`) y el gasto se anota con
   `usageModule` (`fidelity+integrity`).
 - **Capa 0.** `review/local-checks.js` hace estas comprobaciones:

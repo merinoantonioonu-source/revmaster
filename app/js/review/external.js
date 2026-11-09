@@ -22,8 +22,8 @@ export function buildExternalText(session, opts) {
   if (o.withInstructions) {
     const lang = session.srcLang === 'fr' ? 'franc\u00e9s' : 'ingl\u00e9s';
     head = 'Eres un revisor profesional de traducciones de las Naciones Unidas del ' + lang + ' al espa\u00f1ol.\n\n' +
-      'El texto est\u00e1 ENMASCARADO: las expresiones entre llaves sustituyen datos confidenciales ({CARGO1}, {ORGANO2}, {NUM3}, {PAIS4}...); ' +
-      'la misma etiqueta en el original y en la traducci\u00f3n es el mismo dato. No cambies las etiquetas ni intentes adivinar lo que ocultan.\n\n' +
+      (session.unmasked ? '' : 'El texto est\u00e1 ENMASCARADO: las expresiones entre llaves sustituyen datos confidenciales ({CARGO1}, {ORGANO2}, {NUM3}, {PAIS4}...); ' +
+      'la misma etiqueta en el original y en la traducci\u00f3n es el mismo dato. No cambies las etiquetas ni intentes adivinar lo que ocultan.\n\n') +
       'Revisa:\n' + o.modules.filter(id => TASKS[id]).map(id => '- ' + TASKS[id].text.replace(/^TAREA \u2014 /, '')).join('\n') + '\n\n' +
       'RESPONDE SOLO con una l\u00ednea por problema, sin Markdown ni texto adicional:\n' +
       '<n.\u00ba de p\u00e1rrafo> | <categor\u00eda> | <gravedad> | <cita exacta de la traducci\u00f3n> | <sugerencia> | <motivo breve>\n' +

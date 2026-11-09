@@ -38,8 +38,7 @@ export function mountReviewView(host, tools) {
       el('h2.ptitle', '\u00bfQu\u00e9 quiere que revise la IA?', helpBtn('modules')),
       el('p.lead', 'Sentido es la revisi\u00f3n de fondo: compara cada p\u00e1rrafo con el original y se\u00f1ala lo que la traducci\u00f3n dice distinto, lo que falta y lo que sobra. Redacci\u00f3n lee solo el espa\u00f1ol, y Nombres oficiales comprueba las denominaciones. Despu\u00e9s, el Verificador descarta los falsos positivos.'),
       el('div.mgrid#rv-modules'),
-      el('div.privacy', icon('lock', 20),
-        el('span', 'El texto sale enmascarado: personas, cifras, fechas y s\u00edmbolos nunca salen de este equipo (Nombres oficiales env\u00eda solo la lista de nombres de organismos, \u00f3rganos, cargos, pa\u00edses y lugares). Antes de enviar ver\u00e1 cu\u00e1ntas llamadas se har\u00e1n y su coste.'))),
+      el('div.privacy#rv-privacy')),
     el('div.pfoot', el('div.pfoot-in',
       el('button.btn.big', { onclick: () => emit('goto', 'mask') }, icon('back', 16), 'Atr\u00e1s'),
       el('span.grow'),
@@ -47,7 +46,7 @@ export function mountReviewView(host, tools) {
       el('button.btn.primary.big#rv-run', { onclick: onRun })))));
   on('view', (v) => { if (v === 'review') { renderAll(); scheduleEstimates(); } });
   on('findings', () => { if (state.view === 'review') { renderTools(); renderModules(); } });
-  on('masked', () => { estimates = {}; if (state.view === 'review') scheduleEstimates(); });
+  on('masked', () => { estimates = {}; renderPrivacy(); if (state.view === 'review') scheduleEstimates(); });
   on('project', () => {
     progress = {}; estimates = {};
     emit('review-status', '');
@@ -55,7 +54,19 @@ export function mountReviewView(host, tools) {
   });
 }
 
+/** What leaves this computer: masked text, or (a project "Sin enmascarar") the real text. */
+function renderPrivacy() {
+  const box = $('#rv-privacy');
+  if (!box) return;
+  const um = !!(state.session && state.session.unmasked);
+  box.classList.toggle('unmasked', um);
+  box.replaceChildren(icon(um ? 'mask' : 'lock', 20), el('span', um
+    ? 'Sin enmascarar: el texto sale tal cual, con nombres, cargos, cifras y fechas (este proyecto est\u00e1 marcado como texto ya publicado; se cambia en Archivos). Antes de enviar ver\u00e1 cu\u00e1ntas llamadas se har\u00e1n y su coste.'
+    : 'El texto sale enmascarado: personas, cifras, fechas y s\u00edmbolos nunca salen de este equipo (Nombres oficiales env\u00eda solo la lista de nombres de organismos, \u00f3rganos, cargos, pa\u00edses y lugares). Antes de enviar ver\u00e1 cu\u00e1ntas llamadas se har\u00e1n y su coste.'));
+}
+
 function renderAll() {
+  renderPrivacy();
   if (!state.session) return;
   renderTools();
   renderModules();
@@ -322,10 +333,12 @@ function planDialog(plan, budget, cap) {
     el('div', { style: { marginTop: '4px' } }, c.ok
       ? 'La primera pasada va a la API de lotes del proveedor: cuesta la mitad y responde en minutos u horas (hasta 24 h). Puede cerrar la p\u00e1gina: al volver, UMBRA recoge las respuestas y termina la revisi\u00f3n (la parte a fondo y el verificador, que son peque\u00f1os, se hacen entonces al precio normal).'
       : (nothing ? 'No hay nada que enviar.' : 'No disponible: ' + (c.missing.join(', ') || 'ning\u00fan proveedor') + ' no tiene API de lotes en UMBRA (Gemini, Anthropic, Mistral y OpenAI s\u00ed la tienen; en un proveedor compatible con OpenAI se activa en su perfil).')));
+  const um = !!(state.session && state.session.unmasked);
   const body = el('div',
+    um ? el('div.note.warn', { style: { marginBottom: '10px' } }, el('b', 'Sin enmascarar: '), 'se enviar\u00e1 el texto real de los dos documentos, con nombres, cargos, cifras y fechas. \u00daselo solo con textos ya publicados.') : null,
     el('ul', rows),
     el('p', el('b', fmtInt(plan.totals.calls) + ' llamadas \u00b7 ~' + fmtInt(plan.totals.inTok + plan.totals.outTok) + ' tokens \u00b7 ~' + fmtMoney(plan.totals.cost))),
-    el('p.info', 'Estimaci\u00f3n orientativa: el gasto real se registra en Uso de IA. Solo se env\u00eda texto enmascarado (y, si est\u00e1 marcado Nombres oficiales, la lista de nombres de organismos, \u00f3rganos, cargos, pa\u00edses y lugares).' +
+    el('p.info', 'Estimaci\u00f3n orientativa: el gasto real se registra en Uso de IA. ' + (um ? 'Proyecto sin enmascarar: el texto se env\u00eda tal cual.' : 'Solo se env\u00eda texto enmascarado (y, si est\u00e1 marcado Nombres oficiales, la lista de nombres de organismos, \u00f3rganos, cargos, pa\u00edses y lugares).') +
       (nothing ? ' No hay nada nuevo que enviar: todo est\u00e1 en la cach\u00e9.' : '')),
     el('label.lbl', 'Presupuesto m\u00e1ximo de esta ejecuci\u00f3n (US$)'), budgetIn,
     defBox);
@@ -338,10 +351,11 @@ function planDialog(plan, budget, cap) {
 export async function reverify() {
   const list = state.findings.filter(f => f.state === 'open' && (f.source === 'ai' || f.source === 'external') && !f.verified);
   if (!list.length) { toast('No hay hallazgos de IA pendientes sin verificar.', 'warn'); return; }
-  if (!(await confirmDialog('Verificar', 'Se enviar\u00e1n ' + list.length + ' hallazgos al Verificador (texto enmascarado).', 'Verificar'))) return;
+  const um = !!state.session.unmasked;
+  if (!(await confirmDialog('Verificar', 'Se enviar\u00e1n ' + list.length + ' hallazgos al Verificador (' + (um ? 'texto real: el proyecto es \u00abSin enmascarar\u00bb' : 'texto enmascarado') + ').', 'Verificar'))) return;
   const ctx = await _ctx();
   const { callAI } = await import('../ai/gateway.js');
-  const call = (args) => callAI(Object.assign({ masked: true, project: state.project.name, file: state.project.tgtName }, args));
+  const call = (args) => callAI(Object.assign(um ? { unmaskedProject: true } : { masked: true }, { project: state.project.name, file: state.project.tgtName }, args));
   progress.verifier = { state: 'run', done: 0, total: 1, msg: 'Verificando' };
   emit('review-status', 'Verificando\u2026');
   const t = toast('Verificando ' + list.length + ' hallazgos\u2026', '', 60000);

@@ -6,7 +6,7 @@ import { el, modal } from '../util/dom.js';
 
 export function showGuide() {
   const body = el('div',
-    el('p', el('b', 'UMBRA'), ' enmascara los datos sensibles de una traducci\u00f3n y la revisa con IA. Todo ocurre en este navegador: los documentos no se suben a ning\u00fan servidor y a la IA solo llega texto enmascarado. La barra de la izquierda tiene los cinco pasos y dice en qu\u00e9 punto est\u00e1 cada uno.'),
+    el('p', el('b', 'UMBRA'), ' enmascara los datos sensibles de una traducci\u00f3n y la revisa con IA. Todo ocurre en este navegador: los documentos no se suben a ning\u00fan servidor y a la IA solo llega texto enmascarado (salvo en un proyecto marcado \u00abSin enmascarar\u00bb en Archivos, para textos ya publicados). La barra de la izquierda tiene los cinco pasos y dice en qu\u00e9 punto est\u00e1 cada uno.'),
     el('h4', '1 \u00b7 Archivos'),
     el('ul',
       el('li', 'Cargue el original (ingl\u00e9s o franc\u00e9s) y la traducci\u00f3n (espa\u00f1ol): DOCX, PPTX o XLSX exportados de eLUNa.'),

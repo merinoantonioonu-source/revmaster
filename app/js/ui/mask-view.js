@@ -62,6 +62,7 @@ function renderTools() {
   if (state.view !== 'mask') return;
   clear(toolsHost);
   if (!state.project) return;
+  if (state.project.unmasked) toolsHost.appendChild(el('span.pill.warn', { title: 'Este proyecto se revisa sin enmascarar (Archivos): a la IA llega el texto real y este paso no es necesario' }, 'Sin enmascarar: no hace falta este paso'));
   const ents = state.session ? state.session.ent.entities : [];
   const numBad = ents.filter(e => e.cat === 'NUM' && e.status === 'nopair').length;
   if (numBad) toolsHost.appendChild(el('span.pill.err', { title: 'Cifras que no est\u00e1n igual en las dos lenguas: posible error' }, numBad + (numBad === 1 ? ' cifra sin pareja' : ' cifras sin pareja')));

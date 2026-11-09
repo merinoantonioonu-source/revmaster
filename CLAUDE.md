@@ -34,7 +34,12 @@ The owner is both developer and end user and **does not code**. Explain things i
   `app/js/ai/gateway.js`, which refuses unmasked text for external providers. The ONE exception,
   chosen by the owner: `callAINames` (module "Nombres oficiales") sends the table of institutional
   names (ORG, ORGANO, CARGO, PAIS, LUGAR; never persons, figures, dates, symbols or the text), built
-  and checked row by row inside the gateway. Do not widen it.
+  and checked row by row inside the gateway. Do not widen it. The second exception, also the owner's
+  (2026-11-09): a project marked **"Sin enmascarar"** in Archivos (`project.unmasked`, a text already
+  published) sends its real text (`session.unmasked`: the "masked" texts are the real ones; callers pass
+  `unmaskedProject: true` instead of `masked: true`). It is per project, asked when switched on, off for
+  every new project, and shown on every screen (side bar badge, Enmascarar, Revisar, the plan, the
+  report). `tests/unmasked.e2e.mjs` covers it. No other way out for unmasked text.
 - **Tests**: `node tests/run-all.mjs` (Playwright + Chromium are preinstalled; it starts a static
   server and a mock OpenAI-compatible provider). Run them before opening a PR.
 - **VERSION.md** is append-only: one line per change.
