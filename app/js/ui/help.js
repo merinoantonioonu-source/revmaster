@@ -13,7 +13,7 @@ const T = {
   // ------------------------------------------------------------------ files and start
   files: { t: 'Paso 1 \u00b7 Archivos', b: [
     'Pulse una casilla o arrastre a ella el archivo: a la izquierda el **original** (ingl\u00e9s o franc\u00e9s) y a la derecha la **traducci\u00f3n** (espa\u00f1ol).',
-    ['Formatos: DOCX, PPTX y XLSX exportados de eLUNa.',
+    ['Formatos: DOCX, PPTX y XLSX exportados de eLUNa. Tambi\u00e9n un **bitexto TXT** (como los que exporta el Editor de COMeT: cada l\u00ednea con el original, un tabulador y la traducci\u00f3n): en cualquiera de las dos casillas, trae los dos lados y se abre como un proyecto, cada segmento como un p\u00e1rrafo; las copias que se exportan son DOCX.',
       'UMBRA empareja los p\u00e1rrafos de los dos documentos, enmascara al momento y pasa al paso 2.',
       'Para cambiar un archivo, vuelva a pulsar su casilla.',
       '**Nuevo proyecto** empieza otro documento; **Abrir proyecto (.umbra)** carga uno guardado en un archivo; **Banco de pruebas** abre el documento de prueba.',
