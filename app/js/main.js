@@ -148,14 +148,14 @@ async function deleteWithConfirm(p) {
 // ------------------------------------------------------------------ Archivos: drop zones
 
 function makeDrop(side) {
-  const box = el('div.drop#drop-' + side, { title: 'Pulse o arrastre aqu\u00ed ' + (side === 'src' ? 'el original' : 'la traducci\u00f3n') + ' (DOCX, PPTX o XLSX)' },
+  const box = el('div.drop#drop-' + side, { title: 'Pulse o arrastre aqu\u00ed ' + (side === 'src' ? 'el original' : 'la traducci\u00f3n') + ' (DOCX, PPTX o XLSX), o en cualquiera de las dos un bitexto TXT (original y traducci\u00f3n juntos)' },
     el('div.dic', icon(side === 'src' ? 'file' : 'pencil', 26)),
     el('div.dtx',
       el('div.lbl', side === 'src' ? 'ORIGINAL \u00b7 INGL\u00c9S O FRANC\u00c9S' : 'TRADUCCI\u00d3N \u00b7 ESPA\u00d1OL', helpBtn('files')),
       el('div.fn', 'Pulse o arrastre el archivo'),
-      el('div.mt', 'DOCX, PPTX o XLSX exportado de eLUNa')));
+      el('div.mt', 'DOCX, PPTX o XLSX exportado de eLUNa, o un bitexto TXT')));
   const choose = async () => {
-    const files = await pickFiles('.docx,.pptx,.xlsx', false);
+    const files = await pickFiles('.docx,.pptx,.xlsx,.txt', false);
     if (files[0]) handleFile(side, files[0]);
   };
   box.addEventListener('click', choose);
@@ -170,8 +170,28 @@ function makeDrop(side) {
   return box;
 }
 
+// A bitext in TXT (COMeT's Editor exports them: original, tab, translation, one segment per line): the
+// two sides at once, as a new project (formats/bitext-txt.js).
+async function handleBitext(file) {
+  try {
+    if (state.project && !(await confirmDialog('Abrir un bitexto',
+      'El bitexto \u00ab' + file.name + '\u00bb trae el original y la traducci\u00f3n juntos: se abrir\u00e1 como un proyecto nuevo (el actual queda en Proyectos recientes). \u00bfContinuar?', 'Abrir'))) return;
+    const { bitextFiles } = await import('./formats/bitext-txt.js');
+    const b = await bitextFiles(file);
+    pending = { src: null, tgt: null };
+    const unmasked = pendingUnmasked;
+    pendingUnmasked = false;
+    await openFiles(b.src, b.tgt, { unmasked, fromBitext: file.name });
+    if (unmasked) setView('review'); else setView('mask');
+    toast('Bitexto cargado: ' + fmtInt(b.pairs) + ' segmentos, cada uno como un p\u00e1rrafo del original y de la traducci\u00f3n.', 'ok', 6000);
+  } catch (e) {
+    toast('No se pudo abrir: ' + e.message, 'err', 7000);
+  }
+}
+
 async function handleFile(side, file) {
-  if (!/\.(docx|pptx|xlsx)$/i.test(file.name)) { toast('Formato no admitido: use DOCX, PPTX o XLSX.', 'err'); return; }
+  if (/\.txt$/i.test(file.name)) { handleBitext(file); return; }
+  if (!/\.(docx|pptx|xlsx)$/i.test(file.name)) { toast('Formato no admitido: use DOCX, PPTX o XLSX, o un bitexto TXT.', 'err'); return; }
   try {
     if (state.project) {
       const ok = await confirmDialog('Cambiar ' + (side === 'src' ? 'el original' : 'la traducci\u00f3n'),

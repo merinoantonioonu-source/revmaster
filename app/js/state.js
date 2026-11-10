@@ -109,7 +109,8 @@ export async function openFiles(srcFile, tgtFile, opts) {
     id: uid('p'), name: tgtFile.name.replace(/\.[^.]+$/, ''), createdAt: Date.now(), updatedAt: Date.now(),
     srcName: srcFile.name, tgtName: tgtFile.name, srcBytes, tgtBytes, srcLang: null,
     profile: (await getValue('last_profile', '')) || '', mask: defaultMaskSettings(), unmasked: !!(opts && opts.unmasked),
-    docType: opts && typeof opts.docType === 'string' ? opts.docType : guessDocType([srcFile.name, tgtFile.name]), findings: [], runs: []
+    docType: opts && typeof opts.docType === 'string' ? opts.docType : guessDocType([srcFile.name, tgtFile.name]), findings: [], runs: [],
+    fromBitext: (opts && opts.fromBitext) || ''
   };
   await _load(project);
   await saveProject();
