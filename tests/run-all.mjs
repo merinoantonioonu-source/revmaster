@@ -24,7 +24,8 @@ const steps = [
   ['Nombres oficiales sin pareja', 'node', [path.join(HERE, 'names.e2e.mjs')]],
   ['Proyecto y limpieza', 'node', [path.join(HERE, 'project.e2e.mjs')]],
   ['Comparar con la version final', 'node', [path.join(HERE, 'compare.e2e.mjs')]],
-  ['Bitexto TXT', 'node', [path.join(HERE, 'bitext.e2e.mjs')]]
+  ['Bitexto TXT', 'node', [path.join(HERE, 'bitext.e2e.mjs')]],
+  ['Pistas de Redaccion', 'node', [path.join(HERE, 'hints.e2e.mjs')]]
 ];
 
 let failed = 0;

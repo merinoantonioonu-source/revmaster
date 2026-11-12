@@ -218,6 +218,10 @@ function moduleCard(m, cfg) {
         el('span.mc-desc', off ? 'Desactivado en Ajustes \u203a M\u00f3dulos.' : (m.plain || m.desc)))),
     el('div.mc-meta',
       el('label.mc-ex', el('span', 'Exigencia'), strict),
+      m.id === 'writing' ? el('label.mc-ex', { title: 'Marca, con un programa local, los p\u00e1rrafos con una palabra repetida cerca o muchos nombres en -ci\u00f3n, y se lo dice a la IA para que mire ah\u00ed. No es una comprobaci\u00f3n: decide la IA. Gasta muy pocos tokens.' },
+        el('input', { type: 'checkbox', 'data-hints': 'writing', checked: cfg.hints ? true : null, disabled: off ? true : null,
+          onchange: async (e) => { await saveModuleConfig(m.id, { hints: e.target.checked }); delete estimates[m.id]; scheduleEstimates(); } }),
+        el('span', 'Pistas')) : null,
       el('span.grow'),
       model, cost));
   if (p && p.state === 'run') card.appendChild(el('i.bar', { style: { width: (p.total ? Math.round(100 * (p.done || 0) / Math.max(1, p.total)) : 15) + '%' } }));

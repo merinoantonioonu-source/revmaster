@@ -114,7 +114,7 @@ export async function runPlan(plan, ctx, hooks) {
         const chunk = unitsDeep.slice(i, i + 20);
         progress('A fondo ' + (Math.floor(i / 20) + 1), g.modules.join('+'));
         try {
-          const user = buildBatchUser(session, chunk, g.input);
+          const user = buildBatchUser(session, chunk, g.input, g.hints);
           const res = await _runBatch(chunk, g, g.deep, 'deep', user, 0, call, ctx);
           const ns = new Set(chunk.map(u => u.n));
           for (let k = groupFindings.length - 1; k >= 0; k--) {
@@ -194,7 +194,7 @@ async function _runBatch(units, g, client, role, user, est, call, ctx, preText, 
   if (preText !== null && preText !== undefined) text = preText;
   else {
     try {
-      const r = await call({ module: moduleId, usageModule: g.modules.join('+'), role, prompt: user || buildBatchUser(session, units, g.input), system: g.system,
+      const r = await call({ module: moduleId, usageModule: g.modules.join('+'), role, prompt: user || buildBatchUser(session, units, g.input, g.hints), system: g.system,
         words, thinking: _thinking(ctx.cfg, moduleId), maxTokens: 8192 }, est ? _estCost(est) : 0);
       text = r.text;
     } catch (e) {

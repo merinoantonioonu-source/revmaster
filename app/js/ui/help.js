@@ -226,7 +226,8 @@ const T = {
     ['**Activo**: si se desactiva, el m\u00f3dulo no se ejecuta aunque est\u00e9 marcado en Revisar.',
       '**Modelo**: el proveedor y el modelo de cada revisor. **Sentido** lee todo el texto con el modelo que elija: conviene el m\u00e1s fuerte. **Redacci\u00f3n** y **Nombres oficiales** pueden ir con uno econ\u00f3mico; el **Verificador**, con uno bueno.',
       '**Exigencia**: **Solo lo importante** (errores cr\u00edticos o mayores; recomendado para Sentido), **Normal** (tambi\u00e9n los menores; Redacci\u00f3n, de serie) o **Exhaustiva** (tambi\u00e9n matices y mejoras opcionales). Lo que quede fuera de la exigencia se descarta aunque la IA lo devuelva.',
-      '**Verificar**: los hallazgos del m\u00f3dulo pasan por el Verificador, que descarta falsos positivos y lo que no sea de la tarea del m\u00f3dulo.'],
+      '**Verificar**: los hallazgos del m\u00f3dulo pasan por el Verificador, que descarta falsos positivos y lo que no sea de la tarea del m\u00f3dulo.',
+      '**Pistas** (solo en la tarjeta de Redacci\u00f3n de Revisar): un programa local marca los p\u00e1rrafos con una palabra repetida cerca o muchos nombres en -ci\u00f3n (si el original no los tiene) y se lo dice a la IA, que decide. No es una comprobaci\u00f3n sin IA y cuesta muy pocos tokens. Est\u00e1 desactivada de serie: compruebe con el Banco de pruebas y la comparaci\u00f3n con la versi\u00f3n final si le ayuda.'],
     'Lo dem\u00e1s est\u00e1 en **Opciones avanzadas**: no hace falta tocarlo.'] },
   'module-advanced': { t: 'Opciones avanzadas', b: [
     ['**Razonamiento**: cu\u00e1nto \u00abpiensa\u00bb el modelo antes de responder. M\u00e1s razonamiento = mejor juicio, pero se cobra como salida.',

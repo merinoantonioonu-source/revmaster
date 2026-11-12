@@ -49,6 +49,9 @@ Si la traducci\u00f3n es \u00ab\u2014\u00bb, el nombre no se reconoci\u00f3 en l
 
 /** How demanding each module is. */
 export const STRICTNESS = { grave: 'Solo lo importante', normal: 'Normal', estricta: 'Exhaustiva' };
+/** Said to Redaccion only when its local hints are on (the paragraphs that have a suspicion come with it, hints.js). */
+export const HINTS_LINE = 'Algunos p\u00e1rrafos traen una SOSPECHA de un programa (una palabra repetida cerca o muchos nombres en -ci\u00f3n): solo mira ah\u00ed y se\u00f1\u00e1lalo (EST) si de verdad se puede decir mejor; si se lee bien, calla.';
+
 export const STRICT_ALLOWED = { grave: ['CRI', 'MAY'], normal: ['CRI', 'MAY', 'MEN'], estricta: ['CRI', 'MAY', 'MEN', 'SUG'] };
 const STRICT_TEXT = {
   grave: 'EXIGENCIA: solo lo de gravedad CRI o MAY seg\u00fan la definici\u00f3n anterior (aunque sea una sola palabra). Nada de MEN ni SUG.',
@@ -118,6 +121,7 @@ export function systemPrompt(store, moduleIds, lang, cfg, opts) {
   for (const id of moduleIds) for (const c of (TASKS[id] ? TASKS[id].cats : [])) if (!cats.includes(c)) cats.push(c);
   let t = COMMON.replace('{{LANG}}', lang === 'fr' ? 'franc\u00e9s' : 'ingl\u00e9s').replace('{{CATS}}', cats.join(', ')) +
     '\n\n' + moduleIds.map(id => _task(store, id, cfg)).join('\n\n');
+  if (o.hints && moduleIds.includes('writing')) t += '\n' + HINTS_LINE;
   if (!moduleIds.includes('names')) t = _withDocType(t, o.docType);
   return o.unmasked ? withoutTags(t) : t;
 }
@@ -131,7 +135,7 @@ export function verifierPrompt(store, lang, opts) {
 /** Fingerprint of what a module asks (for the results cache). */
 export function promptVersion(store, moduleIds, cfg, opts) {
   const o = opts || {};
-  return fnv1a(COMMON + moduleIds.map(id => _task(store, id, cfg)).join('|') + (o.unmasked ? '|sin-enmascarar' : '') + (o.docType ? '|tipo:' + o.docType : ''));
+  return fnv1a(COMMON + moduleIds.map(id => _task(store, id, cfg)).join('|') + (o.unmasked ? '|sin-enmascarar' : '') + (o.docType ? '|tipo:' + o.docType : '') + (o.hints && moduleIds.includes('writing') ? '|pistas' : ''));
 }
 
 export const CAT_LABELS = {
