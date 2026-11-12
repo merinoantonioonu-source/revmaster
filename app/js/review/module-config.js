@@ -4,7 +4,9 @@
  *
  * cfg = { enabled, thinking:'minimal'|'low'|'high'|'', batchWords (0 = automatic), verify,
  *         budget (US$ per run, 0 = no limit), scope:'all'|'changed', context,
- *         strictness:'grave'|'normal'|'estricta' (how demanding: prompts.js STRICTNESS) }
+ *         strictness:'grave'|'normal'|'estricta' (how demanding: prompts.js STRICTNESS),
+ *         hints: Redaccion only - local hints (hints.js: a word repeated close by, nouns piled up in -cion) go
+ *         with the paragraphs that have them; off by default until the test bench shows it helps }
  * Only the modules of today's list (module-list.js) are read: the settings of the reviewers merged or
  * removed in the simplification (2026-11-09) are left where they are and not used.
  */
@@ -16,7 +18,7 @@ export const CFG_KEY = 'module_cfg';
 
 export const DEFAULTS = {
   meaning: { enabled: true, thinking: 'low', batchWords: 0, verify: true, budget: 0, scope: 'all', strictness: 'grave' },
-  writing: { enabled: true, thinking: 'minimal', batchWords: 0, verify: true, budget: 0, scope: 'all', strictness: 'normal' },
+  writing: { enabled: true, thinking: 'minimal', batchWords: 0, verify: true, budget: 0, scope: 'all', strictness: 'normal', hints: false },
   names: { enabled: true, thinking: 'low', batchWords: 0, verify: false, budget: 0, scope: 'all', strictness: 'normal' },
   verifier: { enabled: true, thinking: 'high', batchWords: 0, verify: false, budget: 0, scope: 'all' }
 };

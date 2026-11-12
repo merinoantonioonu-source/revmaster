@@ -21,6 +21,7 @@ import { idbGet } from '../store/idb.js';
 import { resolveClient } from '../ai/registry.js';
 import { estimateCost } from '../ai/usage.js';
 import { namesRows, namesTableText } from './names.js';
+import { paragraphHints } from './hints.js';
 
 const TOK = (s) => Math.ceil(String(s || '').length / 3.8);
 const WORDS = (s) => (String(s || '').match(/\S+/g) || []).length;
@@ -83,7 +84,9 @@ export async function makePlan(session, ctx, opts) {
     const input = moduleById(mates[0]).input;
     const tri = models[mates[0]].tri;
     const deep = models[mates[0]].deep;
-    const sOpts = { unmasked: session.unmasked, docType: session.docType };
+    // Redaccion's local hints (hints.js), when switched on in its card.
+    const hints = mates.includes('writing') && !!(ctx.cfg.writing && ctx.cfg.writing.hints);
+    const sOpts = { unmasked: session.unmasked, docType: session.docType, hints };
     const system = systemPrompt(ctx.prompts, mates, session.srcLang, ctx.cfg, sOpts);
     const rh = 'v2';
     const pv = {};
@@ -130,10 +133,10 @@ export async function makePlan(session, ctx, opts) {
     }
     if (cur.length) batches.push(cur);
 
-    const group = { modules: mates, input, tri, deep, system, rh, pv, batches: [], dupOf, cachedHits,
+    const group = { modules: mates, input, tri, deep, system, rh, pv, hints, batches: [], dupOf, cachedHits,
       est: { inTok: 0, outTok: 0, cost: 0, calls: 0 } };
     for (const b of batches) {
-      const user = buildBatchUser(session, b.map(x => x.u), input);
+      const user = buildBatchUser(session, b.map(x => x.u), input, hints);
       const inTok = TOK(system) + TOK(user);
       const outTok = 25 + Math.ceil(b.length * 0.35) * 45 * mates.length;
       group.batches.push({ items: b, user, inTok, outTok });
@@ -201,13 +204,22 @@ async function _cost(client, inTok, outTok, cachedTok, unpriced) {
 }
 
 /** The user part of a batch call: the units, nothing else (the instructions are in the system part). */
-export function buildBatchUser(session, units, input) {
+export function buildBatchUser(session, units, input, hints) {
   let body = '';
   if (input === 'bilingual') {
     body = 'P\u00c1RRAFOS (O = original, T = traducci\u00f3n):\n' + units.map(u =>
       '[' + u.n + ']\nO: ' + _flat(unitSrcMasked(session, u)) + '\nT: ' + _flat(unitTgtMasked(session, u))).join('\n');
   } else {
     body = 'P\u00c1RRAFOS DE LA TRADUCCI\u00d3N:\n' + units.map(u => '[' + u.n + '] ' + _flat(unitTgtMasked(session, u))).join('\n');
+  }
+  // The local suspicions (hints.js), one short line for each paragraph that has them: only where there is one.
+  if (hints) {
+    const lines = [];
+    for (const u of units) {
+      const h = paragraphHints(unitSrcMasked(session, u), unitTgtMasked(session, u));
+      if (h.length) lines.push('[' + u.n + '] ' + h.join('; '));
+    }
+    if (lines.length) body += '\nSOSPECHAS:\n' + lines.join('\n');
   }
   return body + '\n(FIN ' + units.length + ')';
 }
