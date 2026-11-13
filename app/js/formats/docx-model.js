@@ -19,7 +19,7 @@
  *   fileName: string,
  *   _bytes: ArrayBuffer (a copy of the original file, for the writers),
  *   paras: [ { id, text, runs, loc, fmt, isHeading, listLabel, listPrefix,
- *              listMarker, fnRefs, _el, _seg } ],
+ *              listMarker, fnRefs, enRefs, _el, _seg } ],
  *     - runs: [ { t, b, i, u, sup, sub, strike, sz, color, highlight,
  *                 fnRef, enRef, link, img, brk, ins, del, dt, author, date } ]
  *       TRACKED CHANGES: insertions are kept (the change is accepted) and only
@@ -38,6 +38,7 @@
  *     - cell: { paraIds:[], gridSpan, vMerge:'restart'|'cont'|null, widthPct, shade }
  *   footnotes / endnotes: [ { id, num, paraIds:[], text } ],
  *   fnRefOrder: [fnId,...],
+ *   enRefOrder: [enId,...],
  *   media: { relPathKey -> dataUrl },
  *   stats: { bodyParas, nonEmptyParas, tableCount, footnoteCount, fnRefCount, xeCount }
  * }
@@ -770,6 +771,7 @@ function _makeParas(pEl, loc, ctx, model) {
     // skip the marker region themselves (see markerLen / _features).
     const { marker } = _stripLeadingMarker(rawText);
     const fnRefs = segRuns.filter(r => r.fnRef !== null && r.fnRef !== undefined && r.fnRef).map(r => r.fnRef);
+    const enRefs = segRuns.filter(r => r.enRef !== null && r.enRef !== undefined && r.enRef).map(r => r.enRef);
 
     const para = {
       id: model.paras.length,
@@ -782,11 +784,13 @@ function _makeParas(pEl, loc, ctx, model) {
       isHeading,
       listLabel: prefix ? prefix.trim() : (marker || _detectListLabel(rawText)),
       fnRefs,
+      enRefs,
       _el: pEl,
       _seg: { index: si, total }
     };
     model.paras.push(para);
     for (const id of fnRefs) model.fnRefOrder.push(id);
+    for (const id of enRefs) model.enRefOrder.push(id);
     made.push(para);
   }
 
@@ -794,7 +798,7 @@ function _makeParas(pEl, loc, ctx, model) {
   if (made.length === 0) {
     const para = {
       id: model.paras.length, text: '', listPrefix: listPrefix, listMarker: null,
-      runs: [], loc, fmt, isHeading, listLabel: null, fnRefs: [],
+      runs: [], loc, fmt, isHeading, listLabel: null, fnRefs: [], enRefs: [],
       _el: pEl, _seg: { index: 0, total: 1 }
     };
     model.paras.push(para);
@@ -1225,6 +1229,7 @@ export async function parseDocxModel(file) {
     footnotes: [],
     endnotes: [],
     fnRefOrder: [],
+    enRefOrder: [],
     media: {},
     stats: {},
     // Export support (phase 2): keep the live parts so edits made to para._el
@@ -1348,13 +1353,25 @@ export async function parseDocxModel(file) {
 
   model.media = await _loadMedia(zip, mediaPaths);
 
-  // Order footnotes by their first reference in the body, so "footnote N" means
-  // the same thing in both documents even if the XML lists them differently.
+  // Order footnotes (and endnotes, the same way) by their first reference in
+  // the body, so "footnote N" means the same thing in both documents even if
+  // the XML lists them differently. Word renumbers a note's id and moves it to
+  // the END of footnotes.xml/endnotes.xml whenever it gets recreated (typical
+  // of an edit to its text after the file was first saved) -- the call in the
+  // body still sits where it always did, so sorting by first reference puts
+  // the note back where a reader (and the src/tgt aligner) expects it.
   const orderIndex = new Map();
   model.fnRefOrder.forEach((id, i) => { if (!orderIndex.has(id)) orderIndex.set(id, i); });
   model.footnotes.sort((a, b) => {
     const ai = orderIndex.has(a.id) ? orderIndex.get(a.id) : 1e9;
     const bi = orderIndex.has(b.id) ? orderIndex.get(b.id) : 1e9;
+    return ai - bi;
+  });
+  const enOrderIndex = new Map();
+  model.enRefOrder.forEach((id, i) => { if (!enOrderIndex.has(id)) enOrderIndex.set(id, i); });
+  model.endnotes.sort((a, b) => {
+    const ai = enOrderIndex.has(a.id) ? enOrderIndex.get(a.id) : 1e9;
+    const bi = enOrderIndex.has(b.id) ? enOrderIndex.get(b.id) : 1e9;
     return ai - bi;
   });
   // Custom-marked notes (w:customMarkFollows) show their literal mark ("*")
