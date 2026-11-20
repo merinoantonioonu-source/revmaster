@@ -5,7 +5,9 @@
  * translator's manual adjustments and returns one entity per KEY (the same key in the source and
  * the target is the same entity, so both sides get the same tag).
  *
- * Tags: source  {CARGO1}      target  {el CARGO1}   (article of the ENTITY; none when unknown).
+ * Tags: {CARGO1}, the same on both sides. An entity written both as a name and as its acronym in the
+ * document (United Nations Development Programme / UNDP / PNUD) keeps one number, and its acronym is
+ * marked with an "s" (sigla): {ORG5} ({ORG5s}) - one entity, one count, but the AI sees which is which.
  * Numbering is per category, in order of first appearance (source before target in each unit).
  *
  * A person recognised once by a courtesy title (Ms. Ivanova, Sr. Ruiz) is masked wherever the name
@@ -32,7 +34,18 @@ export const CAT_SINGULAR = {
 };
 export const ARTICLES = ['', 'el', 'la', 'los', 'las'];
 
-export const TAG_RE = /\{(?:(el|la|los|las)\s)?(NUM|FECHA|ORGANO|ORG|PAIS|LUGAR|PER|CARGO|SIMB|URL|X)(\d+)\}/g;
+export const TAG_RE = /\{(?:(el|la|los|las)\s)?(NUM|FECHA|ORGANO|ORG|PAIS|LUGAR|PER|CARGO|SIMB|URL|X)(\d+)(s?)\}/g;
+
+/** An acronym: one word of capitals (and digits or hyphens), at least two capitals: UNDP, PNUD, AUSSOM. */
+export function isAcronymForm(form) {
+  const f = String(form || '').trim();
+  return /^[A-Z0-9][A-Z0-9&\-]{1,11}$/.test(f) && (f.match(/[A-Z]/g) || []).length >= 2;
+}
+
+/** The tag of one occurrence: the acronym of an entity also written in full gets the "s" mark. */
+export function occTag(e, o) {
+  return (o && o.short && e.tagShort) ? e.tagShort : e.tagSrc;
+}
 
 export function defaultMaskSettings() {
   return {
@@ -96,7 +109,7 @@ export function computeEntities(input) {
       const key = _resolveKey(s.key, mask.merges);
       if (removedKeys.has(key)) continue;
       if (removedOcc.has(side + ':' + paraId + ':' + s.start)) { skipped.add(key); continue; }
-      const o = { side, paraId, start: s.start, end: s.end, key, surface: s.surface, art: s.art || '' };
+      const o = { side, paraId, start: s.start, end: s.end, key, surface: s.surface, art: s.art || '', short: isAcronymForm(s.surface) };
       list.push(o);
       let e = byKey.get(key);
       if (!e) {
@@ -139,7 +152,12 @@ export function computeEntities(input) {
     // helped). The same tag on both sides; TAG_RE still reads an article for old texts.
     e.tagSrc = '{' + e.cat + e.n + '}';
     e.tagTgt = e.tagSrc;
-    const tgtFormsN = Object.keys(e.tgtForms).length;
+    // Written both in full and as an acronym in this document: the acronym is {CATns}.
+    const allForms = Object.keys(e.srcForms).concat(Object.keys(e.tgtForms));
+    e.tagShort = (allForms.some(isAcronymForm) && allForms.some(f => !isAcronymForm(f))) ? '{' + e.cat + e.n + 's}' : null;
+    // A name and its acronym are not two translations: count the names and the acronyms apart.
+    const tf = Object.keys(e.tgtForms);
+    const tgtFormsN = Math.max(tf.filter(isAcronymForm).length, tf.filter(f => !isAcronymForm(f)).length);
     if (!e.srcCount || !e.tgtCount) e.status = 'nopair';
     else if (e.srcCount !== e.tgtCount) e.status = 'count';
     // A person is named in full or by the surname alone: several forms are normal there.
@@ -227,7 +245,7 @@ export function maskText(text, occs, side, byKey) {
     if (o.start < pos) continue;
     const e = byKey.get(o.key);
     if (!e) continue;
-    const tag = side === 'src' ? e.tagSrc : e.tagTgt;
+    const tag = occTag(e, o);
     out += text.slice(pos, o.start);
     map.push({ oStart: o.start, oEnd: o.end, mStart: out.length, mEnd: out.length + tag.length, key: o.key });
     out += tag;
@@ -249,13 +267,23 @@ export function maskedToOriginal(map, mPos, edge) {
   return mPos + delta;
 }
 
-/** Replaces every tag of a masked text with the entity's target (or source) form. */
+/** The forms of a forms map that are (or are not) acronyms. */
+function _formsOf(forms, acr) {
+  const out = {};
+  for (const f of Object.keys(forms || {})) if (isAcronymForm(f) === acr) out[f] = forms[f];
+  return out;
+}
+
+/** Replaces every tag of a masked text with the entity's target (or source) form; {ORG5s} with its
+ *  acronym on that side (PNUD), {ORG5} with its name when the entity also has an acronym. */
 export function rehydrate(text, entitiesByTag, side) {
-  return String(text || '').replace(TAG_RE, (all, art, cat, n) => {
+  return String(text || '').replace(TAG_RE, (all, art, cat, n, sh) => {
     const e = entitiesByTag.get(cat + n);
     if (!e) return all;
-    const f = side === 'src' ? (mainForm(e.srcForms) || mainForm(e.tgtForms)) : (mainForm(e.tgtForms) || mainForm(e.srcForms));
-    return f || all;
+    const mine = side === 'src' ? e.srcForms : e.tgtForms, other = side === 'src' ? e.tgtForms : e.srcForms;
+    let f = '';
+    if (e.tagShort) f = mainForm(_formsOf(mine, !!sh)) || mainForm(_formsOf(other, !!sh));
+    return f || mainForm(mine) || mainForm(other) || all;
   });
 }
 

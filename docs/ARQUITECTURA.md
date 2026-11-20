@@ -517,3 +517,16 @@ prueba y vista de lo enviado), adaptadas a UMBRA.
 - `findings.anchorItem`: si la cita trae una etiqueta que el párrafo enmascarado no tiene (la puso la
   red), se busca entera en el texto real.
 
+## 16. Ajustes a mano del enmascarado y siglas (2026-11-20)
+
+- **Señalar su pareja** (tarjetas «Sin pareja» o «Recuento distinto»): el texto que se seleccione en la
+  otra hoja se añade como término del proyecto unido a esa entidad (`startPick`, `onPickSelection`).
+- **Ampliar** (clic derecho en una etiqueta): la aparición con la palabra anterior o la siguiente abre
+  «Enmascarar selección»; los términos ganan a las listas cuando se pisan (`PRIORITY` en `detect.js`).
+- Los nombres de varias palabras de las listas se reconocen aunque una palabra cambie de mayúscula a
+  minúscula (`_caseVariant`): «southern Africa» = Southern Africa = «África Meridional».
+- **Nombre y sigla**: una entidad escrita en el documento con su nombre y con su sigla conserva un número,
+  una tarjeta y un recuento; las apariciones de la sigla llevan `{CATns}` (`tagShort`, `occTag`).
+  `TAG_RE` lee la «s»; `rehydrate` devuelve la sigla de cada lengua para la etiqueta con «s» y el nombre
+  para la otra. Nombre + sigla no cuenta como «Formas distintas».
+

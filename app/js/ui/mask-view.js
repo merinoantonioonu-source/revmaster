@@ -7,7 +7,7 @@ import { helpBtn, helpItem } from './help.js';
 import { el, $, clear, toast, modal, copyText, download, pickFiles, promptDialog, uid } from '../util/dom.js';
 import { state, on, emit, setMask, remaskNow, saveDictItem, addFindings } from '../state.js';
 import { renderDoc } from './preview.js';
-import { CATS, CAT_LABELS, CAT_SINGULAR, STATUS_LABELS, mainForm } from '../redact/entities.js';
+import { CATS, CAT_LABELS, CAT_SINGULAR, STATUS_LABELS, mainForm, occTag } from '../redact/entities.js';
 import { exportMasked, exportBilingualXlsx, exportBilingualHtml, exportKeyMap } from '../export/exports.js';
 import { buildExternalText, importExternal } from '../review/external.js';
 import { openMenu } from './menu.js';
@@ -517,10 +517,10 @@ function renderPanes() {
         const shown = _inReveal(side, p.id, o);
         if (showOriginal || shown) {
           return { start: o.start, end: o.end, cls: 'ent-orig ' + e.cat + (bad ? ' bad' : '') + (sel ? ' sel' : '') + (shown ? ' revealed' : ''),
-            attrs: { title: e.cat + e.n, 'data-key': o.key, 'data-occ': occ } };
+            attrs: { title: occTag(e, o).replace(/[{}]/g, ''), 'data-key': o.key, 'data-occ': occ } };
         }
         // The tooltip shows only what the tag hides.
-        const pill = el('span.tk.' + e.cat + (bad ? '.bad' : '') + (sel ? '.sel' : ''), { title: o.surface, 'data-key': o.key, 'data-occ': occ }, e.cat + e.n);
+        const pill = el('span.tk.' + e.cat + (bad ? '.bad' : '') + (sel ? '.sel' : ''), { title: o.surface, 'data-key': o.key, 'data-occ': occ }, occTag(e, o).replace(/[{}]/g, ''));
         return { start: o.start, end: o.end, replace: pill };
       }).filter(Boolean),
       onParaClick: (p, ev) => onSheetClick(side, p, ev)
