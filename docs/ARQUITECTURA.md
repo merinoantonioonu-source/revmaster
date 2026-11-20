@@ -487,3 +487,33 @@ El usuario eligió entre seis diseños (lienzo «UMBRA · Alternativas de interf
 - **Enmascarar**: las categorías pasan al menú «Qué enmascarar» (sigue abierto mientras se cambian) y
   la lengua del original al menú Opciones.
 - Iconos: `ui/icons.js` (trazos SVG; sin emojis).
+
+## 15. Red de seguridad, lo enviado a la IA y personas en todo el documento (2026-11-20)
+
+Ideas tomadas del módulo de anonimización de Wordscope (lista y patrones aplicados a todo lo que sale,
+prueba y vista de lo enviado), adaptadas a UMBRA.
+
+- **Personas en todo el documento** (`redact/entities.js`, `spreadPersons`): una persona reconocida por
+  su tratamiento («Ms. Maria Ivanova») se enmascara también cuando su nombre completo o su apellido
+  aparecen solos, en las dos lenguas y con la misma clave (`per:<apellido>`), luego con la misma etiqueta.
+  Una forma de una sola palabra que también aparece en minúscula en los textos es una palabra corriente
+  («Long» con «long-term») y no se propaga. Las personas no cuentan como «Formas distintas».
+- **Red de seguridad** (`ai/leak-guard.js`):
+  - `buildLeakGuard(entidades, { skip, texts })` reúne las formas reales de las entidades del proyecto
+    (sin cifras sueltas, sin formas de menos de tres caracteres, sin palabras corrientes y sin las
+    entidades con una aparición que el traductor dejó a la vista: `ent.skipped`);
+  - `state.js` la rehace en cada enmascarado (`_syncGuard`) y la quita al cerrar el proyecto o si es
+    «Sin enmascarar»;
+  - la puerta de salida (`gateway.js`) la aplica al texto de `callAI` y de cada petición de los lotes
+    diferidos, y `mask-view.js` al texto para una IA externa: cada forma real pasa a su etiqueta y un
+    aviso lo dice (`onLeak` → `ui/sent-view.js`, `initLeakNotice`);
+  - no toca la tabla de Nombres oficiales (marcada con un símbolo privado de `gateway.js`) ni un
+    proyecto «Sin enmascarar».
+- **Lo enviado a la IA** (`sentLog` en `leak-guard.js`, `ui/sent-view.js`): la puerta registra cada
+  llamada tal como sale (módulo, modelo, hora, instrucciones, texto, lo que enmascaró la red), solo en
+  memoria y hasta 300 llamadas; se borra al recargar o al abrir otro proyecto. En Corregir, «Ver lo
+  enviado» enseña el párrafo del hallazgo tal como salió (o, sin registro, como se enviaría hoy); en el
+  menú Más de Revisar y Corregir, «Lo enviado a la IA» lista todas las llamadas.
+- `findings.anchorItem`: si la cita trae una etiqueta que el párrafo enmascarado no tiene (la puso la
+  red), se busca entera en el texto real.
+

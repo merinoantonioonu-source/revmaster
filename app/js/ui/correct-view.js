@@ -24,6 +24,7 @@ import { openMenu } from './menu.js';
 import { reverify, benchDialog, resetReviewState } from './review-view.js';
 import { icon } from './icons.js';
 import { compareDialog } from './compare-view.js';
+import { sentDialog, sentForFinding } from './sent-view.js';
 
 let root, toolsHost, panes = {};
 let filt = { module: 'all', sev: 'all', state: 'open', q: '' };
@@ -133,6 +134,7 @@ function moreMenu(anchor) {
       emit('findings'); saveProjectSoon();
     } },
     { sep: true },
+    { label: 'Lo enviado a la IA\u2026', onClick: sentDialog },
     { label: 'Copiar para IA externa\u2026', onClick: externalDialog },
     { label: 'Importar respuesta de IA externa\u2026', onClick: importDialog },
     { sep: true },
@@ -529,8 +531,9 @@ function renderInspector() {
     box.appendChild(el('div.ci-acts', el('button.btn', { onclick: () => updateFinding(f.id, { state: 'open' }) }, 'Deshacer: volver a pendiente')));
   }
   box.appendChild(el('div.ci-src',
-    (f.source === 'local' || f.source === 'rule' ? 'Sin IA' : f.source === 'external' ? 'IA externa' : 'Modelo: ' + (f.model || 'IA') + (f.role === 'deep' ? ' (a fondo)' : f.role === 'cache' ? ' (cach\u00e9)' : '')) +
-      (f.unanchored ? ' \u00b7 cita no localizada en el texto' : '')));
+    el('span', (f.source === 'local' || f.source === 'rule' ? 'Sin IA' : f.source === 'external' ? 'IA externa' : 'Modelo: ' + (f.model || 'IA') + (f.role === 'deep' ? ' (a fondo)' : f.role === 'cache' ? ' (cach\u00e9)' : '')) +
+      (f.unanchored ? ' \u00b7 cita no localizada en el texto' : '')),
+    el('button.btn.link#cx-sent', { title: 'El texto de este p\u00e1rrafo tal como sali\u00f3 hacia la IA', onclick: () => sentForFinding(f) }, 'Ver lo enviado')));
 }
 
 function step(dir) {

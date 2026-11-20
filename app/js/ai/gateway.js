@@ -10,11 +10,16 @@
  * Archivos and shown on every screen), calls the provider and records what
  * the call used (usage.js) - also when the provider cut the answer short (TRUNCATED), because those
  * tokens were spent too.
+ *
+ * The safety net (leak-guard.js): before a masked text leaves, any real form of an entity of the open
+ * project still in it is replaced by its tag, and the user is warned. Every call is recorded as it was
+ * sent ("Lo enviado a la IA").
  */
 
 import { resolveClient, getProvider, getApiKey } from './registry.js';
 import { recordUsage, costOf, priceFor, BATCH_SUFFIX } from './usage.js';
 import { batchKind, submitBatch, pollBatch, batchResults, cancelBatch } from './batch.js';
+import { guardText, logSent } from './leak-guard.js';
 
 export const DEFAULT_TEMPERATURE = 0.2;
 
@@ -28,6 +33,11 @@ function _err(code, message, extra) {
 /** May this text leave? Masked; or the project is "Sin enmascarar"; or allowed and the provider is local. */
 const _mayLeave = (o, trust) => o.masked === true || o.unmaskedProject === true || (o.allowUnmasked === true && trust === 'local');
 const _mayAsk = (o) => o.masked === true || o.unmaskedProject === true || o.allowUnmasked === true;
+
+/** Marks the names table (built and checked in callAINames): the one text the net does not touch. */
+const NAMES_TABLE = Symbol('names-table');
+/** A masked text, to be looked at by the net. */
+const _watched = (o) => o.masked === true && o.unmaskedProject !== true && !o[NAMES_TABLE];
 
 const UNMASKED_MSG = 'El texto no est\u00e1 enmascarado: solo un proveedor local (de confianza "Local") puede recibirlo. ' +
   'Enmascara el documento o elige un proveedor local para este m\u00f3dulo.';
@@ -55,6 +65,13 @@ export async function callAI(opts) {
     throw _err('UNMASKED', UNMASKED_MSG, { providerId: r.providerId, modelId: r.modelId });
   }
 
+  // The safety net, then the record of what leaves.
+  let prompt = String(o.prompt || '');
+  let leaks = [];
+  if (_watched(o)) { const g = guardText(prompt); prompt = g.text; leaks = g.hits; }
+  logSent({ module: o.usageModule || o.module || '', role: o.role || 'triage', providerId: r.providerId, modelId: r.modelId,
+    system: o.system || '', prompt, leaks, unmasked: !_watched(o) && !o[NAMES_TABLE], names: !!o[NAMES_TABLE] });
+
   let usage = null;
   const onUsage = (u) => { usage = u; };
   const record = () => recordUsage({
@@ -65,7 +82,7 @@ export async function callAI(opts) {
 
   let text;
   try {
-    text = await r.client.complete(String(o.prompt || ''), o.system || '', {
+    text = await r.client.complete(prompt, o.system || '', {
       temperature: o.temperature !== undefined ? o.temperature : DEFAULT_TEMPERATURE,
       maxTokens: o.maxTokens,
       thinking: o.thinking || null,
@@ -121,7 +138,7 @@ export async function callAINames(o) {
   }
   const prompt = 'NOMBRES (fila | categor\u00eda | original | traducci\u00f3n):\n' +
     rows.map(r => r.n + ' | ' + r.cat + ' | ' + r.src + ' | ' + r.tgt).join('\n') + '\n(FIN ' + rows.length + ')';
-  return callAI(Object.assign({}, o, { prompt, masked: true, rows: undefined }));
+  return callAI(Object.assign({}, o, { prompt, masked: true, rows: undefined, [NAMES_TABLE]: true }));
 }
 
 // ------------------------------------------------------------------ deferred batches (-50 %)
@@ -144,7 +161,14 @@ export async function submitDeferred(o) {
   const r = await resolveClient(o.module || '', o.role || 'triage');
   if (!_mayLeave(o, r.trust)) throw _err('UNMASKED', UNMASKED_MSG);
   const key = await getApiKey(r.providerId);
-  const reqs = (o.requests || []).map(q => Object.assign({ temperature: DEFAULT_TEMPERATURE }, q));
+  const reqs = (o.requests || []).map(q => {
+    const out = Object.assign({ temperature: DEFAULT_TEMPERATURE }, q);
+    let leaks = [];
+    if (_watched(o)) { const g = guardText(out.prompt); out.prompt = g.text; leaks = g.hits; }
+    logSent({ module: o.module || '', role: o.role || 'triage', providerId: r.providerId, modelId: r.modelId,
+      system: out.system || '', prompt: String(out.prompt || ''), leaks, unmasked: !_watched(o), deferred: true });
+    return out;
+  });
   const job = await submitBatch(r.profile, key, r.modelId, reqs);
   return Object.assign(job, { providerId: r.providerId });
 }

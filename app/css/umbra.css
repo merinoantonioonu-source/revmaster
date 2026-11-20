@@ -506,3 +506,14 @@ textarea.inp.ci-sug:disabled { border-color: var(--border); background: var(--bg
 .recent-del:hover { color: #b42318; }
 /* Comparar con la version final: the figures */
 table.grid.cmp td:last-child { text-align: right; font-weight: 700; width: 90px; }
+/* Lo enviado a la IA (ui/sent-view.js) */
+.sentbox { white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.55; background: var(--bg-app);
+  border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; max-height: 300px; overflow: auto; margin: 4px 0 10px; }
+.sentbox .tk { font-size: 10.5px; }
+.sentlist { border: 1px solid var(--border); border-radius: 10px; max-height: 60vh; overflow: auto; }
+.sentlist > details { border-bottom: 1px solid var(--border-soft); padding: 0 12px; }
+.sentlist > details > summary { display: flex; align-items: center; gap: 10px; min-height: 40px; cursor: pointer; flex-wrap: wrap; }
+.sentlist > details > summary .st { font-family: Consolas, 'Courier New', monospace; color: var(--text-muted); font-size: 12px; }
+.sentlist details.sys > summary { cursor: pointer; color: var(--text-muted); font-size: 12px; margin-bottom: 6px; }
+.ci-src { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ci-src .btn.link { margin-left: auto; font-size: 12px; }
