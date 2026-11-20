@@ -14,11 +14,12 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+# Two jobs on purpose (2026-11-20): with the upload and the deploy in the same job, GitHub sometimes does
+# not list the artifact yet when the deploy asks for it a fraction of a second later ("No artifacts named
+# github-pages were found"). A separate job starts later, and re-running only the deploy does not upload a
+# second artifact.
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,5 +29,15 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: app
+
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Esperar a que GitHub registre el paquete
+        run: sleep 15
       - id: deployment
         uses: actions/deploy-pages@v4
