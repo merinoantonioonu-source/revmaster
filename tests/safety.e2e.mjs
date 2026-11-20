@@ -37,7 +37,8 @@ const EN = [
   'Maria Ivanova thanked the Committee.',
   'Mr. Long welcomed the long-term plan.',
   'Long negotiations followed.',
-  'Droughts hit southern Africa and southern Mozambique.'
+  'Droughts hit southern Africa and southern Mozambique.',
+  'The United Nations Development Programme (UNDP) supported the plan.'
 ];
 const ES = [
   'Informe de la reuni\u00f3n',
@@ -46,7 +47,8 @@ const ES = [
   'Maria Ivanova dio las gracias al Comit\u00e9.',
   'El Sr. Long acogi\u00f3 con benepl\u00e1cito el plan a largo plazo.',
   'Siguieron largas negociaciones.',
-  'Las sequ\u00edas azotaron \u00c1frica Meridional y el sur de Mozambique.'
+  'Las sequ\u00edas azotaron \u00c1frica Meridional y el sur de Mozambique.',
+  'El Programa de las Naciones Unidas para el Desarrollo (PNUD) apoy\u00f3 el plan.'
 ];
 const mk = (file, paras) => py('import docx,sys,json\nd=docx.Document()\nfor t in json.loads(sys.argv[2]): d.add_paragraph(t)\nd.save(sys.argv[1])', path.join(OUT, file), JSON.stringify(paras));
 mk('safety_en.docx', EN);
@@ -103,6 +105,25 @@ async function main() {
       return e ? e.status + ':' + Object.keys(e.tgtForms).join('/') : 'none';
     });
     ok(sa === 'ok:\u00c1frica Meridional', '"southern Africa" is recognised as Southern Africa and pairs with \u00c1frica Meridional (' + sa + ')');
+    // A name and its acronym: one entity, one count, the acronym marked with "s".
+    const acr = await page.evaluate(async () => {
+      const { state } = await import('/app/js/state.js');
+      const { rehydrate } = await import('/app/js/redact/entities.js');
+      const { guardText } = await import('/app/js/ai/leak-guard.js');
+      const s = state.session;
+      const e = s.ent.entities.find(x => Object.keys(x.srcForms).includes('UNDP'));
+      const t = e.tagSrc, sh = e.tagShort;
+      return { src: s.masked.src.get(7).masked, tgt: s.masked.tgt.get(7).masked, t, sh, status: e.status, n: e.srcCount + '/' + e.tgtCount,
+        backS: rehydrate(sh, s.byTag, 'tgt'), backL: rehydrate(t, s.byTag, 'tgt'), backSrc: rehydrate(sh, s.byTag, 'src'), guard: guardText('UNDP and PNUD').text,
+        pills: Array.from(document.querySelectorAll('#mask-tgt .tk')).map(x => x.textContent).filter(x => x.startsWith(e.cat + e.n)) };
+    });
+    ok(acr.sh === acr.t.replace('}', 's}') && acr.src === 'The ' + acr.t + ' (' + acr.sh + ') supported the plan.' && acr.tgt.startsWith('El ' + acr.t + ' (' + acr.sh + ') apoy'),
+      'Name and acronym keep one number; the acronym is marked with "s" (' + acr.src + ' | ' + acr.tgt + ')');
+    ok(acr.status === 'ok' && acr.n === '2/2', 'Still one entity with one count (' + acr.status + ', ' + acr.n + ')');
+    ok(acr.backS === 'PNUD' && acr.backL === 'Programa de las Naciones Unidas para el Desarrollo' && acr.backSrc === 'UNDP',
+      'Back to the real text: the "s" tag gives the acronym of that language, the plain tag the name (' + [acr.backS, acr.backL, acr.backSrc].join(' | ') + ')');
+    ok(acr.guard === acr.sh + ' and ' + acr.sh && acr.pills.includes(acr.sh.replace(/[{}]/g, '')), 'The safety net and the sheets use the "s" tag too (' + acr.guard + ')');
+
     // Right click on a tag > "Ampliar con <word before>": the dialog of a new entity with the wider text.
     await page.locator('#mask-src .tk', { hasText: /^PAIS/ }).last().click({ button: 'right' });
     await page.click('.menu .mi:has-text("Ampliar con \u00absouthern\u00bb")');

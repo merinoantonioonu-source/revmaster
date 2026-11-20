@@ -12,7 +12,7 @@ import { encryptJSON, decryptJSON, encryptBytes, decryptBytes } from '../util/cr
 import { unitSrc, unitTgt, unitSrcMasked, unitTgtMasked, reviewableUnits } from '../review/session.js';
 import { applyAccepted, STATE_LABELS, SEV_LABELS } from '../review/findings.js';
 import { CAT_LABELS } from '../review/prompts.js';
-import { mainForm, CAT_SINGULAR } from '../redact/entities.js';
+import { mainForm, CAT_SINGULAR, occTag } from '../redact/entities.js';
 import { moduleById } from '../review/module-list.js';
 
 function _base(name) { return String(name || 'documento').replace(/\.[^.]+$/, ''); }
@@ -30,7 +30,7 @@ export async function exportMasked(side) {
     for (const o of occs) {
       const e = s.ent.byKey.get(o.key);
       if (!e) continue;
-      list.push({ start: o.start, end: o.end, text: side === 'src' ? e.tagSrc : e.tagTgt });
+      list.push({ start: o.start, end: o.end, text: occTag(e, o) });
     }
     if (list.length) repl.set(pid, list);
   }
@@ -70,7 +70,7 @@ export function exportBilingualHtml() {
 
 /** The key map (tag -> real forms). Encrypted with a password when one is given. */
 export async function exportKeyMap(password) {
-  const map = state.session.ent.entities.map(e => ({ tagSrc: e.tagSrc, tagTgt: e.tagTgt, cat: e.cat,
+  const map = state.session.ent.entities.map(e => ({ tagSrc: e.tagSrc, tagTgt: e.tagTgt, tagSigla: e.tagShort || undefined, cat: e.cat,
     original: Object.keys(e.srcForms), traduccion: Object.keys(e.tgtForms) }));
   const payload = { kind: 'umbra-keymap', project: state.project.name, at: new Date().toISOString(), map };
   const content = password ? { kind: 'umbra-keymap-encrypted', box: await encryptJSON(payload, password) } : payload;

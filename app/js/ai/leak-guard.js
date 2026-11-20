@@ -16,7 +16,7 @@
  * sent: module, model, time, instructions and text, and what the net masked.
  */
 
-import { lowercaseWords, isOrdinaryWord } from '../redact/entities.js';
+import { lowercaseWords, isOrdinaryWord, isAcronymForm } from '../redact/entities.js';
 
 const MAX_LOG = 300;
 let _guard = null;
@@ -44,7 +44,7 @@ export function buildLeakGuard(entities, opts) {
       if (f.length < 3 || tagOf.has(f)) continue;
       if (!/[\p{L}]/u.test(f) && !/\d[.,\u00a0\u202f ]\d/.test(f) && !/[\/@:]/.test(f)) continue;   // a plain number
       if (isOrdinaryWord(f, lower)) continue;
-      tagOf.set(f, tag);
+      tagOf.set(f, (e.tagShort && isAcronymForm(f)) ? e.tagShort : tag);
     }
   }
   if (!tagOf.size) return null;

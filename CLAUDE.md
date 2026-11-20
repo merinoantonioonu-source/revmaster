@@ -121,6 +121,10 @@ See `docs/ARQUITECTURA.md` (contracts between modules) and `docs/PROPUESTA.md` (
   (`startPick`/`onPickSelection` in `mask-view.js`); right click on a tag > "Ampliar con <word>" opens the
   "Enmascarar seleccion" dialog with the wider text (terms win over list matches: PRIORITY in
   `detect.js`). List names of several words also match when one word changes case (`_caseVariant`).
+- **Name and acronym** (2026-11-20): an entity written both in full and as an acronym in the document keeps
+  one number, one card and one count; acronym occurrences get `{CATns}` (`tagShort`, `occTag`, `isAcronymForm`
+  in `entities.js`; `TAG_RE` reads the "s"; `rehydrate` gives the acronym of that language for the "s" tag).
+  Name + acronym is not "Formas distintas". One short clause in COMMON and in the external-AI text explains it.
 - The prompts are calibrated on the owner's review report (2026-11-05): its cases are the test bench
   (`tools/make_bench.py` -> `app/data/calibration/`; Archivos > Banco de pruebas, result in Mas). When tuning a
   module, ask the owner for the bench result ("Copiar el resumen") before and after; add new report
