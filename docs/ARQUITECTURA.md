@@ -530,3 +530,24 @@ prueba y vista de lo enviado), adaptadas a UMBRA.
   `TAG_RE` lee la «s»; `rehydrate` devuelve la sigla de cada lengua para la etiqueta con «s» y el nombre
   para la otra. Nombre + sigla no cuenta como «Formas distintas».
 
+
+## 17. Enmascarar: «Por resolver» y Emparejar en tabla (2026-11-20)
+
+- La columna de entidades (`mask-view.js`) ya no tiene tarjetas: arriba, **Por resolver** (`pendingItems`,
+  una línea por problema, en caché hasta el siguiente enmascarado) y, plegada, **Todas las etiquetas**
+  (`entityTable`, una fila por entidad con el filtro de categoría). Cada línea: un punto (rojo: sin pareja;
+  ámbar: recuento o formas), la etiqueta, una frase corta, los párrafos (§) y como mucho dos botones más
+  el menú «…» (`entityMenu`: lugares, Señalar, Es la misma que…, Categoría, A mi diccionario, No
+  enmascarar).
+- Una entidad solo en el original cuya mejor candidata (`rankCandidates`: `strong` y puntuación ≥ 6) está
+  solo en la traducción sale como **una** línea, «parecen la misma», con **Unir** (`merges[b] = a`) y **No
+  son la misma**.
+- Dos campos nuevos en `project.mask` (`defaultMaskSettings`; los proyectos antiguos sin ellos cargan
+  igual): `okKeys { key: status }` («Está bien así»: no sale entre lo pendiente mientras tenga ese
+  problema) y `notPairs ['a|b']` («No son la misma»). Reiniciar y Opciones los vacían.
+- **Emparejar** (`pairPicker`): tabla Etiqueta | Original | Traducción | Por qué, con buscador, filtros
+  (Mismo párrafo, Sin pareja, Solo la categoría), 8 filas y «Ver las N restantes»; la línea de abajo dice
+  en qué etiqueta quedará (`_mergedTag`). La misma tabla sirve a «Enmascarar selección» (fila «No»).
+- La entidad que se mira (`.hot`, que pone `nav.js`) lleva un anillo rojo grueso con halo, la etiqueta
+  algo mayor y tres latidos (`um-hot`); dentro de una oración marcada, las etiquetas conservan su color
+  (`.tk::highlight`).

@@ -121,6 +121,13 @@ See `docs/ARQUITECTURA.md` (contracts between modules) and `docs/PROPUESTA.md` (
   (`startPick`/`onPickSelection` in `mask-view.js`); right click on a tag > "Ampliar con <word>" opens the
   "Enmascarar seleccion" dialog with the wider text (terms win over list matches: PRIORITY in
   `detect.js`). List names of several words also match when one word changes case (`_caseVariant`).
+- **Enmascarar list** (2026-11-20, the owner's choice among three mockups): no entity cards. "Por resolver"
+  (`pendingItems` in `mask-view.js`) shows one short line per problem with at most two buttons and a "..."
+  menu (`entityMenu`); an entity only in the original whose best candidate is only in the translation comes as
+  ONE item "parecen la misma" (Unir / No son la misma). "Todas las etiquetas" is a folded table. Decisions
+  persist in `project.mask.okKeys` ("Esta bien asi", per status) and `notPairs`. Emparejar is a table
+  (`pairPicker`: Etiqueta | Original | Traduccion | Por que, search, filters). The entity being looked at
+  (`.hot`) must stay impossible to miss: thick red ring, halo, bigger chip, pulse. Keep texts short.
 - **Name and acronym** (2026-11-20): an entity written both in full and as an acronym in the document keeps
   one number, one card and one count; acronym occurrences get `{CATns}` (`tagShort`, `occTag`, `isAcronymForm`
   in `entities.js`; `TAG_RE` reads the "s"; `rehydrate` gives the acronym of that language for the "s" tag).

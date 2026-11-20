@@ -47,7 +47,7 @@ async function load(page, src, tgt) {
     const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click(sel)]);
     await chooser.setFiles(path.join(FIX, file));
   }
-  await page.waitForSelector('#view-mask.on .ent', { timeout: 20000 });
+  await page.waitForSelector('#view-mask.on .pendhead', { timeout: 20000 });
 }
 
 async function download(page, trigger, name) {
@@ -275,7 +275,7 @@ async function main() {
       const { ctx: c4, page: p4 } = await newApp(browser, base);
       const [chooser] = await Promise.all([p4.waitForEvent('filechooser'), p4.click('#view-files button:has-text("Abrir proyecto (.umbra)")')]);
       await chooser.setFiles(umbraPath);
-      await p4.waitForSelector('#view-mask.on .ent', { timeout: 20000 });
+      await p4.waitForSelector('#view-mask.on .pendhead', { timeout: 20000 });
       const n2 = await p4.evaluate(async () => { const { state } = await import('/app/js/state.js'); return state.findings.length; });
       ok(n2 === nFind && n2 > 0, 'Project .umbra reopened with its findings (' + n2 + '/' + nFind + ')');
       await c4.close();
@@ -287,8 +287,19 @@ async function main() {
     {
       const { ctx: c1, page: p1, errors: e1 } = await newApp(browser, base);
       await load(p1, 'e2e_en.docx', 'e2e_es.docx');
-      const nopair = await p1.$$eval('.ent .st.bad', ns => ns.length);
+      const nopair = await p1.$$eval('#mask-entities .pend.bad .line .tk', ns => ns.length);
       ok(nopair >= 2, 'Masking shows the figures without a pair (1,250 vs 1.520): ' + nopair);
+      // The two figures, in the same paragraph and without a counterpart, come as one item: Unir joins them.
+      const pairItem = p1.locator('#mask-entities .pend[data-kind="pair"]', { hasText: '1,250' }).first();
+      ok(/1\.520/.test(await pairItem.textContent()), 'The two figures are offered as one item ("parecen la misma")');
+      await pairItem.locator('button:has-text("Unir")').click();
+      await p1.waitForTimeout(500);
+      const joined = await p1.evaluate(async () => {
+        const { state } = await import('/app/js/state.js');
+        const e = state.session.ent.entities.find(x => Object.keys(x.srcForms).includes('1,250'));
+        return e ? e.status + ':' + Object.keys(e.tgtForms).join('/') : 'none';
+      });
+      ok(joined === 'ok:1.520', 'Unir makes them one entity without problems (' + joined + ')');
       await p1.click('.step[data-view="review"]');
       await p1.waitForSelector('#rv-modules .mchip');
       ok(await p1.locator('#rv-modules .mchip[data-mod="local"]').count() === 0, 'No module without AI in the review bar');

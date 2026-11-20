@@ -121,7 +121,7 @@ async function main() {
       const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.click(sel + ' .fn')]);
       await fc.setFiles(path.join(FIX, file));
     }
-    await page.waitForSelector('#view-mask.on .ent', { timeout: 20000 });
+    await page.waitForSelector('#view-mask.on .pendhead', { timeout: 20000 });
 
     // Step 2: Enmascarar
     const maskSeen = await sweep('#topbar', 'Mask bar');

@@ -77,6 +77,7 @@ const T = {
       '**Siglas desconocidas presentes en ambos textos**: una sigla que no est\u00e1 en las listas pero aparece igual en el original y en la traducci\u00f3n se enmascara.',
       '**Volver a enmascarar todo lo que se quit\u00f3 a mano**: anula los \u00abNo enmascarar\u00bb.',
       '**Deshacer todos los emparejamientos**: separa las entidades que se emparejaron a mano.',
+      '**Volver a mostrar lo marcado como \u00abEst\u00e1 bien as\u00ed\u00bb o \u00abNo son la misma\u00bb**: lo devuelve a la lista Por resolver.',
       '**Quitar los t\u00e9rminos a\u00f1adidos a mano en este proyecto**: borra lo enmascarado con [[Alt+E]] (su diccionario personal no cambia).'] ] },
   'mask-export': { t: 'Exportar enmascarado', b: [
     ['**Original / Traducci\u00f3n enmascarada**: el mismo documento, en su formato, con etiquetas en lugar de los datos. Sirve para enviarlo a una IA o a otra persona sin datos sensibles.',
@@ -87,17 +88,20 @@ const T = {
   entities: { t: 'Entidades del documento', b: [
     'Una entidad es un dato que UMBRA tapa con una etiqueta (`{CARGO1}`, la misma en las dos lenguas): cifras, fechas, s\u00edmbolos y direcciones (por su forma), organismos, \u00f3rganos, pa\u00edses, lugares y cargos (por sus listas triling\u00fces), personas (tras \u00abMr.\u00bb, \u00abSra.\u00bb, \u00abM.\u00bb\u2026; una vez reconocida, tambi\u00e9n su nombre o su apellido solos en el resto del documento, salvo si son tambi\u00e9n una palabra corriente del texto), siglas presentes en las dos lenguas y lo que usted a\u00f1ada.',
     'Si un organismo aparece con su nombre y con su sigla, las dos formas llevan el mismo n\u00famero y la sigla, adem\u00e1s, una \u00abs\u00bb: **ORG5** y **ORG5s**. Es una sola entidad con un solo recuento; la IA ve qu\u00e9 es nombre y qu\u00e9 es sigla, y la sigla vuelve en la forma de cada lengua (UNDP / PNUD).',
-    ['**Pulse una tarjeta**: las dos hojas van a la entidad; la oraci\u00f3n sale en amarillo en las dos lenguas y la etiqueta, con un brillo rojo. Otra pulsaci\u00f3n: la siguiente aparici\u00f3n.',
-      '**Con problemas / Todas**: por defecto se ven solo las que tienen alg\u00fan problema. Debajo, la categor\u00eda.',
-      '**Sin pareja**: est\u00e1 en una lengua y no en la otra. **Recuento distinto**: no aparece el mismo n\u00famero de veces. **Formas distintas**: la traducci\u00f3n la nombra de varias maneras.',
-      '**Ver d\u00f3nde no cuadra \u203a** y **Siguiente \u203a**: recorren los p\u00e1rrafos en los que no coincide.'],
-    'Botones: **Categor\u00eda**, **Emparejar\u2026** (es la misma entidad que otra etiqueta), **A mi diccionario** (se enmascarar\u00e1 en todos los documentos) y **No enmascarar**.',
-    'En una tarjeta **Sin pareja** o con **Recuento distinto**, **Se\u00f1alar su pareja**: UMBRA va al p\u00e1rrafo y espera a que seleccione en la otra hoja (arrastrando el rat\u00f3n o con doble clic) el texto que le corresponde, que queda con la misma etiqueta. [[Esc]] o el mismo bot\u00f3n cancelan. Si la selecci\u00f3n pisa una etiqueta de color, pulse antes **Ver original**.'] },
+    '**Por resolver**: arriba, solo lo que no cuadra, una l\u00ednea por problema, y cu\u00e1ntas etiquetas cuadran ya. Lo que resuelve desaparece de la lista.',
+    ['**\u00abX\u00bb no est\u00e1 en la traducci\u00f3n** (o en el original): est\u00e1 en una lengua y no en la otra. **Se\u00f1alarla en la traducci\u00f3n**: UMBRA va al p\u00e1rrafo y espera a que seleccione en la otra hoja (arrastrando el rat\u00f3n o con doble clic) el texto que le corresponde, que queda con la misma etiqueta. [[Esc]] o el mismo bot\u00f3n cancelan. Si la selecci\u00f3n pisa una etiqueta de color, pulse antes **Ver original**.',
+      '**\u00abX\u00bb y \u00abY\u00bb parecen la misma**: una etiqueta solo en el original y otra solo en la traducci\u00f3n que UMBRA cree que son la misma entidad (en el mismo p\u00e1rrafo o con la misma sigla). **Unir** las deja con una sola etiqueta; **No son la misma**, no vuelve a proponerlas juntas.',
+      '**4 en el original, 3 en la traducci\u00f3n**: no aparece el mismo n\u00famero de veces; debajo, en qu\u00e9 p\u00e1rrafo falta o sobra. **Se\u00f1alar la que falta** funciona como arriba.',
+      '**Una vez \u00abX\u00bb (5 veces \u00abY\u00bb)**: la traducci\u00f3n la nombra de varias maneras. **Ver \u00a7n** lleva a cada p\u00e1rrafo.',
+      '**Est\u00e1 bien as\u00ed**: la deja como est\u00e1 y deja de salir entre lo pendiente (se deshace en su men\u00fa \u00ab\u2026\u00bb o en Opciones).'],
+    '**Pulse una l\u00ednea**: las dos hojas van al lugar; la oraci\u00f3n sale en amarillo en las dos lenguas y la etiqueta, con un anillo rojo muy visible que late unos segundos. Otra pulsaci\u00f3n: el lugar siguiente.',
+    'El men\u00fa **\u2026** de cada l\u00ednea: lugar anterior y siguiente, **Es la misma que\u2026** (Emparejar), **Categor\u00eda**, **A mi diccionario** (se enmascarar\u00e1 en todos los documentos) y **No enmascarar**.',
+    '**Todas las etiquetas**: plegada debajo, la tabla completa (etiqueta, original, traducci\u00f3n y estado), con el filtro de categor\u00eda; la fila elegida tiene su men\u00fa \u00ab\u2026\u00bb.'] },
   sheets: { t: 'Las dos hojas', b: [
     'A la izquierda, el original; a la derecha, la traducci\u00f3n, con las etiquetas en color.',
     ['**Clic en una oraci\u00f3n**: se resalta en amarillo con su pareja en la otra hoja, que se desplaza hasta ponerla a la misma altura. Si las oraciones no se corresponden una a una, UMBRA las empareja por su longitud y sus etiquetas; si no hay pareja, marca el p\u00e1rrafo m\u00e1s cercano.',
       '**Rat\u00f3n sobre una etiqueta**: se ve lo que oculta, y su pareja en la otra hoja brilla.',
-      '**Clic en una etiqueta**: la entidad se selecciona y brilla en rojo en las dos oraciones.',
+      '**Clic en una etiqueta**: la entidad se selecciona y se rodea de un anillo rojo en las dos oraciones; en la lista sale su l\u00ednea (o su fila de Todas las etiquetas).',
       '**Clic derecho en una frase \u203a Desenmascarar**: muestra el texto real de esa frase y de su pareja hasta que pulse otra frase.',
       '**Para enmascarar algo que UMBRA no ha detectado**: selecci\u00f3nelo y pulse [[Alt+E]], o clic derecho \u203a **Enmascarar la selecci\u00f3n\u2026**',
       '**Clic derecho en una etiqueta \u203a Ampliar con \u00abpalabra\u00bb**: cuando a la etiqueta le falta la palabra de antes o de despu\u00e9s (\u00absouthern\u00bb en \u00absouthern Africa\u00bb), abre **Enmascarar la selecci\u00f3n** con el texto ampliado y su misma categor\u00eda; elija all\u00ed su pareja en la otra lengua (UMBRA la sugiere).',
@@ -106,7 +110,7 @@ const T = {
   'mask-selection': { t: 'Enmascarar una selecci\u00f3n', b: [
     'Se enmascaran todas las apariciones del texto en esa hoja.',
     ['**Categor\u00eda**: la que mejor encaje; si ninguna, Personalizada. Si elige una entidad de la lista, toma su categor\u00eda.',
-      '**Es la misma entidad que**: la lista de la otra lengua, con buscador. Primero van las m\u00e1s probables (en el mismo p\u00e1rrafo, sin pareja, con la misma sigla o una forma parecida) y la mejor viene marcada como **Sugerida**. Elija \u00abNo\u00bb si es una entidad nueva.',
+      '**Es la misma entidad que**: la tabla de la otra lengua (Original, Traducci\u00f3n y por qu\u00e9), con buscador y filtros. Primero van las m\u00e1s probables (en el mismo p\u00e1rrafo, sin pareja, con la misma sigla o una forma parecida) y la mejor viene marcada como **Sugerida**. Elija \u00abNo\u00bb si es una entidad nueva.',
       '**Forma en la otra lengua**: c\u00f3mo aparece en el otro documento, para enmascararla tambi\u00e9n.',
       '**Mi diccionario personal**: se enmascarar\u00e1 en todos los documentos (y viaja en el archivo de sincronizaci\u00f3n).'],
     'Si se equivoca: Opciones \u203a Quitar los t\u00e9rminos a\u00f1adidos a mano.'] },
@@ -128,7 +132,8 @@ const T = {
     'El registro se guarda solo en memoria: se borra al recargar la p\u00e1gina o al abrir otro proyecto. Lo que viene de la cach\u00e9 o de una IA externa no pasa por aqu\u00ed; entonces se ve c\u00f3mo se enviar\u00eda hoy el p\u00e1rrafo.'] },
   merge: { t: 'Emparejar entidades', b: [
     '**Para qu\u00e9 sirve**: a veces UMBRA da dos etiquetas distintas a una sola entidad, porque en cada lengua se escribe de otra forma. Por ejemplo, \u00abUNDP\u00bb en el original queda como `{ORG4}` y \u00abPNUD\u00bb en la traducci\u00f3n como `{ORG7}`: las dos salen como \u00abSin pareja\u00bb.',
-    '**C\u00f3mo se usa**: pulse **Emparejar\u2026** en la tarjeta de una de ellas y elija la otra. La lista tiene buscador y empieza por las m\u00e1s probables (mismo p\u00e1rrafo, sin pareja, misma sigla o forma parecida); la mejor viene marcada como **Sugerida**. Desde ese momento llevan la misma etiqueta y dejan de salir como problema.',
+    'Muchas veces UMBRA ya lo propone en **Por resolver** (\u00abparecen la misma\u00bb, bot\u00f3n **Unir**). Si no, en el men\u00fa \u00ab\u2026\u00bb de una de ellas, **Es la misma que\u2026**.',
+    '**La tabla**: cada etiqueta de la otra lengua con su forma en el **Original** y en la **Traducci\u00f3n** (\u00ab\u2014\u00bb si no est\u00e1) y **Por qu\u00e9** se propone. Empieza por las m\u00e1s probables y la mejor viene marcada como **Sugerida**. Arriba, el buscador y los filtros **Mismo p\u00e1rrafo**, **Sin pareja** y **Solo** su categor\u00eda; debajo, en qu\u00e9 etiqueta quedar\u00e1. Desde ese momento llevan la misma etiqueta y dejan de salir como problema.',
     'Para deshacerlo: Opciones \u203a Deshacer todos los emparejamientos.'] },
 
   // ------------------------------------------------------------------ steps 3 and 4: review and correct

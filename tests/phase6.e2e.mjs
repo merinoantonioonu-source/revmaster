@@ -37,7 +37,7 @@ async function load(page, src, tgt) {
     const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click(sel)]);
     await chooser.setFiles(path.join(FIX, file));
   }
-  await page.waitForSelector('#view-mask.on .ent', { timeout: 20000 });
+  await page.waitForSelector('#view-mask.on .pendhead', { timeout: 20000 });
 }
 
 async function main() {
@@ -115,7 +115,7 @@ async function main() {
     await page.waitForTimeout(2500);   // the first automatic poll
     // Reload: the job must survive and finish.
     await page.reload();
-    await page.waitForSelector('#view-mask.on .ent', { timeout: 20000 });
+    await page.waitForSelector('#view-mask.on .pendhead', { timeout: 20000 });
     await page.click('.step[data-view="review"]');
     await page.waitForSelector('#rv-modules .mcard:has-text("Lotes diferidos")', { timeout: 15000 });
     await page.screenshot({ path: path.join(OUT, '2-deferred-card.png') });
