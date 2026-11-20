@@ -20,6 +20,7 @@ import { loadBenchSpec, benchFiles, evaluateBench, benchSpecOf, readBenchZip } f
 import { icon } from './icons.js';
 import { docTypeRow } from './doc-type.js';
 import { docTypeById } from '../review/doc-types.js';
+import { sentDialog } from './sent-view.js';
 
 let root, toolsHost;
 let running = null;           // { abort: AbortController, modules:[] }
@@ -106,6 +107,7 @@ function moreMenu(anchor) {
   openMenu(anchor, [
     { label: state.project && state.project.bench ? 'Resultado del banco de pruebas\u2026' : 'Banco de pruebas\u2026', onClick: benchDialog },
     { sep: true },
+    { label: 'Lo enviado a la IA\u2026', onClick: sentDialog },
     { label: 'Copiar para IA externa\u2026', onClick: externalDialog },
     { label: 'Importar respuesta de IA externa\u2026', onClick: importDialog },
     { sep: true },

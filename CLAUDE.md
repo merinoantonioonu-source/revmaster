@@ -105,6 +105,17 @@ See `docs/ARQUITECTURA.md` (contracts between modules) and `docs/PROPUESTA.md` (
   spurious / missed, with "Copiar el resumen" for the chat, an Excel and a bench of one's own built from the
   real work. Tune prompts on those summaries and benches, never by putting examples or rule lists in the
   prompts. The app does not change its own instructions.
+- **Masking safety (2026-11-20, ideas from Wordscope's anonymizer):** (1) a person recognised once by a
+  courtesy title is masked wherever the full name or the surname appears alone, both languages, same key
+  (`spreadPersons` in `redact/entities.js`; a one-word form that also appears in lowercase in the texts
+  is an ordinary word and is not spread; PER is exempt from the "Formas distintas" status); (2) the
+  gateway's safety net (`ai/leak-guard.js`): before a masked prompt leaves (`callAI`, deferred requests,
+  the external-AI copy), real forms of the project's entities are replaced by their tags and the user is
+  warned; not the names table (private symbol in `gateway.js`), not "Sin enmascarar", not plain numbers,
+  not entities with an occurrence the translator left visible (`ent.skipped`); `state.js` rebuilds the
+  net on every remask; (3) the record of every call as sent (`sentLog`, memory only, cleared on project
+  change) shown by `ui/sent-view.js` (Corregir inspector "Ver lo enviado", Mas > "Lo enviado a la IA").
+  `anchorItem` finds a quote with an extra tag on the real text. `tests/safety.e2e.mjs` covers it.
 - The prompts are calibrated on the owner's review report (2026-11-05): its cases are the test bench
   (`tools/make_bench.py` -> `app/data/calibration/`; Archivos > Banco de pruebas, result in Mas). When tuning a
   module, ask the owner for the bench result ("Copiar el resumen") before and after; add new report

@@ -19,6 +19,7 @@ import { helpBtn, helpItem, showHelp } from './ui/help.js';
 import { icon } from './ui/icons.js';
 import { openMenu } from './ui/menu.js';
 import { docTypeRow } from './ui/doc-type.js';
+import { initLeakNotice } from './ui/sent-view.js';
 
 const VIEWS = ['files', 'mask', 'review', 'correct', 'export', 'settings'];
 const TITLES = { files: 'Documentos', mask: 'Enmascarar', review: 'Revisar', correct: 'Corregir', export: 'Exportar', settings: 'Ajustes' };
@@ -498,6 +499,7 @@ async function boot() {
   $('#btn-help').addEventListener('click', showGuide);
   $('#btn-help').title = 'Gu\u00eda r\u00e1pida (F1: ayuda de la pantalla en la que est\u00e1)';
   initF1();
+  initLeakNotice();
   initDark();
   initZoom();
   let busyToast = null;

@@ -22,6 +22,7 @@ import { guessLang } from './redact/detect.js';
 import { uid } from './util/dom.js';
 import { currentModuleId } from './review/module-list.js';
 import { guessDocType } from './review/doc-types.js';
+import { buildLeakGuard, setLeakGuard, clearSentLog } from './ai/leak-guard.js';
 
 export const state = {
   project: null, src: null, tgt: null, session: null, findings: [],
@@ -117,6 +118,14 @@ export async function openFiles(srcFile, tgtFile, opts) {
   return project;
 }
 
+/** The gateway's safety net follows the masking of the open project (ai/leak-guard.js). */
+function _syncGuard() {
+  const s = state.session;
+  if (!s || s.unmasked) { setLeakGuard(null); return; }
+  const texts = s.src.paras.map(p => p.text).concat(s.tgt.paras.map(p => p.text));
+  setLeakGuard(buildLeakGuard(s.ent.entities, { skip: s.ent.skipped, texts }));
+}
+
 async function _load(project) {
   emit('busy', 'Leyendo los documentos\u2026');
   try {
@@ -132,6 +141,8 @@ async function _load(project) {
       unmasked: !!project.unmasked, docType: project.docType || '', gazetteer: state.data.gazetteer, dict: state.dict });
     // Findings of reviewers merged in the simplification (2026-11-09) go under the one that covers them now.
     state.findings = (project.findings || []).map(f => { if (f && f.module) f.module = currentModuleId(f.module); return f; });
+    clearSentLog();
+    _syncGuard();
     await setValue('last_project', project.id);
     emit('project', project);
     emit('masked');
@@ -193,6 +204,8 @@ export async function deleteProject(id) {
 
 export function closeProject() {
   state.project = null; state.src = null; state.tgt = null; state.session = null; state.findings = [];
+  setLeakGuard(null);
+  clearSentLog();
   setValue('last_project', null);
   emit('project', null);
 }
@@ -209,6 +222,7 @@ export async function importProjectObject(p) {
 export function remaskNow() {
   if (!state.session) return;
   remask(state.session, { mask: state.project.mask, unmasked: !!state.project.unmasked, docType: state.project.docType || '', gazetteer: state.data.gazetteer, dict: state.dict });
+  _syncGuard();
   emit('masked');
   saveProjectSoon();
 }

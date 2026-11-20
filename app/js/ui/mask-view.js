@@ -11,6 +11,7 @@ import { CATS, CAT_LABELS, CAT_SINGULAR, STATUS_LABELS, mainForm } from '../reda
 import { exportMasked, exportBilingualXlsx, exportBilingualHtml, exportKeyMap } from '../export/exports.js';
 import { buildExternalText, importExternal } from '../review/external.js';
 import { openMenu } from './menu.js';
+import { guardText } from '../ai/leak-guard.js';
 import { icon } from './icons.js';
 import { createNav, sentencesOf, sentenceAt, sentencePeers, unitOf, peerPid, offsetAt, paraText } from './nav.js';
 
@@ -144,9 +145,16 @@ export async function externalDialog() {
     el('input', { type: 'checkbox', value: id, checked: true }), ' ' + label));
   const bil = el('input', { type: 'checkbox', checked: true });
   const ta = el('textarea.inp', { rows: 14, readonly: true });
+  const leakNote = el('div.note.warn.hidden');
   const refresh = () => {
     const chosen = checks.map(c => c.querySelector('input')).filter(i => i.checked).map(i => i.value);
-    ta.value = buildExternalText(state.session, { modules: chosen, bilingual: bil.checked });
+    const text = buildExternalText(state.session, { modules: chosen, bilingual: bil.checked });
+    // The same safety net as the gateway: a real name left in a masked text is masked here too.
+    const g = state.session.unmasked ? { text, hits: [] } : guardText(text);
+    ta.value = g.text;
+    leakNote.classList.toggle('hidden', !g.hits.length);
+    leakNote.textContent = g.hits.length ? 'Red de seguridad: ' + g.hits.map(h => '\u00ab' + h.form + '\u00bb').join(', ') + ' ' +
+      (g.hits.length === 1 ? 'aparec\u00eda' : 'aparec\u00edan') + ' sin enmascarar y ya va con su etiqueta. Revise Enmascarar.' : '';
   };
   checks.forEach(c => c.querySelector('input').addEventListener('change', refresh));
   bil.addEventListener('change', refresh);
@@ -154,6 +162,7 @@ export async function externalDialog() {
   const body = el('div',
     el('p.info', 'Texto enmascarado con las instrucciones para pegarlo en una IA externa (ChatGPT, Gemini, Claude...). Su respuesta se puede importar despu\u00e9s con \u00abImportar respuesta de IA externa\u00bb y aparecer\u00e1 en la lista de hallazgos.'),
     el('div', { style: { marginBottom: '6px' } }, checks), el('label', bil, ' Incluir el original (revisi\u00f3n biling\u00fce)'),
+    leakNote,
     el('div', { style: { marginTop: '8px' } }, ta));
   await modal({ title: 'Copiar para IA externa', help: helpBtn('external-copy'), body, width: '860px', buttons: [
     { label: 'Descargar .txt', onClick: () => { download(new Blob([ta.value], { type: 'text/plain' }), state.project.name + '_PARA_IA.txt'); return false; } },

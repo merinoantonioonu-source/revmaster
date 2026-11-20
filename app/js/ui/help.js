@@ -79,7 +79,7 @@ const T = {
       '**Importar respuesta de IA externa**: convierte la respuesta de esa IA en hallazgos de Revisar.',
       '**Mapa de claves**: la lista etiqueta \u2192 texto real. Contiene los datos reales: p\u00f3ngale contrase\u00f1a y gu\u00e1rdelo aparte.'] ] },
   entities: { t: 'Entidades del documento', b: [
-    'Una entidad es un dato que UMBRA tapa con una etiqueta (`{CARGO1}`, la misma en las dos lenguas): cifras, fechas, s\u00edmbolos y direcciones (por su forma), organismos, \u00f3rganos, pa\u00edses, lugares y cargos (por sus listas triling\u00fces), personas (tras \u00abMr.\u00bb, \u00abSra.\u00bb, \u00abM.\u00bb\u2026), siglas presentes en las dos lenguas y lo que usted a\u00f1ada.',
+    'Una entidad es un dato que UMBRA tapa con una etiqueta (`{CARGO1}`, la misma en las dos lenguas): cifras, fechas, s\u00edmbolos y direcciones (por su forma), organismos, \u00f3rganos, pa\u00edses, lugares y cargos (por sus listas triling\u00fces), personas (tras \u00abMr.\u00bb, \u00abSra.\u00bb, \u00abM.\u00bb\u2026; una vez reconocida, tambi\u00e9n su nombre o su apellido solos en el resto del documento, salvo si son tambi\u00e9n una palabra corriente del texto), siglas presentes en las dos lenguas y lo que usted a\u00f1ada.',
     ['**Pulse una tarjeta**: las dos hojas van a la entidad; la oraci\u00f3n sale en amarillo en las dos lenguas y la etiqueta, con un brillo rojo. Otra pulsaci\u00f3n: la siguiente aparici\u00f3n.',
       '**Con problemas / Todas**: por defecto se ven solo las que tienen alg\u00fan problema. Debajo, la categor\u00eda.',
       '**Sin pareja**: est\u00e1 en una lengua y no en la otra. **Recuento distinto**: no aparece el mismo n\u00famero de veces. **Formas distintas**: la traducci\u00f3n la nombra de varias maneras.',
@@ -106,10 +106,17 @@ const T = {
     ['Marque qu\u00e9 revisar. Con **Incluir el original** la revisi\u00f3n es biling\u00fce.',
       'Pulse **Copiar** (o Descargar .txt) y pegue el texto en la IA.',
       'Copie su respuesta entera y use **Importar respuesta de IA externa**.'],
-    'Solo sale texto enmascarado.'] },
+    'Solo sale texto enmascarado. La red de seguridad tambi\u00e9n mira este texto: si un nombre se hab\u00eda escapado, va con su etiqueta y un aviso lo dice.'] },
   'external-import': { t: 'Importar respuesta de IA externa', b: [
     'Pegue la respuesta completa de la IA. UMBRA reconoce las l\u00edneas con el formato que se le pidi\u00f3 (`12 | OMI | MAY | cita | sugerencia | motivo`) y descarta el resto.',
     'Las etiquetas se convierten en el texto real y los hallazgos aparecen en Revisar con el origen \u00abIA externa\u00bb.'] },
+  sent: { t: 'Lo enviado a la IA', b: [
+    'Lo que de verdad ha salido de este navegador hacia la IA, llamada por llamada, tal como lo registra la puerta de salida.',
+    ['**Ver lo enviado** (en el hallazgo elegido de Corregir): ese p\u00e1rrafo exactamente como sali\u00f3, con las etiquetas en color.',
+      '**Todas las llamadas** (men\u00fa M\u00e1s): hora, revisor, modelo y tama\u00f1o de cada una; p\u00falsela para ver el texto y, plegadas, las instrucciones que lo acompa\u00f1aron.',
+      '**Red de seguridad**: antes de enviar un texto enmascarado, UMBRA busca en \u00e9l las palabras reales de lo que ha enmascarado en el documento (nombres, organismos, cargos, lugares, s\u00edmbolos...). Si alguna se hab\u00eda escapado, la cambia por su etiqueta y avisa; la llamada lo indica aqu\u00ed.',
+      'No mira: la tabla de **Nombres oficiales** (que env\u00eda nombres a prop\u00f3sito), un proyecto **Sin enmascarar**, las cifras sueltas ni una palabra que tambi\u00e9n aparezca en min\u00fascula en el texto.'],
+    'El registro se guarda solo en memoria: se borra al recargar la p\u00e1gina o al abrir otro proyecto. Lo que viene de la cach\u00e9 o de una IA externa no pasa por aqu\u00ed; entonces se ve c\u00f3mo se enviar\u00eda hoy el p\u00e1rrafo.'] },
   merge: { t: 'Emparejar entidades', b: [
     '**Para qu\u00e9 sirve**: a veces UMBRA da dos etiquetas distintas a una sola entidad, porque en cada lengua se escribe de otra forma. Por ejemplo, \u00abUNDP\u00bb en el original queda como `{ORG4}` y \u00abPNUD\u00bb en la traducci\u00f3n como `{ORG7}`: las dos salen como \u00abSin pareja\u00bb.',
     '**C\u00f3mo se usa**: pulse **Emparejar\u2026** en la tarjeta de una de ellas y elija la otra. La lista tiene buscador y empieza por las m\u00e1s probables (mismo p\u00e1rrafo, sin pareja, misma sigla o forma parecida); la mejor viene marcada como **Sugerida**. Desde ese momento llevan la misma etiqueta y dejan de salir como problema.',
@@ -135,6 +142,7 @@ const T = {
     '**Exigencia** de cada tarjeta: **Solo lo importante** (lo que cambia lo que se entiende, aunque sea una palabra), **Normal** (tambi\u00e9n lo menor) o **Exhaustiva** (tambi\u00e9n las mejoras opcionales). Debajo, el modelo y el coste estimado; mientras revisa, el avance. El modelo se cambia en Ajustes \u203a M\u00f3dulos.'] },
   'review-more': { t: 'Men\u00fa M\u00e1s', b: [
     ['**Banco de pruebas** (o su **Resultado**, si est\u00e1 abierto): medir lo que detecta cada m\u00f3dulo.',
+      '**Lo enviado a la IA**: cada llamada desde que abri\u00f3 el proyecto, con el texto exacto que sali\u00f3.',
       '**Copiar para IA externa / Importar respuesta**: revisar con una IA de chat sin clave.',
       '**Comparar con la versi\u00f3n final** (en Corregir): la traducci\u00f3n ya revisada y entregada frente a los hallazgos de UMBRA: acertados, espurios y omitidos probables, un resumen para ajustar UMBRA y un banco de pruebas con ese trabajo.',
       '**Verificar los hallazgos pendientes de la IA** (en Corregir): los manda al Verificador, que descarta los falsos positivos. Cuesta poco: solo env\u00eda los hallazgos con su contexto.',
@@ -295,6 +303,8 @@ const T = {
     ['Los documentos se procesan en este navegador; la web solo sirve el programa.',
       'A una IA solo llega texto ENMASCARADO: la salida rechaza el texto sin enmascarar, salvo hacia un proveedor marcado como local.',
       '\u00danica excepci\u00f3n: **Nombres oficiales** env\u00eda solo la lista de nombres de organismos, \u00f3rganos, cargos, pa\u00edses y lugares (nunca personas, cifras, fechas ni el texto). Se puede desactivar.',
+      'Red de seguridad: antes de que salga un texto enmascarado, UMBRA busca en \u00e9l las palabras reales de lo que ha enmascarado en el documento; si alguna se ha escapado, la sustituye por su etiqueta y avisa.',
+      '**Lo enviado a la IA** (men\u00fa M\u00e1s de Revisar y Corregir) ense\u00f1a el texto exacto de cada llamada.',
       'Enmascarar reduce el riesgo, pero no lo elimina: el contexto puede delatar de qu\u00e9 se habla.'] ] },
   'browser-data': { t: 'Datos de este navegador', b: [
     ['**Vaciar la cach\u00e9 de resultados**: la pr\u00f3xima revisi\u00f3n de los mismos p\u00e1rrafos se volver\u00e1 a pagar.',

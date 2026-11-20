@@ -8,6 +8,9 @@
  * Tags: source  {CARGO1}      target  {el CARGO1}   (article of the ENTITY; none when unknown).
  * Numbering is per category, in order of first appearance (source before target in each unit).
  *
+ * A person recognised once by a courtesy title (Ms. Ivanova, Sr. Ruiz) is masked wherever the name
+ * appears alone in either document (spreadPersons), with the same key, so it keeps one tag.
+ *
  * Manual adjustments live in project.mask (see defaultMaskSettings):
  *   terms       [{ id, cat, art, src:[forms], tgt:[forms] }]  project terms (Alt+E), key 't:<id>'
  *   removedKeys [key]            whole entities that must NOT be masked
@@ -55,7 +58,8 @@ function _resolveKey(key, merges) {
 /**
  * input = { units, src: model, tgt: model, srcLang, mask, gazetteer: [entries], dict: [entries] }
  * units = [{ id, srcPara, tgtPara }] in document order (paraId or null).
- * Returns { entities: [entity], byKey: Map, occ: { src: Map(paraId -> [occ]), tgt: Map(...) } }
+ * Returns { entities: [entity], byKey: Map, occ: { src: Map(paraId -> [occ]), tgt: Map(...) },
+ *           skipped: Set(key) (entities with an occurrence the translator chose not to mask) }
  * entity = { id (= key), key, cat, n, art, tagSrc, tagTgt, srcForms:{form:count}, tgtForms:{form:count},
  *            srcCount, tgtCount, status:'ok'|'nopair'|'count'|'forms', firstUnit }
  * occ = { side, paraId, start, end, key, surface, art }
@@ -84,14 +88,14 @@ export function computeEntities(input) {
   const occ = { src: new Map(), tgt: new Map() };
   const byKey = new Map();
   const order = [];
+  const skipped = new Set();
 
-  const run = (side, paraId, text, lang, unitIdx) => {
-    const spans = detectSpans(text, lang, { gaz, terms, cats, acronymsBoth: both, spelled: mask.spelled, acronyms: mask.acronyms });
+  const run = (side, paraId, spans, unitIdx) => {
     const list = [];
     for (const s of spans) {
       const key = _resolveKey(s.key, mask.merges);
       if (removedKeys.has(key)) continue;
-      if (removedOcc.has(side + ':' + paraId + ':' + s.start)) continue;
+      if (removedOcc.has(side + ':' + paraId + ':' + s.start)) { skipped.add(key); continue; }
       const o = { side, paraId, start: s.start, end: s.end, key, surface: s.surface, art: s.art || '' };
       list.push(o);
       let e = byKey.get(key);
@@ -108,10 +112,16 @@ export function computeEntities(input) {
     if (list.length) occ[side].set(paraId, list);
   };
 
+  // Every paragraph in document order (source before target in each unit), then its spans.
+  const paras = [];
   input.units.forEach((u, i) => {
-    if (u.srcPara !== null && u.srcPara !== undefined) run('src', u.srcPara, input.src.paras[u.srcPara].text, input.srcLang, i);
-    if (u.tgtPara !== null && u.tgtPara !== undefined) run('tgt', u.tgtPara, input.tgt.paras[u.tgtPara].text, 'es', i);
+    if (u.srcPara !== null && u.srcPara !== undefined) paras.push({ side: 'src', paraId: u.srcPara, text: input.src.paras[u.srcPara].text, lang: input.srcLang, unitIdx: i });
+    if (u.tgtPara !== null && u.tgtPara !== undefined) paras.push({ side: 'tgt', paraId: u.tgtPara, text: input.tgt.paras[u.tgtPara].text, lang: 'es', unitIdx: i });
   });
+  const ctx = { gaz, terms, cats, acronymsBoth: both, spelled: mask.spelled, acronyms: mask.acronyms };
+  const spansOf = paras.map(p => detectSpans(p.text, p.lang, ctx));
+  if (cats.has('PER')) spreadPersons(paras.map(p => p.text), spansOf);
+  paras.forEach((p, k) => run(p.side, p.paraId, spansOf[k], p.unitIdx));
 
   // Numbering per category, in order of appearance.
   const counters = {};
@@ -132,10 +142,66 @@ export function computeEntities(input) {
     const tgtFormsN = Object.keys(e.tgtForms).length;
     if (!e.srcCount || !e.tgtCount) e.status = 'nopair';
     else if (e.srcCount !== e.tgtCount) e.status = 'count';
-    else if (tgtFormsN > 1 && e.cat !== 'NUM' && e.cat !== 'FECHA') e.status = 'forms';
+    // A person is named in full or by the surname alone: several forms are normal there.
+    else if (tgtFormsN > 1 && e.cat !== 'NUM' && e.cat !== 'FECHA' && e.cat !== 'PER') e.status = 'forms';
     else e.status = 'ok';
   }
-  return { entities: order, byKey, occ };
+  return { entities: order, byKey, occ, skipped };
+}
+
+const _esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Words of the texts that start with a lowercase letter (to tell an ordinary word that a surname
+ * happens to share - Long, May, Green - from a name).
+ */
+export function lowercaseWords(texts) {
+  const out = new Set();
+  for (const t of texts) for (const m of String(t || '').matchAll(/(?<![\p{L}])\p{Ll}[\p{L}']*/gu)) out.add(m[0]);
+  return out;
+}
+
+/** An ordinary word: one word that also appears with a lowercase first letter in the documents. */
+export function isOrdinaryWord(form, lower) {
+  return !/\s/.test(form) && lower.has(form.charAt(0).toLowerCase() + form.slice(1));
+}
+
+/**
+ * A person recognised by a courtesy title (detector 'per': "Ms. Maria Ivanova") is masked wherever
+ * the name appears alone: the whole name and its endings ("Maria Ivanova", "Ivanova"), whole words,
+ * same case, where nothing else is masked. A one-word ending that is also an ordinary word of the
+ * documents is left alone. texts[k] and spansOf[k] belong to the same paragraph; spansOf is updated.
+ */
+export function spreadPersons(texts, spansOf) {
+  const forms = new Map();
+  for (const spans of spansOf) {
+    for (const s of spans) {
+      if (s.src !== 'per' || !/^per:/.test(s.key)) continue;
+      const words = String(s.surface || '').split(/\s+/).filter(Boolean);
+      for (let i = 0; i < words.length; i++) {
+        const f = words.slice(i).join(' ').replace(/[.,;:]+$/, '');
+        if (f.length >= 3 && /^\p{Lu}/u.test(f) && !forms.has(f)) forms.set(f, s.key);
+      }
+    }
+  }
+  if (!forms.size) return spansOf;
+  const lower = lowercaseWords(texts);
+  for (const f of Array.from(forms.keys())) if (isOrdinaryWord(f, lower)) forms.delete(f);
+  if (!forms.size) return spansOf;
+  const list = Array.from(forms.keys()).sort((a, b) => b.length - a.length);
+  const re = new RegExp('(?<![\\p{L}\\p{N}])(?:' + list.map(_esc).join('|') + ')(?![\\p{L}\\p{N}])', 'gu');
+  texts.forEach((text, k) => {
+    const spans = spansOf[k];
+    const added = [];
+    for (const m of String(text || '').matchAll(re)) {
+      const start = m.index, end = start + m[0].length;
+      const taken = (x) => x.start < end && start < x.end;
+      if (spans.some(taken) || added.some(taken)) continue;
+      added.push({ start, end, cat: 'PER', key: forms.get(m[0]), surface: m[0], art: '', src: 'per+' });
+    }
+    if (added.length) spansOf[k] = spans.concat(added).sort((a, b) => a.start - b.start);
+  });
+  return spansOf;
 }
 
 export const STATUS_LABELS = { ok: 'OK', nopair: 'Sin pareja', count: 'Recuento distinto', forms: 'Formas distintas' };

@@ -64,7 +64,19 @@ export function anchorItem(item, ctx) {
   };
   if (u.tgtPara !== null && item.quote) {
     const m = session.masked.tgt.get(u.tgtPara);
-    const hit = locate(m.masked, item.quote);
+    let hit = locate(m.masked, item.quote);
+    // A quote with a tag the masked paragraph does not have (the gateway's safety net masked a name that
+    // had slipped through) is found whole on the real text rather than in part on the masked one.
+    if ((hit === -1 || hit.partial) && f.quote && f.quote !== item.quote) {
+      const real = session.tgt.paras[u.tgtPara].text;
+      const h2 = locate(real, f.quote);
+      if (h2 !== -1 && !h2.partial) {
+        f.start = h2.start;
+        f.end = h2.end;
+        f.quote = real.slice(f.start, f.end);
+        return f;
+      }
+    }
     if (hit !== -1) {
       f.start = maskedToOriginal(m.map, hit.start, 'start');
       f.end = maskedToOriginal(m.map, hit.end, 'end');
