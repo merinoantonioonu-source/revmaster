@@ -244,6 +244,16 @@ export function setUnmasked(on) {
   emit('project-flags');
 }
 
+/** "Reiniciar": the project as it was when its documents were loaded - the masking settings back to
+ *  the defaults and/or no findings. The documents, the personal dictionary and the AI cache stay. */
+export function resetProject(what) {
+  if (!state.project) return;
+  const w = what || {};
+  if (w.findings) { state.findings = []; emit('findings'); }
+  if (w.mask) { state.project.mask = defaultMaskSettings(); remaskNow(); }
+  saveProjectSoon();
+}
+
 export function setMask(patch) {
   Object.assign(state.project.mask, patch);
   remaskNow();

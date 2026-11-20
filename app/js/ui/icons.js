@@ -35,6 +35,7 @@ const PATHS = {
   collapse: '<path d="M11 6l-6 6 6 6M19 6l-6 6 6 6"/>',
   expand: '<path d="M13 6l6 6-6 6M5 6l6 6-6 6"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  reset: '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>',
   bench: '<path d="M9 3h6M10 3v6L4.5 18.5A2 2 0 0 0 6.2 21.5h11.6a2 2 0 0 0 1.7-3L14 9V3"/><path d="M7 15h10"/>',
   columns: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/>',
   rows: '<path d="M4 6h16M4 12h16M4 18h16"/>',

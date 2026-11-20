@@ -6,7 +6,8 @@
  *   - "Proyectos recientes" has a bin on each project;
  *   - the saved answers of the AI (the results cache) are dealt with where it is decided: the plan says
  *     how many paragraphs it reuses and "Preguntar de nuevo a la IA" shows the plan without them;
- *   - Vaciar (Corregir) only deletes findings: no option about the cache any more.
+ *   - Vaciar (Corregir) only deletes findings: no option about the cache any more;
+ *   - "Reiniciar", always in the header, undoes the masking settings and deletes the findings.
  * Exit code 1 on failure.
  */
 
@@ -99,6 +100,22 @@ async function main() {
     const vac = await page.textContent('.modal');
     ok(!/Olvidar/.test(vac) && /respuestas guardadas de la IA tampoco/.test(vac), 'Vaciar: only findings; it says the saved answers stay');
     await page.click('.modal-foot .btn:has-text("Cancelar")');
+
+    // "Reiniciar", always in the header: the masking settings back to the defaults and no findings.
+    const rsBefore = await page.evaluate(async () => {
+      const { state, setMask, addFindings } = await import('/app/js/state.js');
+      setMask({ terms: [{ id: 'tx1', cat: 'X', art: '', src: ['session'], tgt: [] }] });
+      addFindings([{ id: 'Z1', module: 'meaning', source: 'ai', state: 'open', unit: 0, side: 'tgt', cat: 'MIST', sev: 'MAY', start: null, end: null, quote: '', suggestion: 'x', reason: 'Prueba.' }]);
+      return { terms: state.project.mask.terms.length, findings: state.findings.length };
+    });
+    ok(await page.isVisible('#projreset') && /Reiniciar/.test(await page.textContent('#projreset')), 'Reiniciar is in the header');
+    await page.click('#projreset');
+    await page.waitForSelector('.modal:has-text("Reiniciar el proyecto")');
+    ok(/Deshacer los ajustes de enmascarado \(1\)/.test(await page.textContent('.modal')) && /diccionario personal/.test(await page.textContent('.modal')), 'It says what it undoes and what stays');
+    await page.click('.modal-foot .btn.danger');
+    await page.waitForTimeout(300);
+    const rsAfter = await page.evaluate(async () => { const { state } = await import('/app/js/state.js'); return { terms: state.project.mask.terms.length, findings: state.findings.length }; });
+    ok(rsBefore.terms === 1 && rsBefore.findings > 0 && rsAfter.terms === 0 && rsAfter.findings === 0, 'Reiniciar undoes the masking settings and deletes the findings (' + JSON.stringify([rsBefore, rsAfter]) + ')');
 
     // The header's menu: close, then the bin in "Proyectos recientes".
     await page.click('#projchip');
