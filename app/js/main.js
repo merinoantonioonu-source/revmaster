@@ -8,9 +8,9 @@
 import { el, $, $$, toast, modal, pickFiles, confirmDialog, fmtInt, fmtMoney, promptDialog } from './util/dom.js';
 import { getValue, setValue } from './store/storage.js';
 import { state, on, emit, loadData, openFiles, replaceFile, restoreLastProject, listProjects, openProject,
-  deleteProject, closeProject, refreshLists, remaskNow, setUnmasked } from './state.js';
+  deleteProject, closeProject, refreshLists, remaskNow, setUnmasked, resetProject } from './state.js';
 import { mountMaskView } from './ui/mask-view.js';
-import { mountReviewView, benchDialog } from './ui/review-view.js';
+import { mountReviewView, benchDialog, resetReviewState } from './ui/review-view.js';
 import { mountCorrectView } from './ui/correct-view.js';
 import { mountExportView } from './ui/export-view.js';
 import { mountSettingsView, showSettingsSection, preselectSettingsSection } from './ui/settings-view.js';
@@ -114,6 +114,12 @@ function renderProjChip() {
   if (!chip) return;
   const p = state.project;
   chip.classList.toggle('hidden', !p);
+  const rb = $('#projreset');
+  if (rb) {
+    rb.classList.toggle('hidden', !p);
+    if (!rb.firstChild) rb.replaceChildren(icon('reset', 15), el('span', 'Reiniciar'));
+    rb.title = 'Reiniciar el proyecto: deshacer los ajustes de enmascarado y borrar los hallazgos (los documentos no cambian)';
+  }
   if (!p) return;
   chip.title = 'Proyecto abierto: ' + p.name + '\nOriginal: ' + p.srcName + '\nTraducci\u00f3n: ' + p.tgtName + '\nPulse para cerrarlo, borrarlo o empezar otro';
   chip.replaceChildren(icon('folder', 15),
@@ -128,11 +134,33 @@ function projMenu(anchor) {
     { label: 'Nuevo proyecto', onClick: newProject },
     { label: 'Abrir otro proyecto\u2026', onClick: projectsDialog },
     { sep: true },
+    { label: 'Reiniciar este proyecto\u2026', onClick: resetDialog },
     { label: 'Cerrar este proyecto', onClick: () => { closeProject(); setView('files'); renderRecent(); toast('Proyecto cerrado: sigue guardado en Proyectos recientes.', 'ok'); } },
     { label: 'Borrar este proyecto\u2026', onClick: () => deleteWithConfirm(p) },
     { sep: true },
     helpItem('project', anchor)
   ]);
+}
+
+/** "Reiniciar": back to the project as just loaded (same documents), after saying what goes. */
+async function resetDialog() {
+  const p = state.project;
+  if (!p) return;
+  const m = p.mask || {};
+  const nMask = (m.terms || []).length + Object.keys(m.merges || {}).length + (m.removedKeys || []).length + (m.removedOcc || []).length +
+    Object.keys(m.catOverride || {}).length + Object.keys(m.artOverride || {}).length;
+  const mk = el('input', { type: 'checkbox', checked: true });
+  const fk = el('input', { type: 'checkbox', checked: true });
+  const r = await modal({ title: 'Reiniciar el proyecto', help: helpBtn('project-reset'), width: '560px', body: el('div',
+    el('p', 'Vuelve a \u00ab', el('b', p.name), '\u00bb tal como qued\u00f3 al cargar los documentos. Los documentos no cambian.'),
+    el('div', el('label.row', mk, ' Deshacer los ajustes de enmascarado (' + nMask + '): lo a\u00f1adido, emparejado o quitado a mano y las categor\u00edas elegidas')),
+    el('div', el('label.row', fk, ' Borrar los hallazgos (' + state.findings.length + '), tambi\u00e9n los aceptados y rechazados')),
+    el('p.info', { style: { marginTop: '8px' } }, 'Su diccionario personal y las respuestas guardadas de la IA no se tocan.')),
+    buttons: [{ label: 'Cancelar', value: null }, { label: 'Reiniciar', kind: 'danger', value: 'ok' }] });
+  if (r !== 'ok' || (!mk.checked && !fk.checked)) return;
+  resetProject({ mask: mk.checked, findings: fk.checked });
+  if (fk.checked) resetReviewState();
+  toast('Proyecto reiniciado' + (mk.checked && fk.checked ? '.' : (mk.checked ? ': enmascarado como al cargarlo.' : ': sin hallazgos.')), 'ok');
 }
 
 /** Deletes a project from this browser (its documents, entities and findings), after asking. */
@@ -488,6 +516,7 @@ function initF1() {
 async function boot() {
   for (const b of $$('.step')) b.addEventListener('click', () => setView(b.dataset.view));
   $('#projchip').addEventListener('click', (e) => projMenu(e.currentTarget));
+  $('#projreset').addEventListener('click', resetDialog);
   for (const s of $$('.sic[data-icon]')) s.replaceWith(icon(s.dataset.icon, 18));
   $('#btn-side').addEventListener('click', () => {
     const compact = $('#app').classList.contains('compact');

@@ -28,10 +28,16 @@ const T = {
       '**Descartados por el Verificador donde el revisor s\u00ed cambi\u00f3**: para ver si el Verificador tira hallazgos buenos.'],
     'Es probable, no seguro: un revisor tambi\u00e9n cambia por preferencia. **Copiar el resumen** da el texto para pegar en el chat y ajustar UMBRA; **Descargar Excel**, el detalle; **Crear banco**, un banco de pruebas con este trabajo real (sus cambios como esperados y los p\u00e1rrafos intactos para medir el ruido).',
     'Para poder comparar, no borre el proyecto ni vac\u00ede sus hallazgos antes: la comparaci\u00f3n usa la traducci\u00f3n que se revis\u00f3 y los hallazgos (tambi\u00e9n los descartados).'] },
+  'project-reset': { t: 'Reiniciar el proyecto', b: [
+    'Deja el proyecto como qued\u00f3 al cargar los documentos, que no cambian. Se elige qu\u00e9 deshacer:',
+    ['**Ajustes de enmascarado**: lo enmascarado a mano (Alt+E, Se\u00f1alar su pareja, Ampliar), los emparejamientos, lo que se dej\u00f3 sin enmascarar y las categor\u00edas elegidas en \u00abQu\u00e9 enmascarar\u00bb.',
+      '**Hallazgos**: todos, tambi\u00e9n los aceptados y rechazados (como \u00abVaciar\u00bb en Corregir).'],
+    'No se tocan: su **diccionario personal** (vale para todos los documentos) ni las **respuestas guardadas** de la IA (el plan de ejecuci\u00f3n deja preguntar de nuevo).'] },
   project: { t: 'El proyecto abierto', b: [
     'Arriba, junto al t\u00edtulo de cada paso: el proyecto abierto y sus dos archivos. Al pulsarlo:',
     ['**Nuevo proyecto**: cierra este (queda guardado) y vuelve a Archivos para cargar otros documentos.',
       '**Abrir otro proyecto**: la lista de los guardados en este navegador.',
+      '**Reiniciar este proyecto** (tambi\u00e9n el bot\u00f3n **Reiniciar**, siempre a la vista junto al nombre): vuelve al proyecto reci\u00e9n cargado.',
       '**Cerrar este proyecto**: lo cierra sin borrarlo; sigue en Proyectos recientes.',
       '**Borrar este proyecto**: borra sus documentos, entidades y hallazgos de este navegador. La papelera de Proyectos recientes hace lo mismo.'],
     'Qu\u00e9 no se borra con un proyecto: las **respuestas guardadas** de la IA (se reutilizan en cualquier proyecto con el mismo texto; el plan de ejecuci\u00f3n deja preguntar de nuevo) ni el **registro de uso y gasto** (Ajustes \u203a Uso de IA).'] },

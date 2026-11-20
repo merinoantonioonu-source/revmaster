@@ -524,3 +524,6 @@ table.grid.cmp td:last-child { text-align: right; font-weight: 700; width: 90px;
 .pane-body.picking { box-shadow: inset 0 0 0 3px #f0c419; }
 .pane-body.picking .sheet { cursor: text; }
 .ent .where .pickbtn.on { background: #fff4c2; border-color: #f0c419; }
+/* "Reiniciar" next to the open project, in the header */
+.projreset { min-height: 32px; padding: 0 10px; font-size: 13px; color: var(--text-soft); flex-shrink: 0; }
+.projreset:hover:not(:disabled) { color: #b42318; border-color: #f0b4ac; background: #fdf0ee; }
