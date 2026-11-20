@@ -1,13 +1,14 @@
 /**
- * mask-view.js - Step 1 "Enmascarar": entities panel, the two sheets with the tags (or the real text),
- * category switches, manual masking (Alt+E), per-entity actions and the export menu.
+ * mask-view.js - Step 2 "Enmascarar": the list of what is left to solve (pending items, then every
+ * entity in a table), the two sheets with the tags (or the real text), category switches, manual masking
+ * (Alt+E), "Senalar su pareja", the Emparejar table and the export menu.
  */
 
 import { helpBtn, helpItem } from './help.js';
 import { el, $, clear, toast, modal, copyText, download, pickFiles, promptDialog, uid } from '../util/dom.js';
 import { state, on, emit, setMask, remaskNow, saveDictItem, addFindings } from '../state.js';
 import { renderDoc } from './preview.js';
-import { CATS, CAT_LABELS, CAT_SINGULAR, STATUS_LABELS, mainForm, occTag } from '../redact/entities.js';
+import { CATS, CAT_LABELS, CAT_SINGULAR, STATUS_LABELS, mainForm, occTag, isAcronymForm } from '../redact/entities.js';
 import { exportMasked, exportBilingualXlsx, exportBilingualHtml, exportKeyMap } from '../export/exports.js';
 import { buildExternalText, importExternal } from '../review/external.js';
 import { openMenu } from './menu.js';
@@ -17,9 +18,8 @@ import { createNav, sentencesOf, sentenceAt, sentencePeers, unitOf, peerPid, off
 
 let root, toolsHost;
 let showOriginal = false;
-let showBad = null;      // entity list: true = only the ones with a problem (default when there are any)
 let catFilter = 'all';
-let placeIdx = {};       // entity key -> index of the problem place shown last ('Ver donde')
+let placeIdx = {};       // entity key -> index of the place shown last
 let selectedKey = null;
 let panes = {};
 let nav = null;
@@ -29,9 +29,9 @@ let pick = null;          // "Senalar su pareja": { key, side } - the next text 
 export function mountMaskView(host, tools) {
   root = host;
   toolsHost = tools;
-  root.appendChild(el('div.list#mask-list',
+  root.appendChild(el('div.list.mlist#mask-list',
     el('h4', 'Entidades del documento', helpBtn('entities')),
-    el('div.bubbles#mask-bubbles'),
+    el('div.mhead#mask-head'),
     el('div.scroll#mask-entities')));
   const work = el('div.work',
     el('div.panes',
@@ -69,7 +69,7 @@ function renderTools() {
   if (!state.project) return;
   if (state.project.unmasked) toolsHost.appendChild(el('span.pill.warn', { title: 'Este proyecto se revisa sin enmascarar (Archivos): a la IA llega el texto real y este paso no es necesario' }, 'Sin enmascarar: no hace falta este paso'));
   const ents = state.session ? state.session.ent.entities : [];
-  const numBad = ents.filter(e => e.cat === 'NUM' && e.status === 'nopair').length;
+  const numBad = ents.filter(e => e.cat === 'NUM' && e.status === 'nopair' && !isAccepted(e)).length;
   if (numBad) toolsHost.appendChild(el('span.pill.err', { title: 'Cifras que no est\u00e1n igual en las dos lenguas: posible error' }, numBad + (numBad === 1 ? ' cifra sin pareja' : ' cifras sin pareja')));
   toolsHost.appendChild(el('div.grow'));
   toolsHost.appendChild(el('button.btn', { 'data-cats': '1', title: 'Qu\u00e9 categor\u00edas se enmascaran', onclick: (e) => catsMenu(e.currentTarget) }, 'Qu\u00e9 enmascarar', icon('down', 14)));
@@ -110,6 +110,7 @@ function optionsMenu(anchor) {
     { sep: true },
     { label: 'Volver a enmascarar todo lo que se quit\u00f3 a mano', onClick: () => { setMask({ removedKeys: [], removedOcc: [] }); toast('Restablecido.', 'ok'); } },
     { label: 'Deshacer todos los emparejamientos', onClick: () => setMask({ merges: {} }) },
+    { label: 'Volver a mostrar lo marcado como \u00abEst\u00e1 bien as\u00ed\u00bb o \u00abNo son la misma\u00bb', onClick: () => setMask({ okKeys: {}, notPairs: [] }) },
     { label: 'Quitar los t\u00e9rminos a\u00f1adidos a mano en este proyecto', onClick: () => setMask({ terms: [] }) },
     { sep: true },
     helpItem('mask-options', anchor)
@@ -195,32 +196,241 @@ function render() {
   renderPanes();
 }
 
-const STATUS_ORDER = { nopair: 0, count: 1, forms: 2, ok: 3 };
+const ITEM_ORDER = { pair: 0, nopair: 1, count: 2, forms: 3 };
+const _pairId = (a, b) => [a, b].sort().join('|');
+const _ref = (unitIdx) => '\u00a7' + state.session.units[unitIdx].n;
+const _times = (n) => n === 1 ? 'Una vez' : n + ' veces';
+
+/** "Esta bien asi": the translator accepted the entity as it is, for the problem it had then. */
+function isAccepted(e) {
+  const ok = (state.project && state.project.mask.okKeys) || {};
+  return e.status !== 'ok' && ok[e.key] === e.status;
+}
+
+/** The paragraph refs of a list of unit indexes, the first few: "\u00a73, \u00a75 y 2 mas". */
+function _refs(units) {
+  const list = Array.from(new Set(units)).sort((a, b) => a - b);
+  const head = list.slice(0, 4).map(_ref).join(', ');
+  return list.length > 4 ? head + ' y ' + (list.length - 4) + ' m\u00e1s' : head;
+}
+
+/** The forms of a "Formas distintas" entity: names and acronyms apart, the group with several forms. */
+function _formsSplit(e) {
+  const groups = [Object.keys(e.tgtForms).filter(f => !isAcronymForm(f)), Object.keys(e.tgtForms).filter(isAcronymForm)];
+  const g = groups.find(x => x.length > 1) || groups[0];
+  const sorted = g.slice().sort((a, b) => e.tgtForms[b] - e.tgtForms[a]);
+  return { main: sorted[0], mainN: e.tgtForms[sorted[0]] || 0, minor: sorted.slice(1).map(f => [f, e.tgtForms[f]]) };
+}
+
+/**
+ * What is left to solve, one item per problem: { kind: 'pair', a, b, co } (an entity only in the original
+ * and one only in the translation that look like the same one) or { kind: 'nopair'|'count'|'forms', e }.
+ * Cached until the masking changes.
+ */
+let _pend = null;
+function pendingItems() {
+  const s = state.session;
+  const mask = state.project.mask;
+  const sig = JSON.stringify([mask.okKeys || {}, mask.notPairs || []]);
+  if (_pend && _pend.ent === s.ent && _pend.sig === sig) return _pend.items;
+  const notPairs = new Set(mask.notPairs || []);
+  const bad = s.ent.entities.filter(e => e.status !== 'ok' && !isAccepted(e));
+  const tgtOnly = new Set(bad.filter(e => e.status === 'nopair' && !e.srcCount).map(e => e.key));
+  const used = new Set();
+  const items = [];
+  if (tgtOnly.size) {
+    const srcUnits = _unitsByKey('src');
+    for (const a of bad) {
+      if (a.status !== 'nopair' || !a.srcCount) continue;
+      const top = rankCandidates({ side: 'src', forms: Object.keys(a.srcForms), units: srcUnits.get(a.key) || new Set(), cat: a.cat, excludeKey: a.key })
+        .filter(r => !notPairs.has(_pairId(a.key, r.x.key))).find(r => r.strong);
+      if (top && top.score >= 6 && tgtOnly.has(top.x.key) && !used.has(top.x.key)) {
+        used.add(a.key); used.add(top.x.key);
+        items.push({ kind: 'pair', a, b: top.x, co: top.co });
+      }
+    }
+  }
+  for (const e of bad) if (!used.has(e.key)) items.push({ kind: e.status, e });
+  const first = (it) => (it.e || it.a).firstUnit || 0;
+  items.sort((p, q) => (ITEM_ORDER[p.kind] - ITEM_ORDER[q.kind]) || (first(p) - first(q)));
+  _pend = { ent: s.ent, sig, items };
+  return items;
+}
+
+let showAll = null;      // "Todas las etiquetas" unfolded (default: when nothing is left to solve)
 
 function renderList() {
   const ents = state.session.ent.entities;
-  const bad = ents.filter(e => e.status !== 'ok');
-  if (showBad === null || (showBad && !bad.length)) showBad = bad.length > 0;
-  const head = $('#mask-bubbles');
+  const items = pendingItems();
+  const fine = ents.filter(e => e.status === 'ok' || isAccepted(e)).length;
+  const head = $('#mask-head');
   clear(head);
-  const pool = showBad ? bad : ents;
-  const catSel = el('select.fsel', { title: 'Categor\u00eda', onchange: (e) => { catFilter = e.target.value; renderList(); } },
-    el('option', { value: 'all' }, 'Todas las categor\u00edas'),
-    CATS.filter(c => pool.some(e => e.cat === c)).map(c => el('option', { value: c }, CAT_LABELS[c] + ' (' + pool.filter(e => e.cat === c).length + ')')));
-  if (catFilter !== 'all' && !pool.some(e => e.cat === catFilter)) catFilter = 'all';
-  catSel.value = catFilter;
-  head.appendChild(el('div.seg2',
-    el('button' + (showBad ? '.on' : ''), { title: 'Sin pareja, recuento distinto o formas distintas', onclick: () => { showBad = true; renderList(); } },
-      'Con problemas', el('span.n', String(bad.length))),
-    el('button' + (!showBad ? '.on' : ''), { onclick: () => { showBad = false; renderList(); } }, 'Todas', el('span.n', String(ents.length)))));
-  head.appendChild(catSel);
+  head.appendChild(el('div.pendhead',
+    el('div.t', el('b', items.length ? 'Por resolver: ' + items.length : 'Todo cuadra'),
+      el('span', fine + ' de ' + ents.length + (ents.length === 1 ? ' etiqueta cuadra' : ' etiquetas cuadran'))),
+    el('div.prog', el('i', { style: { width: (ents.length ? Math.round(100 * fine / ents.length) : 100) + '%' } }))));
   const list = $('#mask-entities');
   clear(list);
-  const shown = pool.filter(e => catFilter === 'all' || e.cat === catFilter)
-    .sort((x, y) => showBad ? (STATUS_ORDER[x.status] - STATUS_ORDER[y.status]) || ((x.firstUnit || 0) - (y.firstUnit || 0)) : 0);
-  if (!shown.length) list.appendChild(el('div.empty', showBad ? 'Ninguna entidad tiene problemas.' : 'No hay entidades en esta vista.'));
-  for (const e of shown) list.appendChild(entityCard(e));
-  list.appendChild(el('p.info', { style: { marginTop: '8px' } }, 'Seleccione texto en una hoja y pulse Alt+E (o clic derecho) para enmascararlo. Pulse una etiqueta para ver la entidad.'));
+  if (!ents.length) list.appendChild(el('div.empty', 'No se ha encontrado ninguna entidad.'));
+  else if (!items.length) list.appendChild(el('div.empty.allok', icon('check', 18), 'Todo cuadra: cada etiqueta tiene su pareja.'));
+  for (const it of items) list.appendChild(pendItem(it));
+  if (items.length) list.appendChild(el('p.pendnote', icon('check', 14), 'Lo que resuelve desaparece de esta lista.'));
+  if (ents.length) {
+    const open = showAll === null ? !items.length : showAll;
+    list.appendChild(el('button.alltoggle' + (open ? '.open' : ''), { type: 'button', 'aria-expanded': open ? 'true' : 'false',
+      onclick: () => { showAll = !open; renderList(); } }, icon(open ? 'down' : 'right', 14), el('b', 'Todas las etiquetas'), el('span.muted', '(' + ents.length + ')')));
+    if (open) list.appendChild(entityTable(ents));
+  }
+  list.appendChild(el('p.info.mfoot', 'Seleccione texto en una hoja y pulse Alt+E (o clic derecho) para enmascararlo. Pulse una etiqueta para ver la entidad.'));
+}
+
+function _chip(e) { return el('span.tk.' + e.cat, e.cat + e.n); }
+function _q(text) { return el('b.q', '\u00ab' + text + '\u00bb'); }
+
+/** One thing to solve: a dot, the tag, one short sentence, where, two buttons and "...". */
+function pendItem(it) {
+  const e = it.e || it.a;
+  const on = selectedKey === e.key || (it.b && selectedKey === it.b.key);
+  const red = it.kind === 'nopair' || it.kind === 'pair';
+  const places = placesOf(e);
+  const i = placeIdx[e.key];
+  const at = on && i !== undefined && places[i] ? ' \u00b7 ' + (i + 1) + '/' + places.length : '';
+  const lines = [];
+  let where = '';
+  const acts = [];
+  if (it.kind === 'pair') {
+    const fa = mainForm(it.a.srcForms), fb = mainForm(it.b.tgtForms);
+    lines.push(el('div.line', _chip(it.a), _q(fa)));
+    lines.push(el('div.line', el('span.muted', 'y'), _chip(it.b), _q(fb), el('span', 'parecen la misma.')));
+    const ua = occurrenceUnits(it.a.key), ub = occurrenceUnits(it.b.key);
+    where = 'Una solo en el original y otra solo en la traducci\u00f3n' + (it.co ? ', en el mismo p\u00e1rrafo (' + _refs(ua.filter(u => ub.includes(u))) + ').' : ' (' + _refs(ua) + ' / ' + _refs(ub) + ').');
+    acts.push(el('button.btn.sm.primary', { type: 'button', title: 'Las dos pasan a ser la misma etiqueta', onclick: () => joinPair(it.a, it.b) }, icon('link', 14), 'Unir'),
+      el('button.btn.sm', { type: 'button', onclick: () => notPair(it.a, it.b) }, 'No son la misma'));
+  } else if (it.kind === 'nopair') {
+    const inSrc = !!e.srcCount;
+    lines.push(el('div.line', _chip(e), _q(mainForm(inSrc ? e.srcForms : e.tgtForms)), el('span', inSrc ? 'no est\u00e1 en la traducci\u00f3n.' : 'no est\u00e1 en el original.')));
+    where = _refs(occurrenceUnits(e.key)) + at;
+    acts.push(_pickBtn(e, inSrc ? 'Se\u00f1alarla en la traducci\u00f3n' : 'Se\u00f1alarla en el original'), _okBtn(e));
+  } else if (it.kind === 'count') {
+    lines.push(el('div.line', _chip(e), el('span', e.srcCount + ' en el original, ' + e.tgtCount + ' en la traducci\u00f3n.')));
+    const parts = problemPlaces(e).map(p => {
+      const d = p.src - p.tgt;
+      return (d > 0 ? (d === 1 ? 'falta una' : 'faltan ' + d) : (-d === 1 ? 'sobra una' : 'sobran ' + (-d))) + ' en ' + _ref(p.unit);
+    });
+    where = parts.length ? (parts.slice(0, 3).join('; ') + (parts.length > 3 ? '\u2026' : '')) : '';
+    where = where.charAt(0).toUpperCase() + where.slice(1) + at;
+    acts.push(_pickBtn(e, 'Se\u00f1alar la que falta'), _okBtn(e));
+  } else {
+    const f = _formsSplit(e);
+    lines.push(el('div.line', _chip(e), el('span', f.minor.map(([x, n]) => _times(n) + ' \u00ab' + x + '\u00bb').join(', ') + ' (' + _times(f.mainN).toLowerCase() + ' \u00ab' + f.main + '\u00bb).')));
+    where = _refs(places.map(p => p.unit)) + at;
+    const next = places.length ? places[i === undefined || !on ? 0 : (i + 1) % places.length] : null;
+    acts.push(next ? el('button.btn.sm', { type: 'button', onclick: () => gotoPlace(e, places, +1) }, 'Ver ' + _ref(next.unit)) : null, _okBtn(e));
+  }
+  acts.push(el('button.btn.sm.ic.more', { type: 'button', title: 'M\u00e1s acciones', 'aria-label': 'M\u00e1s acciones', onclick: (ev) => entityMenu(ev.currentTarget, e) }, icon('more', 14)));
+  return el('div.pend' + (red ? '.bad' : '.mid') + (on ? '.on' : ''), { 'data-key': e.key, 'data-kind': it.kind,
+    title: 'Pulse para ir al lugar (otra vez: el siguiente)', onclick: (ev) => { if (ev.target.closest('button')) return; gotoItem(it); } },
+    el('span.dot'),
+    el('div.txt', lines, where ? el('div.where', where) : null, el('div.acts', acts)));
+}
+
+function _pickBtn(e, label) {
+  const on = pick && pick.key === e.key;
+  return el('button.btn.sm.pickbtn' + (on ? '.on' : ''), { type: 'button', title: 'Seleccione en la otra hoja el texto que corresponde a ' + e.cat + e.n + ' y quedar\u00e1 con la misma etiqueta (Esc cancela)',
+    onclick: () => (on ? endPick() : startPick(e)) }, icon('ibeam', 14), label);
+}
+
+function _okBtn(e) {
+  return el('button.btn.sm.ghost.okbtn', { type: 'button', title: 'Est\u00e1 bien como est\u00e1: deja de salir entre lo pendiente (se deshace en \u00ab\u2026\u00bb)', onclick: () => acceptEntity(e) }, 'Est\u00e1 bien as\u00ed');
+}
+
+function gotoItem(it) {
+  gotoEntity(it.e || it.a);
+  // A pair: the other half glows too.
+  if (it.b) {
+    const sel = '[data-key="' + (window.CSS && CSS.escape ? CSS.escape(it.b.key) : it.b.key) + '"]';
+    for (const side of ['src', 'tgt']) for (const x of panes[side].querySelectorAll(sel)) x.classList.add('hot');
+  }
+}
+
+function joinPair(a, b) {
+  setMask({ merges: Object.assign({}, state.project.mask.merges, { [b.key]: a.key }) });
+  toast('Unidas: ahora son la misma etiqueta.', 'ok');
+}
+
+function notPair(a, b) {
+  setMask({ notPairs: (state.project.mask.notPairs || []).concat([_pairId(a.key, b.key)]) });
+  toast('Entendido: ya no se proponen juntas.', 'ok');
+}
+
+function acceptEntity(e) {
+  setMask({ okKeys: Object.assign({}, state.project.mask.okKeys, { [e.key]: e.status }) });
+  toast(e.cat + e.n + ' ya no sale entre lo pendiente.', 'ok');
+}
+
+function unacceptEntity(e) {
+  const ok = Object.assign({}, state.project.mask.okKeys);
+  delete ok[e.key];
+  setMask({ okKeys: ok });
+}
+
+/** The actions of an entity in a menu: places, pairing, category, dictionary, not masking. */
+function entityMenu(anchor, e) {
+  const places = placesOf(e);
+  const items = [{ header: e.cat + e.n }];
+  if (places.length > 1) {
+    items.push({ label: '\u2039 Lugar anterior', onClick: () => gotoPlace(e, places, -1) },
+      { label: 'Lugar siguiente \u203a', onClick: () => gotoPlace(e, places, +1) });
+  } else if (places.length) items.push({ label: 'Ir a ' + _ref(places[0].unit), onClick: () => gotoPlace(e, places, +1) });
+  if (e.status === 'nopair' || e.status === 'count') {
+    items.push({ label: 'Se\u00f1alar su pareja en ' + (_missingSide(e) === 'src' ? 'el original' : 'la traducci\u00f3n'), onClick: () => startPick(e) });
+  }
+  items.push({ label: 'Es la misma que\u2026', onClick: () => mergeDialog(e) },
+    { label: 'Categor\u00eda\u2026', onClick: () => changeCat(e) },
+    { label: 'A mi diccionario', onClick: () => saveToDict(e) });
+  if (isAccepted(e)) items.push({ label: 'Volver a mostrarla entre lo pendiente', onClick: () => unacceptEntity(e) });
+  items.push({ sep: true },
+    { label: 'No enmascarar', onClick: () => { setMask({ removedKeys: (state.project.mask.removedKeys || []).concat([e.key]) }); toast('Ya no se enmascara ' + e.cat + e.n + '.', 'ok'); } },
+    { sep: true }, helpItem('entities', anchor));
+  openMenu(anchor, items);
+}
+
+/** "Todas las etiquetas": one line per entity, with the category filter. */
+function entityTable(ents) {
+  const catSel = el('select.fsel', { title: 'Categor\u00eda', onchange: (ev) => { catFilter = ev.target.value; renderList(); } },
+    el('option', { value: 'all' }, 'Todas las categor\u00edas'),
+    CATS.filter(c => ents.some(e => e.cat === c)).map(c => el('option', { value: c }, CAT_LABELS[c] + ' (' + ents.filter(e => e.cat === c).length + ')')));
+  if (catFilter !== 'all' && !ents.some(e => e.cat === catFilter)) catFilter = 'all';
+  catSel.value = catFilter;
+  const shown = ents.filter(e => catFilter === 'all' || e.cat === catFilter);
+  return el('div.etab',
+    el('div.etools', catSel),
+    el('div.ethead', el('span', 'Etiqueta'), el('span', 'Original'), el('span', 'Traducci\u00f3n'), el('span'), el('span')),
+    shown.map(entityRow),
+    shown.length ? null : el('div.empty', 'No hay entidades de esa categor\u00eda.'));
+}
+
+function _cell(forms, count, low) {
+  const keys = Object.keys(forms);
+  if (!keys.length) return el('span.c.none', '\u2014');
+  return el('span.c', { title: _forms(forms) }, el('span.f', keys.join(' \u00b7 ')), count > 1 || low ? el('span.n' + (low ? '.bad' : ''), String(count)) : null);
+}
+
+const _STATUS_ICON = { ok: 'check', nopair: 'alert', count: 'neq', forms: 'tilde' };
+
+function entityRow(e) {
+  const on = selectedKey === e.key;
+  const acc = isAccepted(e);
+  const st = e.status === 'ok' ? 'ok' : (acc ? 'acc' : (e.status === 'nopair' ? 'bad' : 'mid'));
+  const low = e.status === 'count';
+  return el('div.etr' + (on ? '.on' : ''), { 'data-key': e.key, title: 'Pulse para ir a la entidad (otra vez: la siguiente aparici\u00f3n)',
+    onclick: (ev) => { if (ev.target.closest('button')) return; gotoEntity(e); } },
+    el('span', _chip(e)),
+    _cell(e.srcForms, e.srcCount, low && e.srcCount < e.tgtCount),
+    _cell(e.tgtForms, e.tgtCount, low && e.tgtCount < e.srcCount),
+    el('span.esti.' + st, { title: acc ? 'Revisada: est\u00e1 bien as\u00ed' : STATUS_LABELS[e.status] }, icon(acc ? 'check' : _STATUS_ICON[e.status], 13)),
+    el('button.more', { type: 'button', title: 'M\u00e1s acciones', 'aria-label': 'M\u00e1s acciones de ' + e.cat + e.n,
+      onclick: (ev) => { ev.stopPropagation(); entityMenu(ev.currentTarget, e); } }, icon('more', 14)));
 }
 
 function _forms(forms) {
@@ -234,10 +444,11 @@ function problemPlaces(e) {
   const occs = (side, pid) => (pid === null || pid === undefined) ? [] : (s.ent.occ[side].get(pid) || []).filter(o => o.key === e.key);
   const out = [];
   if (e.status === 'forms') {
-    const main = mainForm(e.tgtForms);
+    const minor = new Set(_formsSplit(e).minor.map(x => x[0]));
     for (const u of s.units) {
       const t = occs('tgt', u.tgtPara);
-      if (t.some(o => o.surface !== main)) out.push({ unit: u.idx, src: occs('src', u.srcPara).length, tgt: t.length, form: t.find(o => o.surface !== main).surface });
+      const m = t.find(o => minor.has(o.surface));
+      if (m) out.push({ unit: u.idx, src: occs('src', u.srcPara).length, tgt: t.length, form: m.surface });
     }
     return out;
   }
@@ -246,46 +457,6 @@ function problemPlaces(e) {
     if (a !== b) out.push({ unit: u.idx, src: a, tgt: b });
   }
   return out;
-}
-
-function _problemText(e) {
-  if (e.status === 'nopair') return e.srcCount ? 'Solo est\u00e1 en el original (' + e.srcCount + ' ' + (e.srcCount > 1 ? 'veces' : 'vez') + '): \u00bffalta en la traducci\u00f3n o se tradujo de otra forma? Si est\u00e1 escrita de otra forma, \u00abSe\u00f1alar su pareja\u00bb; si ya tiene otra etiqueta, \u00abEmparejar\u00bb.'
-    : 'Solo est\u00e1 en la traducci\u00f3n (' + e.tgtCount + ' ' + (e.tgtCount > 1 ? 'veces' : 'vez') + '): \u00bfsobra, o en el original tiene otra forma (una sigla, por ejemplo)? Si est\u00e1 escrita de otra forma, \u00abSe\u00f1alar su pareja\u00bb; si ya tiene otra etiqueta, \u00abEmparejar\u00bb.';
-  if (e.status === 'count') return 'Aparece ' + e.srcCount + ' ' + (e.srcCount > 1 ? 'veces' : 'vez') + ' en el original y ' + e.tgtCount + ' en la traducci\u00f3n.';
-  if (e.status === 'forms') return 'Se traduce de ' + Object.keys(e.tgtForms).length + ' formas distintas.';
-  return '';
-}
-
-function entityCard(e) {
-  const sel = selectedKey === e.key;
-  const stCls = e.status === 'ok' ? 'ok' : (e.status === 'nopair' ? 'bad' : 'mid');
-  const card = el('div.ent' + (sel ? '.sel' : ''), { 'data-key': e.key, title: 'Pulse para ir a la entidad (otra vez: la siguiente aparici\u00f3n)',
-    onclick: (ev) => { if (ev.target.closest('.acts, .where')) return; gotoEntity(e); } },
-    el('div.row', el('span.tk.' + e.cat, e.cat + e.n), el('span.st.' + stCls, STATUS_LABELS[e.status])),
-    el('div.forms', 'O: ' + _forms(e.srcForms)),
-    el('div.forms', 'T: ' + _forms(e.tgtForms)));
-  const places = placesOf(e);
-  const i = placeIdx[e.key];
-  const at = (i !== undefined && places[i]) ? places[i] : null;
-  if (e.status !== 'ok') card.appendChild(el('div.why', _problemText(e)));
-  if (places.length && (e.status !== 'ok' || sel)) {
-    card.appendChild(el('div.where',
-      el('button.btn.sm' + (e.status !== 'ok' ? '.primary' : ''), { title: e.status !== 'ok' ? 'Lleva a cada p\u00e1rrafo en el que no cuadra y resalta los dos lados' : 'Siguiente aparici\u00f3n',
-        onclick: () => gotoPlace(e, places, +1) }, at ? 'Siguiente \u203a' : (e.status !== 'ok' ? 'Ver d\u00f3nde no cuadra \u203a' : 'Ir \u203a')),
-      places.length > 1 && at ? el('button.btn.sm', { title: 'Anterior', onclick: () => gotoPlace(e, places, -1) }, '\u2039') : null,
-      (e.status === 'nopair' || e.status === 'count') ? el('button.btn.sm.pickbtn' + (pick && pick.key === e.key ? '.on' : ''), {
-        title: 'Seleccione en la otra hoja el texto que corresponde a ' + e.cat + e.n + ' y quedar\u00e1 con la misma etiqueta',
-        onclick: () => (pick && pick.key === e.key ? endPick() : startPick(e)) }, 'Se\u00f1alar su pareja') : null,
-      el('span.muted', at ? ' \u00a7' + state.session.units[at.unit].n + (e.status !== 'ok' ? ' \u00b7 ' + (at.form ? '\u00ab' + at.form + '\u00bb' : at.src + ' en el original, ' + at.tgt + ' en la traducci\u00f3n') : '') + ' \u00b7 ' + (i + 1) + '/' + places.length
-        : ' ' + places.length + (places.length > 1 ? ' lugares' : ' lugar'))));
-  }
-  const acts = el('div.acts',
-    el('button.btn.sm', { onclick: () => changeCat(e) }, 'Categor\u00eda'),
-    el('button.btn.sm', { title: 'Es la misma entidad que otra etiqueta (por ejemplo, la sigla del original y el nombre completo de la traducci\u00f3n)', onclick: () => mergeDialog(e) }, 'Emparejar\u2026'),
-    el('button.btn.sm', { onclick: () => saveToDict(e) }, 'A mi diccionario'),
-    el('button.btn.sm.danger', { onclick: () => { setMask({ removedKeys: (state.project.mask.removedKeys || []).concat([e.key]) }); toast('Ya no se enmascara ' + e.cat + e.n + '.', 'ok'); } }, 'No enmascarar'));
-  card.appendChild(acts);
-  return card;
 }
 
 /** Units where an entity occurs on either side, in document order. */
@@ -302,19 +473,24 @@ function occurrenceUnits(key) {
   return Array.from(set).sort((a, b) => a - b);
 }
 
-/** Where a click on the card goes: the places where it does not add up, or else every occurrence. */
+/** Where a click on the item goes: the places where it does not add up, or else every occurrence. */
 function placesOf(e) {
   const prob = e.status !== 'ok' ? problemPlaces(e) : [];
   if (prob.length) return prob;
   return occurrenceUnits(e.key).map(unit => ({ unit }));
 }
 
-/** Click on a card: first place (again: the next one), the sentences in yellow, the entity in red. */
+/** Click on an item: first place (again: the next one), the sentences in yellow, the entity in red. */
 function gotoEntity(e) {
   const places = placesOf(e);
   if (selectedKey !== e.key) delete placeIdx[e.key];
   if (!places.length) { selectedKey = e.key; renderList(); renderPanes(); return; }
   gotoPlace(e, places, +1);
+}
+
+function _scrollToSelected() {
+  const it = document.querySelector('#mask-entities .pend.on') || document.querySelector('#mask-entities .etr.on');
+  if (it) it.scrollIntoView({ block: 'nearest' });
 }
 
 function gotoPlace(e, places, step) {
@@ -325,12 +501,18 @@ function gotoPlace(e, places, step) {
   renderList();
   renderPanes();
   focusUnit(places[i].unit, { key: e.key });
-  const card = document.querySelector('#mask-entities .ent.sel');
-  if (card) card.scrollIntoView({ block: 'nearest' });
+  _scrollToSelected();
+}
+
+/** From the sheets: the entity is shown in the list (unfolding "Todas" when it has nothing pending). */
+function _revealInList(key) {
+  const items = pendingItems();
+  if (!items.some(it => (it.e || it.a).key === key || (it.b && it.b.key === key))) showAll = true;
 }
 
 function selectEntity(key, scroll) {
   const e = key ? state.session.ent.byKey.get(key) : null;
+  if (key) _revealInList(key);
   if (e && scroll) { gotoEntity(e); return; }
   selectedKey = key;
   renderList();
@@ -387,7 +569,7 @@ function _formSim(a, b) {
 /**
  * The entities of the OTHER language that may be the same as the subject, best first.
  * subj = { side, forms:[text], units:Set(unit idx), cat, excludeKey }
- * -> [{ x (entity), score, why:[text] }]
+ * -> [{ x (entity), score, why:[text], strong, co (same paragraph), fits (no counterpart there) }]
  */
 function rankCandidates(subj) {
   const s = state.session;
@@ -416,68 +598,113 @@ function rankCandidates(subj) {
     // Strong enough to be chosen in advance: a similar form, or an unpaired one of the same kind in
     // the same paragraph.
     const strong = sim >= 3 || (co && fits && sameCat);
-    out.push({ x, score, why, strong });
+    out.push({ x, score, why, strong, co, fits });
   }
   return out.sort((a, b) => b.score - a.score);
 }
 
 /**
- * A list of candidates with a search box; the best one is chosen in advance when it is a likely match.
- * -> { node, get value(), setSubject(subj), choose(key) }   opts = { allowNone, onChoose(x|null) }
+ * The candidates as a table (Etiqueta | Original | Traduccion | Por que), with a search box and filters;
+ * the best one is chosen in advance when it is a likely match.
+ * -> { node, get value(), get best(), setSubject(subj), choose(key) }
+ * opts = { allowNone, onChoose(x|null), resultLine(x) -> node|text (under the table) }
  */
 function pairPicker(subj, opts) {
   const o = opts || {};
+  const LIMIT = 8;
   let ranked = rankCandidates(subj);
-  let chosen = null, best = null;
-  const pick = () => { const top = ranked.find(r => r.strong); best = top && top.score >= 6 ? top.x.key : null; };
-  pick();
+  let chosen = null, best = null, all = false;
+  const filt = { co: false, fits: false, cat: false };
+  const pickBest = () => { const top = ranked.find(r => r.strong); best = top && top.score >= 6 ? top.x.key : null; };
+  pickBest();
   chosen = best;
-  const q = el('input.inp', { type: 'search', placeholder: 'Buscar por etiqueta (ORG25) o por texto\u2026', style: { width: '100%' } });
+  const q = el('input.inp', { type: 'search', placeholder: 'Buscar etiqueta (ORG25) o texto\u2026' });
+  const chips = el('span.pchips');
   const list = el('div.pairlist');
+  const res = el('div.pres');
+  const choose = (key, x) => { chosen = key; draw(); if (o.onChoose) o.onChoose(x); };
+  const chip = (k, label) => el('button.fchip' + (filt[k] ? '.on' : ''), { type: 'button', 'aria-pressed': filt[k] ? 'true' : 'false',
+    onclick: () => { filt[k] = !filt[k]; all = false; draw(); } }, label);
+  const cell = (forms) => { const k = Object.keys(forms); return k.length ? el('span.pc', { title: _forms(forms) }, k.join(' \u00b7 ')) : el('span.pc.none', '\u2014'); };
   const draw = () => {
+    clear(chips);
+    chips.append(chip('co', 'Mismo p\u00e1rrafo'), chip('fits', 'Sin pareja'));
+    if (subj.cat) chips.append(chip('cat', 'Solo ' + CAT_LABELS[subj.cat].toLowerCase()));
     clear(list);
+    list.appendChild(el('div.pth', el('span'), el('span', 'Etiqueta'), el('span', 'Original'), el('span', 'Traducci\u00f3n'), el('span', 'Por qu\u00e9')));
     const fq = _fold(q.value.trim());
-    const rows = ranked.filter(r => !fq || _fold(r.x.cat + r.x.n).includes(fq) ||
-      Object.keys(r.x.srcForms).concat(Object.keys(r.x.tgtForms)).some(f => _fold(f).includes(fq)));
+    const rows = ranked.filter(r => (!filt.co || r.co) && (!filt.fits || r.fits) && (!filt.cat || r.x.cat === subj.cat) &&
+      (!fq || _fold(r.x.cat + r.x.n).includes(fq) || Object.keys(r.x.srcForms).concat(Object.keys(r.x.tgtForms)).some(f => _fold(f).includes(fq))));
     if (o.allowNone) {
-      list.appendChild(el('label.pairrow' + (chosen === null ? '.on' : ''), el('input', { type: 'radio', name: 'pairpick', checked: chosen === null ? true : null,
-        onchange: () => { chosen = null; draw(); if (o.onChoose) o.onChoose(null); } }), el('span', 'No: es una entidad nueva')));
+      list.appendChild(el('label.pairrow.none' + (chosen === null ? '.on' : ''), el('input', { type: 'radio', name: 'pairpick', checked: chosen === null ? true : null,
+        onchange: () => choose(null, null) }), el('span.pnone', 'No: es una entidad nueva')));
     }
-    if (!rows.length) list.appendChild(el('div.empty', q.value ? 'Nada coincide con la b\u00fasqueda.' : 'No hay ninguna entidad en la otra lengua.'));
-    for (const r of rows.slice(0, 150)) {
+    if (!rows.length) list.appendChild(el('div.empty', q.value || filt.co || filt.fits || filt.cat ? 'Nada coincide con la b\u00fasqueda.' : 'No hay ninguna entidad en la otra lengua.'));
+    let shown = rows.slice(0, all ? 150 : LIMIT);
+    if (!all && chosen && !shown.some(r => r.x.key === chosen)) { const c = rows.find(r => r.x.key === chosen); if (c) shown = shown.concat([c]); }
+    for (const r of shown) {
       const x = r.x;
+      const why = r.why.join(' \u00b7 ');
       list.appendChild(el('label.pairrow' + (chosen === x.key ? '.on' : ''), { 'data-key': x.key },
-        el('input', { type: 'radio', name: 'pairpick', checked: chosen === x.key ? true : null, onchange: () => { chosen = x.key; draw(); if (o.onChoose) o.onChoose(x); } }),
-        el('span.tk.' + x.cat, x.cat + x.n),
-        el('span.pairforms', x.srcCount ? 'O: ' + Object.keys(x.srcForms).join(' \u00b7 ') : '', x.srcCount && x.tgtCount ? '  ' : '', x.tgtCount ? 'T: ' + Object.keys(x.tgtForms).join(' \u00b7 ') : ''),
-        x.key === best ? el('span.pill.ok', 'Sugerida') : (r.why.length ? el('span.pill.gray', r.why[0]) : null)));
+        el('input', { type: 'radio', name: 'pairpick', checked: chosen === x.key ? true : null, onchange: () => choose(x.key, x) }),
+        el('span', el('span.tk.' + x.cat, x.cat + x.n)),
+        cell(x.srcForms), cell(x.tgtForms),
+        el('span.pwhy', x.key === best ? el('span.pill.ok', 'Sugerida') : null, why ? why.charAt(0).toUpperCase() + why.slice(1) : '')));
+    }
+    if (rows.length > shown.length) list.appendChild(el('button.pmore', { type: 'button', onclick: () => { all = true; draw(); } }, 'Ver las ' + (rows.length - shown.length) + ' restantes'));
+    if (o.resultLine) {
+      clear(res);
+      const x = chosen ? state.session.ent.byKey.get(chosen) : null;
+      if (x) res.append(icon('link', 14), o.resultLine(x));
+      res.classList.toggle('hidden', !x);
     }
   };
-  q.addEventListener('input', draw);
+  q.addEventListener('input', () => { all = false; draw(); });
   draw();
   return {
-    node: el('div', q, list),
+    node: el('div.ppick', el('div.ptools', q, chips), list, o.resultLine ? res : null),
     get value() { return chosen; },
     get best() { return best; },
-    setSubject(next) { ranked = rankCandidates(next); const was = chosen === best; pick(); if (was) chosen = best; draw(); },
+    setSubject(next) { subj = next; ranked = rankCandidates(next); const was = chosen === best; pickBest(); if (was) chosen = best; draw(); },
     choose(key) { chosen = key; draw(); }
   };
+}
+
+/**
+ * The tag a subject will carry once joined to x (the merged entity keeps x's key and is numbered by its
+ * first appearance; an acronym of an entity also written in full gets the "s").
+ */
+function _mergedTag(subj, x, subjForms) {
+  const ents = state.session.ent.entities;
+  const ix = ents.indexOf(x), is = subj ? ents.indexOf(subj) : -1;
+  const first = is >= 0 && is < ix ? subj : x;
+  const pos = is >= 0 ? Math.min(ix, is) : ix;
+  const cat = (state.project.mask.catOverride || {})[x.key] || first.cat;
+  let n = 1;
+  for (let k = 0; k < pos; k++) if (ents[k] !== x && ents[k] !== subj && ents[k].cat === cat) n++;
+  const allForms = Object.keys(x.srcForms).concat(Object.keys(x.tgtForms), subjForms);
+  const short = allForms.some(f => !isAcronymForm(f)) && subjForms.length && subjForms.every(isAcronymForm);
+  return { cat, text: cat + n + (short ? 's' : '') };
 }
 
 async function mergeDialog(e) {
   // The usual case: an entity found on one side only whose counterpart got a tag of its own
   // (UNDP in the original, PNUD in the translation).
-  const side = e.srcCount && !e.tgtCount ? 'src' : (e.tgtCount && !e.srcCount ? 'tgt' : 'tgt');
+  const side = e.srcCount && !e.tgtCount ? 'src' : 'tgt';
   const forms = Object.keys(side === 'src' ? e.srcForms : e.tgtForms);
   const units = _unitsByKey(side).get(e.key) || new Set();
-  const picker = pairPicker({ side, forms, units, cat: e.cat, excludeKey: e.key });
-  const where = e.srcCount && !e.tgtCount ? 'solo en el original' : (e.tgtCount && !e.srcCount ? 'solo en la traducci\u00f3n' : 'en las dos lenguas');
-  const r = await modal({ title: 'Emparejar ' + e.cat + e.n, help: helpBtn('merge'), width: '680px', body: el('div',
-    el('p', el('span.tk.' + e.cat, e.cat + e.n), ' ', el('b', forms.join(' \u00b7 ')), ' est\u00e1 ', where, '.'),
-    el('p.info', 'Elija la etiqueta de la otra lengua que es la MISMA entidad (por ejemplo, \u00abUNDP\u00bb y \u00abPNUD\u00bb). ' +
-      'Primero van las m\u00e1s probables: las que est\u00e1n en el mismo p\u00e1rrafo, sin pareja o con una forma parecida; la mejor viene marcada. Las dos pasar\u00e1n a ser la misma etiqueta.'),
+  const refs = _refs(Array.from(units));
+  const where = e.srcCount && !e.tgtCount ? 'solo est\u00e1 en el original' : (e.tgtCount && !e.srcCount ? 'solo est\u00e1 en la traducci\u00f3n' : 'est\u00e1 en las dos lenguas');
+  const picker = pairPicker({ side, forms, units, cat: e.cat, excludeKey: e.key }, {
+    resultLine: (x) => {
+      const t = _mergedTag(e, x, forms);
+      return el('span', '\u00ab' + mainForm(side === 'src' ? e.srcForms : e.tgtForms) + '\u00bb pasar\u00e1 a ser ', el('span.tk.' + t.cat, t.text), ' en todo el documento.');
+    } });
+  const r = await modal({ title: 'Emparejar ' + e.cat + e.n, help: helpBtn('merge'), width: '860px', body: el('div',
+    el('div.psubj', _chip(e), el('b', forms.join(' \u00b7 ')), el('span', where + (refs ? ' (' + refs + ').' : '.')), el('span.grow'),
+      el('span.muted', side === 'tgt' ? '\u00bfCu\u00e1l del original es la misma?' : '\u00bfCu\u00e1l de la traducci\u00f3n es la misma?')),
     picker.node),
-    buttons: [{ label: 'Cancelar', value: null }, { label: 'Emparejar', kind: 'primary', value: 'ok', onClick: () => { if (!picker.value) { toast('Elija una entidad de la lista.', 'warn'); return false; } } }] });
+    buttons: [{ label: 'Cancelar', value: null }, { label: 'Emparejar', kind: 'primary', value: 'ok', onClick: () => { if (!picker.value) { toast('Elija una etiqueta de la tabla.', 'warn'); return false; } } }] });
   if (r !== 'ok' || !picker.value) return;
   // The entity that is paired keeps the tag of the one chosen.
   setMask({ merges: Object.assign({}, state.project.mask.merges, { [e.key]: picker.value }) });
@@ -543,12 +770,12 @@ function onSheetClick(side, p, ev) {
   if (t) {
     // A tag: its entity is selected, glowing in red in both sentences; the other sheet follows.
     selectedKey = t.dataset.key;
+    _revealInList(selectedKey);
     renderList();
     renderPanes();
     const u = unitOf(state.session, side, p.id);
     if (u) nav.focusUnit(u.idx, { key: t.dataset.key, quiet: true });
-    const card = document.querySelector('#mask-entities .ent.sel');
-    if (card) card.scrollIntoView({ block: 'nearest' });
+    _scrollToSelected();
   }
 }
 
@@ -712,8 +939,8 @@ function _missingSide(e) {
   return e.srcCount < e.tgtCount ? 'src' : 'tgt';
 }
 
-/** From the card of an entity without its counterpart: the next text selected in the other sheet
- *  becomes that entity (same tag), without a dialog. Escape or the button again cancels. */
+/** From an entity without its counterpart: the next text selected in the other sheet becomes that
+ *  entity (same tag), without a dialog. Escape or the button again cancels. */
 function startPick(e) {
   endPick();
   const side = _missingSide(e);

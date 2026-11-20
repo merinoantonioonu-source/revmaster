@@ -19,6 +19,8 @@
  *   removedOcc  ['side:paraId:start']  single occurrences that must not be masked
  *   merges      { fromKey: toKey }      "these two are the same entity"
  *   catOverride { key: cat }, artOverride { key: art }
+ *   okKeys      { key: status }  "Esta bien asi": not listed as pending while it keeps that status
+ *   notPairs    ['keyA|keyB']    "No son la misma": two entities never offered as a pair again
  */
 
 import { detectSpans, compileGazetteer, acronymsIn } from './detect.js';
@@ -57,7 +59,9 @@ export function defaultMaskSettings() {
     removedOcc: [],
     merges: {},
     catOverride: {},
-    artOverride: {}
+    artOverride: {},
+    okKeys: {},
+    notPairs: []
   };
 }
 

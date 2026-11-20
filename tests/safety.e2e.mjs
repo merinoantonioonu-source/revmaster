@@ -81,7 +81,7 @@ async function main() {
       const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.click(sel + ' .fn')]);
       await fc.setFiles(path.join(OUT, file));
     }
-    await page.waitForSelector('#view-mask.on .ent', { timeout: 20000 });
+    await page.waitForSelector('#view-mask.on .pendhead', { timeout: 20000 });
 
     // 1) A person recognised once is masked wherever the name appears alone.
     const per = await page.evaluate(async () => {

@@ -3,9 +3,10 @@
  * nav.e2e.mjs - Navigation between the sheets (as in COMeT Final Check) and the tools around it:
  *   - sentence offsets; a click marks the sentence and its pair; arrows; sentence alignment when the
  *     two paragraphs do not have the same number of sentences;
- *   - Entities: "Con problemas" by default; a click on a card goes there (yellow sentences, red glow on
- *     the entity), also for an entity found on one side only; "Emparejar" with a search box and a
- *     suggestion chosen in advance; hovering a tag shows only the hidden text and lights its
+ *   - Entities: "Por resolver" (one line per problem; a likely pair as one item with Unir / No son la
+ *     misma); a click on an item goes there (yellow sentences, a thick pulsing red ring on the tag);
+ *     "Emparejar" as a table with search, filters and a suggestion chosen in advance; "Senalarla" by
+ *     mouse drag; "Esta bien asi" saved with the project; hovering a tag shows only the hidden text and lights its
  *     counterpart; right click > "Desenmascarar" until another sentence is clicked; no articles;
  *   - Corregir: a finding marks its exact text and both sentences, in its row and in "Documento";
  *     filters; the inspector (an edited proposal is what gets accepted); "Vaciar"; the table window;
@@ -108,7 +109,7 @@ async function main() {
       const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.click(sel + ' .fn')]);
       await fc.setFiles(path.join(OUT, file));
     }
-    await page.waitForSelector('#view-mask.on .ent', { timeout: 20000 });
+    await page.waitForSelector('#view-mask.on .pendhead', { timeout: 20000 });
 
     const tags = await page.evaluate(async () => (await import('/app/js/state.js')).state.session.ent.entities.map(e => e.tagSrc + '=' + e.tagTgt));
     ok(tags.length && tags.every(t => { const [a, b] = t.split('='); return a === b && !/\{(el|la|los|las) /.test(b); }), 'Tags carry no article: the same tag on both sides (' + tags.slice(0, 4).join(', ') + ')');
@@ -127,24 +128,31 @@ async function main() {
     ok(h.seg.length === 2 && /abstained\.$/.test(h.seg[0]) && /se abstuvo\.$/.test(h.seg[1]) && /apoy/.test(h.seg[1]),
       'Three sentences against two: the counterpart sentence is found by alignment, not the whole paragraph (' + JSON.stringify(h.seg) + ')');
 
-    // 2) Entities: problems first; a card click goes there with a red glow.
-    const segOn = await page.textContent('#mask-bubbles .seg2 button.on');
-    ok(/Con problemas/.test(segOn), 'The entity list starts with the ones that have a problem (' + segOn.trim() + ')');
-    const onlyTgt = page.locator('#mask-entities .ent', { hasText: 'T: 1.520' }).first();
-    await onlyTgt.click();
+    // 2) Entities: what is left to solve; a click on an item goes there with a strong red ring.
+    const head = await page.textContent('#mask-head .pendhead');
+    ok(/Por resolver: \d+/.test(head) && /de \d+ etiquetas cuadran/.test(head), 'The list starts with what is left to solve (' + head.replace(/\s+/g, ' ').trim() + ')');
+    const pairItem = page.locator('#mask-entities .pend[data-kind="pair"]').first();
+    const pairTxt = (await pairItem.textContent()).replace(/\s+/g, ' ');
+    ok(/1,250/.test(pairTxt) && /1\.520/.test(pairTxt) && /parecen la misma/.test(pairTxt) && /mismo p\u00e1rrafo/.test(pairTxt),
+      'An entity only in the original and one only in the translation, in the same paragraph, are offered as one item (' + pairTxt.trim() + ')');
+    ok(await page.locator('#mask-entities .ent, #mask-entities .why').count() === 0, 'No old verbose cards any more');
+    await pairItem.locator('.line').first().click();
     await page.waitForTimeout(500);
     h = await highlights(page);
     ok(h.seg.some(x => /personas asistieron al per\u00edodo de sesiones\.$/.test(x)) && h.seg.some(x => /people attended the session\.$/.test(x)) &&
-      h.hot.some(x => /^mask-tgt:NUM/.test(x)),
-      'Card of an entity found only in the translation: both sentences in yellow and the tag with a red glow (' + JSON.stringify(h) + ')');
+      h.hot.some(x => /^mask-src:NUM/.test(x)) && h.hot.some(x => /^mask-tgt:NUM/.test(x)),
+      'A pair item: both sentences in yellow and both tags ringed in red (' + JSON.stringify(h) + ')');
+    const ring = await page.$eval('#mask-src .tk.hot', n => { const c = getComputedStyle(n); return { w: parseFloat(c.outlineWidth), anim: c.animationName, fs: parseFloat(c.fontSize) }; });
+    ok(ring.w >= 3 && ring.anim === 'um-hot' && ring.fs > 11, 'The tag being looked at is much more visible: thick ring, pulse, bigger chip (' + JSON.stringify(ring) + ')');
     await page.screenshot({ path: path.join(OUT, '2-card.png') });
-    const cargo = page.locator('#mask-entities .ent', { hasText: 'Secretary-General' }).first();
-    ok(/Aparece 2 veces en el original y 1 en la traducci/.test(await cargo.textContent()), 'The card explains the count difference');
-    await cargo.click();
+    const cargo = page.locator('#mask-entities .pend[data-kind="count"]', { hasText: 'CARGO' }).first();
+    const cargoTxt = (await cargo.textContent()).replace(/\s+/g, ' ');
+    ok(/2 en el original, 1 en la traducci/.test(cargoTxt) && /Falta una en \u00a7\d/.test(cargoTxt), 'The item explains the count difference and where it is (' + cargoTxt.trim() + ')');
+    await cargo.locator('.line').first().click();
     await page.waitForTimeout(400);
     h = await highlights(page);
     ok(h.seg.length === 3 && h.hot.filter(x => /^mask-src:CARGO/.test(x)).length === 2 && h.hot.some(x => /^mask-tgt:CARGO/.test(x)),
-      'Card of a count difference: the sentences of both sides and every occurrence glowing (' + JSON.stringify(h) + ')');
+      'Item of a count difference: the sentences of both sides and every occurrence ringed (' + JSON.stringify(h) + ')');
 
     // Hover: the tooltip is the hidden text only; the counterpart glows.
     const pill = page.locator('#mask-src .tk', { hasText: /^CARGO/ }).first();
@@ -164,15 +172,33 @@ async function main() {
     await clickWord(page, '#mask-src', 'twice');
     ok(await page.locator('.pane-body .ent-orig.revealed').count() === 0, 'A click on another sentence masks it again');
 
-    // Emparejar: search box and the likely counterpart chosen in advance.
-    const num = page.locator('#mask-entities .ent', { hasText: 'O: 1,250' }).first();
-    await num.click();
-    await page.locator('#mask-entities .ent.sel button:has-text("Emparejar")').click();
+    // "No son la misma": the pair is split and not offered again.
+    await page.locator('#mask-entities .pend[data-kind="pair"] button:has-text("No son la misma")').click();
+    await page.waitForTimeout(400);
+    const split = await page.evaluate(async () => {
+      const { state } = await import('/app/js/state.js');
+      return { pairs: document.querySelectorAll('#mask-entities .pend[data-kind="pair"]').length, notPairs: (state.project.mask.notPairs || []).length,
+        alone: Array.from(document.querySelectorAll('#mask-entities .pend[data-kind="nopair"]')).map(n => n.textContent).filter(t => /1,250|1\.520/.test(t)).length };
+    });
+    ok(split.pairs === 0 && split.notPairs === 1 && split.alone === 2, 'No son la misma: two separate items, remembered in the project (' + JSON.stringify(split) + ')');
+
+    // Emparejar (the "..." menu): a table with Original / Traduccion, search, filters, the likely counterpart chosen in advance.
+    const num = page.locator('#mask-entities .pend[data-kind="nopair"]', { hasText: '1,250' }).first();
+    await num.locator('button.more').click();
+    await page.click('.menu .mi:has-text("Es la misma que")');
     await page.waitForSelector('.modal:has-text("Emparejar")');
-    const pre = await page.textContent('.pairlist .pairrow.on');
-    ok(/1\.520/.test(pre) && /Sugerida/.test(pre), 'Emparejar chooses in advance the figure without a pair in the same paragraph (' + pre.replace(/\s+/g, ' ').trim() + ')');
+    const heads = await page.$$eval('.modal .pairlist .pth span', ns => ns.map(n => n.textContent));
+    ok(heads.join('|') === '|Etiqueta|Original|Traducci\u00f3n|Por qu\u00e9', 'Emparejar is a table: Etiqueta | Original | Traduccion | Por que (' + heads.join('|') + ')');
+    const pre = await page.$eval('.pairlist .pairrow.on', r => Array.from(r.children).map(c => c.textContent.trim()));
+    ok(/1\.520/.test(pre[3]) && pre[2] === '\u2014' && /Sugerida/.test(pre[4]), 'Emparejar chooses in advance the figure without a pair in the same paragraph, each side in its own column (' + JSON.stringify(pre) + ')');
+    ok(/pasar\u00e1 a ser NUM\d+ en todo el documento/.test(await page.textContent('.modal .pres')), 'It says which tag it will carry');
+    const nAll = await page.locator('.pairlist .pairrow').count();
+    await page.click('.modal .fchip:has-text("Sin pareja")');
+    const nFits = await page.locator('.pairlist .pairrow').count();
+    ok(nFits >= 1 && nFits < nAll, 'The "Sin pareja" filter leaves only the ones without a counterpart (' + nFits + '/' + nAll + ')');
+    await page.click('.modal .fchip:has-text("Sin pareja")');
     await page.fill('.modal input[type=search]', 'zzz');
-    ok(await page.locator('.pairlist .pairrow').count() === 0, 'The search box filters the list');
+    ok(await page.locator('.pairlist .pairrow').count() === 0, 'The search box filters the table');
     await page.fill('.modal input[type=search]', '');
     await page.screenshot({ path: path.join(OUT, '4-pair.png') });
     await page.click('.modal-foot .btn.primary');
@@ -184,11 +210,12 @@ async function main() {
     });
     ok(paired === 'ok:1.520', 'After Emparejar both figures are one entity without problems (' + paired + ')');
 
-    // "Senalar su pareja": from the card of "dos" (only in the translation), select "twice" in the original.
-    const dosCard = page.locator('#mask-entities .ent', { hasText: 'T: dos' }).first();
-    await dosCard.locator('button.pickbtn').click();
+    // "Senalarla en el original": from the item of "dos" (only in the translation), select "twice" in the original.
+    const dosItem = page.locator('#mask-entities .pend[data-kind="nopair"]', { hasText: 'dos' }).first();
+    ok(/no est\u00e1 en el original/.test(await dosItem.textContent()), 'An entity only in the translation says so in one line');
+    await dosItem.locator('button.pickbtn').click();
     await page.waitForSelector('#mask-pickbar');
-    ok(await page.locator('#mask-src.picking').count() === 1 && /el original/.test(await page.textContent('#mask-pickbar')), 'Senalar su pareja waits for a selection in the original');
+    ok(await page.locator('#mask-src.picking').count() === 1 && /el original/.test(await page.textContent('#mask-pickbar')), 'Senalarla waits for a selection in the original');
     const tw = await page.evaluate(() => {
       const w = document.createTreeWalker(document.querySelector('#mask-src'), NodeFilter.SHOW_TEXT);
       let n;
@@ -207,6 +234,31 @@ async function main() {
     });
     ok(/^ok:twice:\{NUM\d+\}$/.test(dos) && await page.locator('#mask-pickbar').count() === 0, 'The selected text joins that entity, with the same tag, and the mode ends (' + dos + ')');
     await page.screenshot({ path: path.join(OUT, '4b-pick.png') });
+
+    // "Esta bien asi": the item goes, it is saved with the project and it is still gone when the project opens again.
+    await page.locator('#mask-entities .pend[data-kind="count"]', { hasText: 'CARGO' }).first().locator('button.okbtn').click();
+    await page.waitForTimeout(1200);
+    const kept = await page.evaluate(async () => {
+      const { state, openProject } = await import('/app/js/state.js');
+      const { idbGet } = await import('/app/js/store/idb.js');
+      const e = state.session.ent.entities.find(x => x.cat === 'CARGO');
+      const stored = await idbGet('projects', state.project.id);
+      const before = !!document.querySelector('#mask-entities .pend[data-key="' + e.key + '"]');
+      await openProject(state.project.id);
+      await new Promise(r => setTimeout(r, 600));
+      const after = !!document.querySelector('#mask-entities .pend[data-key="' + e.key + '"]');
+      return { stored: stored.mask.okKeys[e.key], before, after, all: document.querySelector('#mask-head').textContent };
+    });
+    ok(kept.stored === 'count' && !kept.before && !kept.after, 'Esta bien asi hides the item, is saved with the project and survives reopening it (' + JSON.stringify(kept) + ')');
+    // With nothing left to solve the table is already unfolded.
+    if (!(await page.locator('#mask-entities .etr').count())) await page.click('#mask-entities .alltoggle');
+    const accRow = page.locator('#mask-entities .etr', { hasText: 'Secretary-General' }).first();
+    ok(await accRow.locator('.esti.acc').count() === 1, 'Todas las etiquetas: the accepted entity shows as reviewed');
+    await accRow.click();
+    await accRow.locator('button.more').click();
+    await page.click('.menu .mi:has-text("Volver a mostrarla")');
+    await page.waitForTimeout(400);
+    ok(await page.locator('#mask-entities .pend[data-kind="count"]', { hasText: 'CARGO' }).count() === 1, 'Its menu puts it back among what is left to solve');
 
     // 3) Review: injected findings (no AI here), card -> exact text and both sentences.
     await page.click('.step[data-view="review"]');

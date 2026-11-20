@@ -77,7 +77,8 @@ function renderSteps() {
   if (p && p.unmasked) _sub('mask', 'No necesario: sin enmascarar');
   else if (s) {
     const ents = s.ent.entities;
-    const bad = ents.filter(e => e.status !== 'ok').length;
+    const okKeys = (p.mask && p.mask.okKeys) || {};
+    const bad = ents.filter(e => e.status !== 'ok' && okKeys[e.key] !== e.status).length;
     _sub('mask', fmtInt(ents.length) + ' entidades' + (bad ? ' \u00b7 ' + bad + ' por revisar' : ''));
   } else _sub('mask', 'Proteger los datos');
   _sub('review', reviewStatus || (state.findings.length ? 'Hecho: puede repetirlo' : 'Elegir qu\u00e9 buscar'));
@@ -148,12 +149,12 @@ async function resetDialog() {
   if (!p) return;
   const m = p.mask || {};
   const nMask = (m.terms || []).length + Object.keys(m.merges || {}).length + (m.removedKeys || []).length + (m.removedOcc || []).length +
-    Object.keys(m.catOverride || {}).length + Object.keys(m.artOverride || {}).length;
+    Object.keys(m.catOverride || {}).length + Object.keys(m.artOverride || {}).length + Object.keys(m.okKeys || {}).length + (m.notPairs || []).length;
   const mk = el('input', { type: 'checkbox', checked: true });
   const fk = el('input', { type: 'checkbox', checked: true });
   const r = await modal({ title: 'Reiniciar el proyecto', help: helpBtn('project-reset'), width: '560px', body: el('div',
     el('p', 'Vuelve a \u00ab', el('b', p.name), '\u00bb tal como qued\u00f3 al cargar los documentos. Los documentos no cambian.'),
-    el('div', el('label.row', mk, ' Deshacer los ajustes de enmascarado (' + nMask + '): lo a\u00f1adido, emparejado o quitado a mano y las categor\u00edas elegidas')),
+    el('div', el('label.row', mk, ' Deshacer los ajustes de enmascarado (' + nMask + '): lo a\u00f1adido, emparejado, quitado o dado por bueno a mano y las categor\u00edas elegidas')),
     el('div', el('label.row', fk, ' Borrar los hallazgos (' + state.findings.length + '), tambi\u00e9n los aceptados y rechazados')),
     el('p.info', { style: { marginTop: '8px' } }, 'Su diccionario personal y las respuestas guardadas de la IA no se tocan.')),
     buttons: [{ label: 'Cancelar', value: null }, { label: 'Reiniciar', kind: 'danger', value: 'ok' }] });
