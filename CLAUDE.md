@@ -116,6 +116,11 @@ See `docs/ARQUITECTURA.md` (contracts between modules) and `docs/PROPUESTA.md` (
   net on every remask; (3) the record of every call as sent (`sentLog`, memory only, cleared on project
   change) shown by `ui/sent-view.js` (Corregir inspector "Ver lo enviado", Mas > "Lo enviado a la IA").
   `anchorItem` finds a quote with an extra tag on the real text. `tests/safety.e2e.mjs` covers it.
+- **Fixing masks by hand** (2026-11-20): "Senalar su pareja" on a card without a pair (or with a count
+  difference) waits for a mouse selection in the other sheet and adds it as a term merged into that entity
+  (`startPick`/`onPickSelection` in `mask-view.js`); right click on a tag > "Ampliar con <word>" opens the
+  "Enmascarar seleccion" dialog with the wider text (terms win over list matches: PRIORITY in
+  `detect.js`). List names of several words also match when one word changes case (`_caseVariant`).
 - The prompts are calibrated on the owner's review report (2026-11-05): its cases are the test bench
   (`tools/make_bench.py` -> `app/data/calibration/`; Archivos > Banco de pruebas, result in Mas). When tuning a
   module, ask the owner for the bench result ("Copiar el resumen") before and after; add new report

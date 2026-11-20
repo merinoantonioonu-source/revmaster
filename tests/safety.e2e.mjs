@@ -36,7 +36,8 @@ const EN = [
   'Ivanova then answered the questions of the members.',
   'Maria Ivanova thanked the Committee.',
   'Mr. Long welcomed the long-term plan.',
-  'Long negotiations followed.'
+  'Long negotiations followed.',
+  'Droughts hit southern Africa and southern Mozambique.'
 ];
 const ES = [
   'Informe de la reuni\u00f3n',
@@ -44,7 +45,8 @@ const ES = [
   'Ivanova respondi\u00f3 despu\u00e9s a las preguntas de los miembros.',
   'Maria Ivanova dio las gracias al Comit\u00e9.',
   'El Sr. Long acogi\u00f3 con benepl\u00e1cito el plan a largo plazo.',
-  'Siguieron largas negociaciones.'
+  'Siguieron largas negociaciones.',
+  'Las sequ\u00edas azotaron \u00c1frica Meridional y el sur de Mozambique.'
 ];
 const mk = (file, paras) => py('import docx,sys,json\nd=docx.Document()\nfor t in json.loads(sys.argv[2]): d.add_paragraph(t)\nd.save(sys.argv[1])', path.join(OUT, file), JSON.stringify(paras));
 mk('safety_en.docx', EN);
@@ -93,6 +95,23 @@ async function main() {
     ok(per.s2.startsWith(per.tag + ' then') && per.t2.startsWith(per.tag + ' respondi'), 'The surname alone is masked with the same tag in both languages (' + per.s2 + ' | ' + per.t2 + ')');
     ok(per.s3.startsWith(per.tag + ' thanked') && per.t3.startsWith(per.tag + ' dio') && !/Maria/.test(per.s3 + per.t3), 'The full name without a title is masked whole (' + per.s3 + ')');
     ok(per.s5 === 'Long negotiations followed.' && per.longSrc === 1, 'A surname that is also an ordinary word of the text (long-term) is not spread (' + per.s5 + ')');
+
+    // A name of the lists written with a lowercase word ("southern Africa") is still that name, and pairs.
+    const sa = await page.evaluate(async () => {
+      const { state } = await import('/app/js/state.js');
+      const e = state.session.ent.entities.find(x => Object.keys(x.srcForms).includes('southern Africa'));
+      return e ? e.status + ':' + Object.keys(e.tgtForms).join('/') : 'none';
+    });
+    ok(sa === 'ok:\u00c1frica Meridional', '"southern Africa" is recognised as Southern Africa and pairs with \u00c1frica Meridional (' + sa + ')');
+    // Right click on a tag > "Ampliar con <word before>": the dialog of a new entity with the wider text.
+    await page.locator('#mask-src .tk', { hasText: /^PAIS/ }).last().click({ button: 'right' });
+    await page.click('.menu .mi:has-text("Ampliar con \u00absouthern\u00bb")');
+    await page.waitForSelector('.modal:has-text("Enmascarar selecci")');
+    ok(/southern Mozambique/.test(await page.textContent('.modal')) && await page.$eval('.modal select.inp', x => x.value) === 'PAIS', 'Ampliar opens the dialog with the wider text and the same category');
+    await page.click('.modal-foot .btn.primary');
+    await page.waitForTimeout(400);
+    const wide = await page.evaluate(async () => (await import('/app/js/state.js')).state.session.masked.src.get(6).masked);
+    ok(/^Droughts hit \{LUGAR\d+\} and \{PAIS\d+\}\.$/.test(wide), 'After Ampliar, "southern Mozambique" is one tag (' + wide + ')');
 
     // 2) The safety net in the gateway.
     const net = await page.evaluate(async (tag) => {

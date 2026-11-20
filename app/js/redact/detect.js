@@ -85,7 +85,8 @@ function _gazSpans(text, lang, gaz) {
       if (end > t.length) continue;
       let hit;
       if (c.isAcr) hit = t.startsWith(c.text, m.index);
-      else hit = t.startsWith(c.text, m.index) || ((allCaps || _looseCase(c.text)) && lower.startsWith(c.text.toLowerCase(), m.index));
+      else hit = t.startsWith(c.text, m.index) || ((allCaps || _looseCase(c.text)) && lower.startsWith(c.text.toLowerCase(), m.index)) ||
+        _caseVariant(t.substr(m.index, c.text.length), c.text);
       if (!hit) continue;
       const after = t.charAt(end);
       if (after && /[\p{L}\p{N}]/u.test(after)) continue;
@@ -95,6 +96,21 @@ function _gazSpans(text, lang, gaz) {
     }
   }
   return out;
+}
+
+// A name of several words written with a word in lower case where the list has a capital, or the other
+// way round ("southern Africa" for "Southern Africa", "\u00c1frica meridional" for "\u00c1frica Meridional"):
+// only the first letter of a word may change, and at least one capitalised word must be as in the list.
+function _caseVariant(seg, form) {
+  if (seg.length !== form.length || seg.toLowerCase() !== form.toLowerCase()) return false;
+  const a = seg.split(/\s+/), b = form.split(/\s+/);
+  if (a.length < 2 || a.length !== b.length) return false;
+  let kept = false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] === b[i]) { if (/^\p{Lu}/u.test(a[i])) kept = true; continue; }
+    if (a[i].slice(1) !== b[i].slice(1)) return false;
+  }
+  return kept;
 }
 
 // Forms written in lower case in the list (French "Assembl\u00e9e g\u00e9n\u00e9rale" keeps a capital A, but a

@@ -84,7 +84,8 @@ const T = {
       '**Con problemas / Todas**: por defecto se ven solo las que tienen alg\u00fan problema. Debajo, la categor\u00eda.',
       '**Sin pareja**: est\u00e1 en una lengua y no en la otra. **Recuento distinto**: no aparece el mismo n\u00famero de veces. **Formas distintas**: la traducci\u00f3n la nombra de varias maneras.',
       '**Ver d\u00f3nde no cuadra \u203a** y **Siguiente \u203a**: recorren los p\u00e1rrafos en los que no coincide.'],
-    'Botones: **Categor\u00eda**, **Emparejar\u2026** (es la misma entidad que otra etiqueta), **A mi diccionario** (se enmascarar\u00e1 en todos los documentos) y **No enmascarar**.'] },
+    'Botones: **Categor\u00eda**, **Emparejar\u2026** (es la misma entidad que otra etiqueta), **A mi diccionario** (se enmascarar\u00e1 en todos los documentos) y **No enmascarar**.',
+    'En una tarjeta **Sin pareja** o con **Recuento distinto**, **Se\u00f1alar su pareja**: UMBRA va al p\u00e1rrafo y espera a que seleccione en la otra hoja (arrastrando el rat\u00f3n o con doble clic) el texto que le corresponde, que queda con la misma etiqueta. [[Esc]] o el mismo bot\u00f3n cancelan. Si la selecci\u00f3n pisa una etiqueta de color, pulse antes **Ver original**.'] },
   sheets: { t: 'Las dos hojas', b: [
     'A la izquierda, el original; a la derecha, la traducci\u00f3n, con las etiquetas en color.',
     ['**Clic en una oraci\u00f3n**: se resalta en amarillo con su pareja en la otra hoja, que se desplaza hasta ponerla a la misma altura. Si las oraciones no se corresponden una a una, UMBRA las empareja por su longitud y sus etiquetas; si no hay pareja, marca el p\u00e1rrafo m\u00e1s cercano.',
@@ -92,6 +93,7 @@ const T = {
       '**Clic en una etiqueta**: la entidad se selecciona y brilla en rojo en las dos oraciones.',
       '**Clic derecho en una frase \u203a Desenmascarar**: muestra el texto real de esa frase y de su pareja hasta que pulse otra frase.',
       '**Para enmascarar algo que UMBRA no ha detectado**: selecci\u00f3nelo y pulse [[Alt+E]], o clic derecho \u203a **Enmascarar la selecci\u00f3n\u2026**',
+      '**Clic derecho en una etiqueta \u203a Ampliar con \u00abpalabra\u00bb**: cuando a la etiqueta le falta la palabra de antes o de despu\u00e9s (\u00absouthern\u00bb en \u00absouthern Africa\u00bb), abre **Enmascarar la selecci\u00f3n** con el texto ampliado y su misma categor\u00eda; elija all\u00ed su pareja en la otra lengua (UMBRA la sugiere).',
       '[[\u2190]] / [[\u2192]]: oraci\u00f3n anterior y siguiente. **Buscar\u2026**: lleva al primer texto que coincide.',
       '[[Ctrl]]+rueda del rat\u00f3n sobre las hojas ampl\u00eda el texto.'] ] },
   'mask-selection': { t: 'Enmascarar una selecci\u00f3n', b: [
