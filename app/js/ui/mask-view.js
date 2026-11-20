@@ -24,6 +24,7 @@ let selectedKey = null;
 let panes = {};
 let nav = null;
 let revealed = null;      // { src:{pid,start,end}, tgt:{...} }: a sentence pair shown unmasked for a moment
+let pick = null;          // "Senalar su pareja": { key, side } - the next text selected on that side joins that entity
 
 export function mountMaskView(host, tools) {
   root = host;
@@ -44,9 +45,12 @@ export function mountMaskView(host, tools) {
   nav.attachHover();
   attachTagHover();
   on('masked', render);
-  on('view', (v) => { if (v === 'mask') { renderTools(); render(); } });
+  on('view', (v) => { if (v === 'mask') { renderTools(); render(); } else endPick(); });
+  on('project', () => endPick());
+  for (const side of ['src', 'tgt']) panes[side].addEventListener('mouseup', () => setTimeout(() => onPickSelection(side), 0));
   document.addEventListener('keydown', (e) => {
     if (state.view !== 'mask') return;
+    if (pick && e.key === 'Escape') { e.preventDefault(); endPick(); return; }
     if (e.altKey && (e.key === 'e' || e.key === 'E')) { e.preventDefault(); maskSelection(); return; }
     // Left/Right arrows: next/previous sentence (as in Final Check).
     if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.ctrlKey && !e.metaKey && !e.shiftKey &&
@@ -245,8 +249,8 @@ function problemPlaces(e) {
 }
 
 function _problemText(e) {
-  if (e.status === 'nopair') return e.srcCount ? 'Solo est\u00e1 en el original (' + e.srcCount + ' ' + (e.srcCount > 1 ? 'veces' : 'vez') + '): \u00bffalta en la traducci\u00f3n o se tradujo de otra forma? Si es otra entidad, use \u00abEmparejar\u00bb.'
-    : 'Solo est\u00e1 en la traducci\u00f3n (' + e.tgtCount + ' ' + (e.tgtCount > 1 ? 'veces' : 'vez') + '): \u00bfsobra, o en el original tiene otra forma (una sigla, por ejemplo)? Si es otra entidad, use \u00abEmparejar\u00bb.';
+  if (e.status === 'nopair') return e.srcCount ? 'Solo est\u00e1 en el original (' + e.srcCount + ' ' + (e.srcCount > 1 ? 'veces' : 'vez') + '): \u00bffalta en la traducci\u00f3n o se tradujo de otra forma? Si est\u00e1 escrita de otra forma, \u00abSe\u00f1alar su pareja\u00bb; si ya tiene otra etiqueta, \u00abEmparejar\u00bb.'
+    : 'Solo est\u00e1 en la traducci\u00f3n (' + e.tgtCount + ' ' + (e.tgtCount > 1 ? 'veces' : 'vez') + '): \u00bfsobra, o en el original tiene otra forma (una sigla, por ejemplo)? Si est\u00e1 escrita de otra forma, \u00abSe\u00f1alar su pareja\u00bb; si ya tiene otra etiqueta, \u00abEmparejar\u00bb.';
   if (e.status === 'count') return 'Aparece ' + e.srcCount + ' ' + (e.srcCount > 1 ? 'veces' : 'vez') + ' en el original y ' + e.tgtCount + ' en la traducci\u00f3n.';
   if (e.status === 'forms') return 'Se traduce de ' + Object.keys(e.tgtForms).length + ' formas distintas.';
   return '';
@@ -269,6 +273,9 @@ function entityCard(e) {
       el('button.btn.sm' + (e.status !== 'ok' ? '.primary' : ''), { title: e.status !== 'ok' ? 'Lleva a cada p\u00e1rrafo en el que no cuadra y resalta los dos lados' : 'Siguiente aparici\u00f3n',
         onclick: () => gotoPlace(e, places, +1) }, at ? 'Siguiente \u203a' : (e.status !== 'ok' ? 'Ver d\u00f3nde no cuadra \u203a' : 'Ir \u203a')),
       places.length > 1 && at ? el('button.btn.sm', { title: 'Anterior', onclick: () => gotoPlace(e, places, -1) }, '\u2039') : null,
+      (e.status === 'nopair' || e.status === 'count') ? el('button.btn.sm.pickbtn' + (pick && pick.key === e.key ? '.on' : ''), {
+        title: 'Seleccione en la otra hoja el texto que corresponde a ' + e.cat + e.n + ' y quedar\u00e1 con la misma etiqueta',
+        onclick: () => (pick && pick.key === e.key ? endPick() : startPick(e)) }, 'Se\u00f1alar su pareja') : null,
       el('span.muted', at ? ' \u00a7' + state.session.units[at.unit].n + (e.status !== 'ok' ? ' \u00b7 ' + (at.form ? '\u00ab' + at.form + '\u00bb' : at.src + ' en el original, ' + at.tgt + ' en la traducci\u00f3n') : '') + ' \u00b7 ' + (i + 1) + '/' + places.length
         : ' ' + places.length + (places.length > 1 ? ' lugares' : ' lugar'))));
   }
@@ -573,12 +580,34 @@ function onSheetMenu(side, ev) {
   if (index !== null && index >= 0) items.push({ label: 'Desenmascarar', onClick: () => revealSentence(side, pid, index) });
   if (t) {
     const key = t.dataset.key, occ = t.dataset.occ;
+    const ext = _extensions(side, pid, occ, key);
+    if (ext.length) items.push({ sep: true });
+    for (const x of ext) items.push({ label: 'Ampliar con \u00ab' + x.word + '\u00bb (' + x.where + ')\u2026', onClick: () => maskSelection({ text: x.text, side, cat: x.cat }) });
     items.push({ sep: true },
       { label: 'No enmascarar esta aparici\u00f3n', onClick: () => setMask({ removedOcc: (state.project.mask.removedOcc || []).concat([occ]) }) },
       { label: 'No enmascarar esta entidad en todo el documento', onClick: () => setMask({ removedKeys: (state.project.mask.removedKeys || []).concat([key]) }) },
       { label: 'Ver la entidad en la lista', onClick: () => selectEntity(key, true) });
   }
   openMenu({ x: ev.clientX, y: ev.clientY }, items);
+}
+
+/**
+ * "Ampliar": the occurrence of a tag with the word before or after it ("southern" + Africa), offered as
+ * a new entity of the same category for the "Enmascarar seleccion" dialog (which suggests its pair).
+ */
+function _extensions(side, pid, occId, key) {
+  const s = state.session;
+  const start = +String(occId || '').split(':')[2];
+  const o = (s.ent.occ[side].get(pid) || []).find(x => x.start === start && x.key === key);
+  const e = s.ent.byKey.get(key);
+  if (!o || !e) return [];
+  const text = (side === 'src' ? s.src : s.tgt).paras[pid].text;
+  const out = [];
+  const before = /([\p{L}\p{N}][\p{L}\p{N}'\u2019\-]*)([ \u00a0]+)$/u.exec(text.slice(0, o.start));
+  if (before) out.push({ word: before[1], where: 'anterior', text: text.slice(o.start - before[0].length, o.end), cat: e.cat });
+  const after = /^([ \u00a0]+)([\p{L}\p{N}][\p{L}\p{N}'\u2019\-]*)/u.exec(text.slice(o.end));
+  if (after) out.push({ word: after[2], where: 'siguiente', text: text.slice(o.start, o.end + after[0].length), cat: e.cat });
+  return out;
 }
 
 /** Shows a sentence and its counterpart with the real text, until another sentence is clicked. */
@@ -655,6 +684,77 @@ function focusUnit(unitIdx, opt) { nav.focusUnit(unitIdx, opt); }
 
 // ------------------------------------------------------------------ manual masking
 
+/** Does the selection take in a coloured tag (its text has no braces: "ORG5")? */
+function _crossesTag(sel, pane) {
+  if (!sel || !sel.rangeCount) return false;
+  const r = sel.getRangeAt(0);
+  return Array.from(pane.querySelectorAll('.tk')).some(t => r.intersectsNode(t));
+}
+
+/** Adds a translator's term (the text of one side) to the project; with joinKey, as that entity. */
+function _addTerm(text, side, cat, joinKey, otherForm) {
+  const term = { id: uid('t'), cat, art: '', src: [], tgt: [] };
+  if (side === 'src') { term.src.push(text); if (otherForm) term.tgt.push(otherForm); }
+  else { term.tgt.push(text); if (otherForm) term.src.push(otherForm); }
+  const mask = state.project.mask;
+  const patch = { terms: (mask.terms || []).concat([term]) };
+  if (!mask.cats.includes(term.cat)) patch.cats = mask.cats.concat([term.cat]);
+  if (joinKey) patch.merges = Object.assign({}, mask.merges, { ['t:' + term.id]: joinKey });
+  setMask(patch);
+  return term;
+}
+
+// ------------------------------------------------------------------ "Senalar su pareja"
+
+/** The side where an entity is missing (or appears fewer times). */
+function _missingSide(e) {
+  if (e.status === 'nopair') return e.srcCount ? 'tgt' : 'src';
+  return e.srcCount < e.tgtCount ? 'src' : 'tgt';
+}
+
+/** From the card of an entity without its counterpart: the next text selected in the other sheet
+ *  becomes that entity (same tag), without a dialog. Escape or the button again cancels. */
+function startPick(e) {
+  endPick();
+  const side = _missingSide(e);
+  pick = { key: e.key, side };
+  gotoEntity(e);
+  const pane = panes[side];
+  pane.classList.add('picking');
+  const bar = el('div.pickbar#mask-pickbar', { role: 'status' },
+    el('span', 'Seleccione en ', el('b', side === 'src' ? 'el original' : 'la traducci\u00f3n'), ' el texto que corresponde a ',
+      el('span.tk.' + e.cat, e.cat + e.n), ' (' + mainForm(side === 'src' ? e.tgtForms : e.srcForms) + ').'),
+    el('span.grow'),
+    el('button.btn.sm', { onclick: endPick }, 'Cancelar'));
+  pane.parentNode.insertBefore(bar, pane);
+  renderList();
+}
+
+function endPick() {
+  if (!pick) return;
+  const pane = panes[pick.side];
+  if (pane) pane.classList.remove('picking');
+  const bar = document.getElementById('mask-pickbar');
+  if (bar) bar.remove();
+  pick = null;
+  if (state.view === 'mask' && state.session) renderList();
+}
+
+function onPickSelection(side) {
+  if (!pick || pick.side !== side || !state.session) return;
+  const sel = window.getSelection();
+  const text = sel ? sel.toString().replace(/\s+/g, ' ').trim() : '';
+  if (!text) return;
+  if (_crossesTag(sel, panes[side]) || /[{}]/.test(text)) { toast('La selecci\u00f3n incluye una etiqueta: seleccione solo el texto (o use \u00abVer original\u00bb).', 'warn', 6000); return; }
+  const e = state.session.ent.byKey.get(pick.key);
+  if (!e) { endPick(); return; }
+  sel.removeAllRanges();
+  endPick();
+  _addTerm(text, side, e.cat, e.key, '');
+  const now = state.session.ent.byKey.get(e.key);
+  toast('\u00ab' + text + '\u00bb es ahora ' + (now ? now.cat + now.n : e.cat + e.n) + ' en ' + (side === 'src' ? 'el original' : 'la traducci\u00f3n') + '.', 'ok');
+}
+
 async function maskSelection(preset) {
   if (!state.session) return;
   let text, side;
@@ -666,18 +766,19 @@ async function maskSelection(preset) {
     const node = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
     const pane = node && node.closest('.pane-body');
     side = pane === panes.src ? 'src' : (pane === panes.tgt ? 'tgt' : null);
+    if (pane && _crossesTag(sel, pane)) { toast('La selecci\u00f3n incluye una etiqueta: use \u00abVer original\u00bb para seleccionar el texto real.', 'warn', 6000); return; }
   }
   if (!side) { toast('Seleccione el texto dentro de una de las dos hojas.', 'warn'); return; }
   if (/\{|\}/.test(text)) { toast('La selecci\u00f3n incluye una etiqueta: use \u00abVer original\u00bb para seleccionar el texto real.', 'warn', 6000); return; }
   const catSel = el('select.inp', CATS.map(c => el('option', { value: c }, CAT_SINGULAR[c])));
-  catSel.value = 'X';
+  catSel.value = (preset && preset.cat) || 'X';
   const other = el('input.inp', { placeholder: side === 'src' ? 'Forma en la traducci\u00f3n (opcional)' : 'Forma en el original (opcional)' });
   // Where the selection is (to suggest the entity of the other language in the same paragraphs).
   const units = new Set();
   const model = side === 'src' ? state.session.src : state.session.tgt;
   const ft = _fold(text);
   for (const p of model.paras) if (_fold(p.text).includes(ft)) { const u = unitOf(state.session, side, p.id); if (u) units.add(u.idx); }
-  let catTouched = false, pairTouched = false;
+  let catTouched = !!(preset && preset.cat), pairTouched = false;
   const subj = () => ({ side, forms: [text].concat(other.value.trim() ? [] : []), units, cat: catTouched ? catSel.value : null, excludeKey: null });
   const picker = pairPicker(subj(), { allowNone: true, onChoose: (x) => { pairTouched = true; if (x && !catTouched) catSel.value = x.cat; } });
   if (picker.best && !catTouched) catSel.value = state.session.ent.byKey.get(picker.best).cat;
@@ -699,14 +800,7 @@ async function maskSelection(preset) {
     el('label', dict, ' Guardar tambi\u00e9n en mi diccionario personal (para todos los documentos)'));
   const r = await modal({ title: 'Enmascarar selecci\u00f3n', help: helpBtn('mask-selection'), width: '680px', body, buttons: [{ label: 'Cancelar', value: null }, { label: 'Enmascarar', kind: 'primary', value: 'ok' }] });
   if (r !== 'ok') return;
-  const term = { id: uid('t'), cat: catSel.value, art: '', src: [], tgt: [] };
-  if (side === 'src') { term.src.push(text); if (other.value.trim()) term.tgt.push(other.value.trim()); }
-  else { term.tgt.push(text); if (other.value.trim()) term.src.push(other.value.trim()); }
-  const mask = state.project.mask;
-  const patch = { terms: (mask.terms || []).concat([term]) };
-  if (!mask.cats.includes(term.cat)) patch.cats = mask.cats.concat([term.cat]);
-  if (picker.value) patch.merges = Object.assign({}, mask.merges, { ['t:' + term.id]: picker.value });
-  setMask(patch);
+  const term = _addTerm(text, side, catSel.value, picker.value || null, other.value.trim());
   if (dict.checked) {
     await saveDictItem({ cat: term.cat, art: term.art, en: state.project.srcLang === 'fr' ? [] : term.src, fr: state.project.srcLang === 'fr' ? term.src : [], es: term.tgt });
   }

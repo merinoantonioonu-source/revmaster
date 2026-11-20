@@ -184,6 +184,30 @@ async function main() {
     });
     ok(paired === 'ok:1.520', 'After Emparejar both figures are one entity without problems (' + paired + ')');
 
+    // "Senalar su pareja": from the card of "dos" (only in the translation), select "twice" in the original.
+    const dosCard = page.locator('#mask-entities .ent', { hasText: 'T: dos' }).first();
+    await dosCard.locator('button.pickbtn').click();
+    await page.waitForSelector('#mask-pickbar');
+    ok(await page.locator('#mask-src.picking').count() === 1 && /el original/.test(await page.textContent('#mask-pickbar')), 'Senalar su pareja waits for a selection in the original');
+    const tw = await page.evaluate(() => {
+      const w = document.createTreeWalker(document.querySelector('#mask-src'), NodeFilter.SHOW_TEXT);
+      let n;
+      while ((n = w.nextNode())) { const i = n.nodeValue.indexOf('twice'); if (i >= 0) { const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + 5); const b = r.getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height }; } }
+      return null;
+    });
+    await page.mouse.move(tw.x + 1, tw.y + tw.h / 2);
+    await page.mouse.down();
+    await page.mouse.move(tw.x + tw.w - 1, tw.y + tw.h / 2, { steps: 6 });
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+    const dos = await page.evaluate(async () => {
+      const { state } = await import('/app/js/state.js');
+      const e = state.session.ent.entities.find(x => Object.keys(x.tgtForms).includes('dos'));
+      return e ? e.status + ':' + Object.keys(e.srcForms).join('/') + ':' + e.tagSrc : 'none';
+    });
+    ok(/^ok:twice:\{NUM\d+\}$/.test(dos) && await page.locator('#mask-pickbar').count() === 0, 'The selected text joins that entity, with the same tag, and the mode ends (' + dos + ')');
+    await page.screenshot({ path: path.join(OUT, '4b-pick.png') });
+
     // 3) Review: injected findings (no AI here), card -> exact text and both sentences.
     await page.click('.step[data-view="review"]');
     await page.waitForSelector('#rv-modules .mchip');

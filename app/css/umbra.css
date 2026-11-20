@@ -517,3 +517,10 @@ table.grid.cmp td:last-child { text-align: right; font-weight: 700; width: 90px;
 .sentlist details.sys > summary { cursor: pointer; color: var(--text-muted); font-size: 12px; margin-bottom: 6px; }
 .ci-src { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .ci-src .btn.link { margin-left: auto; font-size: 12px; }
+/* "Senalar su pareja" (Enmascarar): the sheet where the counterpart is to be selected */
+.pickbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #fff4c2; border-bottom: 1px solid #f0d77a;
+  font-size: 13px; color: #3d3200; zoom: var(--ui-z); }
+.pickbar .tk { margin: 0 2px; }
+.pane-body.picking { box-shadow: inset 0 0 0 3px #f0c419; }
+.pane-body.picking .sheet { cursor: text; }
+.ent .where .pickbtn.on { background: #fff4c2; border-color: #f0c419; }
